@@ -6,11 +6,10 @@ typedef struct {
     float temp;
 } imu_data_t;
 
-struct ahrs_data
-{
-    float pitch, roll, yaw;
-    float gyro_z;
-};
+typedef struct {   
+    imu_data_t imu_data;
+    float euler[3];
+} ahrs_data_t;
 
 
 struct motor

@@ -39,10 +39,11 @@ class HAL_Motor {
         HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stdy_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin);
         HAL_Motor(MotorPosition position);
         ~HAL_Motor();
-        void update_target_rpm(int target_rpm);
+        void set_target_rpm(int target_rpm);
         void update_rpm();
         void setup_motor_dir(bool dir_forward);
         void set_pid_gains(int p, int i, int d);
+        int get_current_rpm();
 
     private:
         uint8_t pwm_pin;

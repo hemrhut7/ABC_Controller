@@ -1,5 +1,6 @@
 #include <Arduino.h>
-#include "hal/hal_imu.h"
+#include "processing/processing_ahrs.h"
+#include "processing/processing_motor.h"
 
 
 #define PRIORITY_SAFETY    25
@@ -13,37 +14,44 @@
 
 
 TaskHandle_t ControlTaskHandle;
-
-
 TaskHandle_t CommTaskHandle;
+
+Processing_Motor motor_controller;
+
 
 void Control_Task(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_CONTROLL);
 
     // [初始化]：在此初始化 IMU (MPU6050) 與 PID 參數
-    hal_imu_init();
-    // PID_Init();
+    processing_ahrs_init();
+    motor_controller.set_target_rpms(0, 0);
 
     for (;;) {
-        // --- 核心邏輯開始 ---
-        // 1. Read IMU
-        imu_data_t imu_data;
-        hal_imu_read(&imu_data);
+        processing_ahrs_update();
+        motor_controller.update_rpms();
+
+
+        float euler[3];
+        imu_data_t imu;
+        processing_ahrs_get_euler(euler);
+        processing_ahrs_get_imu(&imu);
 
         // Print out the values for verification
-        char print_buffer[256];
-        snprintf(print_buffer, sizeof(print_buffer),
-                 "Accel X: %.2f, Y: %.2f, Z: %.2f m/s^2\tGyro X: %.2f, Y: %.2f, Z: %.2f rad/s",
-                 imu_data.accl[0], imu_data.accl[1], imu_data.accl[2],
-                 imu_data.gyro[0], imu_data.gyro[1], imu_data.gyro[2]);
-        Serial.println(print_buffer);
+        int left_rpm = motor_controller.get_left_rpm();
+        int right_rpm = motor_controller.get_right_rpm();
 
-        // 2. Complementary Filter (Eigen Based)
+        // Print out the values for VOFA+
+        Serial.printf("%.2f,%.2f,%.2f,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+                      euler[0], euler[1], euler[2],
+                      left_rpm, right_rpm,
+                      imu.gyro[0], imu.gyro[1], imu.gyro[2],
+                      imu.accl[0], imu.accl[1], imu.accl[2]);
+
         // 3. Cascaded PID Calculation
         // 4. Output to LEDC (PWM)
         
-        // 模擬運算：Serial.println 在此處為罪行，正式開發請移除
+        
         
         // --- 核心邏輯結束 ---
 
@@ -71,8 +79,7 @@ void setup() {
     Serial.begin(115200);
 
     // 硬體初始化 (HAL 層)
-    // Motor_PWM_Init(); // LEDC 初始化
-    // Encoder_Init();   // PCNT 初始化
+    motor_controller.init();
 
     // 建立任務
     // 參數：函數名, 名稱, 堆棧, 參數, 優先級, Handle, 核心ID

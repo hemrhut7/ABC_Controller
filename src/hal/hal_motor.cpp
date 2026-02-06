@@ -66,7 +66,7 @@ void HAL_Motor::update_rpm() {
     current_rpm = dps * DPS_2_RPM;
 }
 
-void HAL_Motor::update_target_rpm(int target_rpm) {
+void HAL_Motor::set_target_rpm(int target_rpm) {
     last_target_rpm = target_rpm;  // maybe can be applied with LPF later
     int error = target_rpm - current_rpm;
     integral += error;
@@ -99,6 +99,10 @@ void HAL_Motor::set_pid_gains(int p, int i, int d) {
     p_gain = p;
     i_gain = i;
     d_gain = d;
+}
+
+int HAL_Motor::get_current_rpm() {
+    return current_rpm;
 }
 
 void setupPCNT() {
