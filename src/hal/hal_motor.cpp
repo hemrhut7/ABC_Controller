@@ -1,5 +1,4 @@
 #include "hal_motor.h"
-#include "type_defs.h"
 
 HAL_Motor::HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stdy_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin): 
 pwm_pin(pwm_pin), dir_pin1(dir_pin1), dir_pin2(dir_pin2), stdy_pin(stdy_pin), enc_a_pin(enc_a_pin), enc_b_pin(enc_b_pin) {
@@ -61,10 +60,9 @@ void HAL_Motor::getPCNTCount() {
     pcnt_counter_clear(pcnt_uint); // 讀取後清零
 }
 
-// should be call 100Hz
 void HAL_Motor::update_rpm() {
     getPCNTCount();
-    float dps = (float)count * DEG_PER_CNT * 100.0f;
+    float dps = (float)count * DEG_PER_CNT * 200.0f;
     current_rpm = dps * DPS_2_RPM;
 }
 

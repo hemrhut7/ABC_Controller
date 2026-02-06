@@ -8,4 +8,3 @@ typedef enum {
   WORKING,       // 慢閃
 } SYSTEM_STATE;
 
-#endif
