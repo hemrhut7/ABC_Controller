@@ -1,6 +1,7 @@
 #pragma once
 
 #include "hal/hal_motor.h"
+#include "hal/hal_type_define.h"
 
 class Processing_Motor {
 public:
@@ -10,8 +11,7 @@ public:
     void init();
     void set_target_rpms(int left_rpm, int right_rpm);
     void update_rpms();
-    int get_left_rpm();
-    int get_right_rpm();
+    void get_motor_state(motor_state_t *state);
 
 private:
     HAL_Motor motor_l;

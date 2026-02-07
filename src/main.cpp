@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "processing/processing_ahrs.h"
 #include "processing/processing_motor.h"
+#include "hal/hal_telemetry.h"
 
 
 #define PRIORITY_SAFETY    25
@@ -17,6 +18,8 @@ TaskHandle_t ControlTaskHandle;
 TaskHandle_t CommTaskHandle;
 
 Processing_Motor motor_controller;
+Processing_AHRS ahrs;
+Telemetry telemetry(Serial);
 
 
 void Control_Task(void *pvParameters) {
@@ -24,29 +27,12 @@ void Control_Task(void *pvParameters) {
     const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_CONTROLL);
 
     // [初始化]：在此初始化 IMU (MPU6050) 與 PID 參數
-    processing_ahrs_init();
+    ahrs.init();
     motor_controller.set_target_rpms(0, 0);
 
     for (;;) {
-        processing_ahrs_update();
+        ahrs.update();
         motor_controller.update_rpms();
-
-
-        float euler[3];
-        imu_data_t imu;
-        processing_ahrs_get_euler(euler);
-        processing_ahrs_get_imu(&imu);
-
-        // Print out the values for verification
-        int left_rpm = motor_controller.get_left_rpm();
-        int right_rpm = motor_controller.get_right_rpm();
-
-        // Print out the values for VOFA+
-        Serial.printf("%.2f,%.2f,%.2f,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
-                      euler[0], euler[1], euler[2],
-                      left_rpm, right_rpm,
-                      imu.gyro[0], imu.gyro[1], imu.gyro[2],
-                      imu.accl[0], imu.accl[1], imu.accl[2]);
 
         // 3. Cascaded PID Calculation
         // 4. Output to LEDC (PWM)
@@ -67,9 +53,23 @@ void Comm_Task(void *pvParameters) {
     // UART2_Init();
 
     for (;;) {
-        // 1. 處理遙控器 (Xbox/Gamepad) 封包
-        // 2. 將數據打包成 Binary 傳送至 VOFA+
-        // 3. 讀取與 RPi 通訊的 UART Buffer
+        ahrs_data_t ahrs_data;
+        motor_state_t motor_state;
+
+        ahrs.get_euler(ahrs_data.euler);
+        ahrs.get_imu(&ahrs_data.imu_data);
+        motor_controller.get_motor_state(&motor_state);
+
+        
+
+        // 將數據打包成 Binary 傳送至 VOFA+
+        telemetry.queue_vofa_data(ahrs_data.euler, motor_state.rpm_L, motor_state.target_rpm_L, motor_state.rpm_R, motor_state.target_rpm_R,
+                                  ahrs_data.imu_data.gyro, ahrs_data.imu_data.accl);
+        telemetry.send_data();
+                
+        // 讀取與 RPi 通訊的 UART Buffer
+        // 處理遙控器 (Xbox/Gamepad) 封包
+        // 藍芽/WIFI
         
         vTaskDelay(pdMS_TO_TICKS(PERIOD_COMM));
     }
@@ -80,6 +80,7 @@ void setup() {
 
     // 硬體初始化 (HAL 層)
     motor_controller.init();
+    telemetry.init();
 
     // 建立任務
     // 參數：函數名, 名稱, 堆棧, 參數, 優先級, Handle, 核心ID

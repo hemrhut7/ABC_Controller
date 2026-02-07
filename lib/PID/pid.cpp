@@ -1,4 +1,4 @@
-#include "hal_pid.h"
+#include "pid.h"
 
 void PID::setTunings(float kp, float ki, float kd) {
     this->kp = kp;

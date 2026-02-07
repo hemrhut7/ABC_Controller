@@ -12,8 +12,8 @@ typedef struct {
 } ahrs_data_t;
 
 
-struct motor
+typedef struct
 {
     int rpm_L, rpm_R;
     int target_rpm_L, target_rpm_R;
-};
+}motor_state_t;

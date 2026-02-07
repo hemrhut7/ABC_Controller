@@ -3,6 +3,8 @@
 
 #define LC_WINDOW_SIZE 200
 
+#include "LPF.h"
+
 class CPF {
 public:
     CPF(float pitch = 0, float roll = 0, float yaw = 0);
@@ -29,16 +31,6 @@ private:
     float bias_omg[3];
     float omg_threshold[3];
     
-    // LPF for accelerometer
-    struct LPF_3D {
-        LPF_3D(int fs, float f_cut);
-        void update(const float in[3], float out[3]);
-    private:
-        float a[2];
-        float b[3];
-        float x[3][3]; // [axis][n, n-1, n-2]
-        float y[3][3]; // [axis][n, n-1, n-2]
-    };
     LPF_3D lpf_acc;
 
     float K_bias;

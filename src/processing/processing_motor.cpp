@@ -24,10 +24,10 @@ void Processing_Motor::update_rpms() {
     motor_r.update_rpm();
 }
 
-int Processing_Motor::get_left_rpm() {
-    return motor_l.get_current_rpm();
-}
 
-int Processing_Motor::get_right_rpm() {
-    return motor_r.get_current_rpm();
+void Processing_Motor::get_motor_state(motor_state_t *state) {
+    state->rpm_L = motor_l.get_current_rpm();
+    state->rpm_R = motor_r.get_current_rpm();
+    state->target_rpm_L = motor_l.get_target_rpm();
+    state->target_rpm_R = motor_r.get_target_rpm();
 }

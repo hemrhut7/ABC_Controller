@@ -45,7 +45,7 @@ void HAL_Motor::init() {
     digitalWrite(stdy_pin, HIGH);
 
     count = 0;
-    last_time = millis();
+    motor_pid.reset();
 }
 
 HAL_Motor::~HAL_Motor() {
@@ -67,16 +67,10 @@ void HAL_Motor::update_rpm() {
 }
 
 void HAL_Motor::set_target_rpm(int target_rpm) {
-    last_target_rpm = target_rpm;  // maybe can be applied with LPF later
-    int error = target_rpm - current_rpm;
-    integral += error;
-    integral = constrain(integral, -100, 100);  // Anti-windup
-    int derivative = error - last_error;
-    last_error = error;
-
-    int pwm = p_gain * error + i_gain * integral + d_gain * derivative;
-    pwm = constrain(pwm, -255, 255) * dir_forward;
-    drive_moter(pwm);
+    last_target_rpm = target_rpm;
+    last_pwm_out += motor_pid.compute(target_rpm, current_rpm);
+    last_pwm_out = constrain(last_pwm_out, -255, 255);
+    drive_moter(last_pwm_out * dir_forward);
 }
 
 void HAL_Motor::drive_moter(int pmw) {
@@ -96,13 +90,15 @@ void HAL_Motor::setup_motor_dir(bool dir_forward) {
 }
 
 void HAL_Motor::set_pid_gains(int p, int i, int d) {
-    p_gain = p;
-    i_gain = i;
-    d_gain = d;
+    motor_pid.setTunings(p, i, d);
 }
 
 int HAL_Motor::get_current_rpm() {
     return current_rpm;
+}
+
+int HAL_Motor::get_target_rpm() {
+    return last_target_rpm;
 }
 
 void setupPCNT() {
