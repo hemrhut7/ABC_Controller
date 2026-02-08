@@ -1,6 +1,7 @@
 #pragma once
 
 typedef struct {
+    float timestamp;
     float gyro[3];
     float accl[3];
     float temp;
@@ -16,4 +17,10 @@ typedef struct
 {
     int rpm_L, rpm_R;
     int target_rpm_L, target_rpm_R;
-}motor_state_t;
+} motor_state_t;
+
+typedef struct
+{
+    ahrs_data_t ahrs_data;
+    motor_state_t motor_state;
+} ABC_state_t;

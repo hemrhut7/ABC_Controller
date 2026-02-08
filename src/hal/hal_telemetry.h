@@ -1,7 +1,9 @@
 #pragma once
 
-#include "ring_buffer.h"
 #include <Arduino.h>
+#include "ring_buffer.h"
+#include "hal_type_define.h"
+
 
 #define TELEMETRY_BUFFER_SIZE 1024
 
@@ -9,7 +11,7 @@ class Telemetry {
 public:
     Telemetry(HardwareSerial& serial);
     void init();
-    void queue_vofa_data(float euler[3], int rpm_L, int target_rpm_L, int rpm_R, int target_rpm_R, float gyro[3], float accl[3]);
+    void queue_vofa_data(ABC_state_t &ahrs_data);
     void send_data();
 
 private:

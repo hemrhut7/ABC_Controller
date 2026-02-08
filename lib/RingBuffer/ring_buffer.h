@@ -16,7 +16,7 @@ typedef struct {
 } RingBuffer_t;
 
 void RingBuffer_Init(RingBuffer_t *rb, uint8_t *buffer, size_t size);
-bool RingBuffer_Write(RingBuffer_t *rb, const uint8_t *data, size_t length);
+bool RingBuffer_Write(RingBuffer_t *rb, const uint8_t *data, size_t length, bool overwrite);
 bool RingBuffer_Read(RingBuffer_t *rb, uint8_t *data, size_t length);
 size_t RingBuffer_GetDataLength(const RingBuffer_t *rb);
 size_t RingBuffer_GetFreeSpace(const RingBuffer_t *rb);

@@ -5,7 +5,7 @@ pwm_pin(pwm_pin), dir_pin1(dir_pin1), dir_pin2(dir_pin2), stdy_pin(stdy_pin), en
     init();
 }
 
-HAL_Motor::HAL_Motor(MotorPosition position) {
+HAL_Motor::HAL_Motor(MotorPosition position, uint32_t period_ms) {
     if (position == LEFT_MOTOR) {
         pwm_pin = MOTOR_L_PWM_PIN;
         dir_pin1 = MOTOR_L_DIR1_PIN;
@@ -28,6 +28,7 @@ HAL_Motor::HAL_Motor(MotorPosition position) {
         pwm_channel = 1;
     }
     init();
+    update_rate_hz = 1000 / period_ms;
 }
 
 void HAL_Motor::init() {    
@@ -62,7 +63,8 @@ void HAL_Motor::getPCNTCount() {
 
 void HAL_Motor::update_rpm() {
     getPCNTCount();
-    float dps = (float)count * DEG_PER_CNT * 200.0f;
+    // dps = count * degrees_per_count * frequency
+    float dps = (float)count * DEG_PER_CNT * update_rate_hz;
     current_rpm = dps * DPS_2_RPM;
 }
 

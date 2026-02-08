@@ -1,6 +1,6 @@
 #include "processing_motor.h"
 
-Processing_Motor::Processing_Motor() : motor_l(LEFT_MOTOR), motor_r(RIGHT_MOTOR) {
+Processing_Motor::Processing_Motor(uint32_t period_ms) : motor_l(LEFT_MOTOR, period_ms), motor_r(RIGHT_MOTOR, period_ms) {
     // Constructor initializes the motors using member initializer list
 }
 
@@ -9,8 +9,6 @@ Processing_Motor::~Processing_Motor() {
 }
 
 void Processing_Motor::init() {
-    // The HAL_Motor objects are already initialized by their constructors.
-    // We can add additional setup here if needed.
     setupPCNT(); // This sets up the pulse counters for both motors.
 }
 

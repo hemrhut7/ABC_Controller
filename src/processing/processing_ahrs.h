@@ -6,13 +6,12 @@
 
 class Processing_AHRS {
 public:
-    Processing_AHRS();
+    Processing_AHRS(uint32_t period_ms);
     ~Processing_AHRS();
 
     void init();
     void update();
-    void get_euler(float euler[3]);
-    void get_imu(imu_data_t *data);
+    void get_ahrs_data(ahrs_data_t *data);
 
 private:
     CPF cpf;

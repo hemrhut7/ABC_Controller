@@ -23,8 +23,9 @@ namespace Vec {
     }
 }
 
-CPF::CPF(float pitch, float roll, float yaw) : lpf_acc(200, 5) {
-    time = -1.0;
+
+CPF::CPF(uint32_t period_ms) : lpf_acc(1000 / period_ms, 5) {
+    first_update = true;
     std::fill(pre_omg, pre_omg + 3, 0.0f);
     g0 = 9.80665f;
     weight = 0.01f;
@@ -32,16 +33,23 @@ CPF::CPF(float pitch, float roll, float yaw) : lpf_acc(200, 5) {
     gyro_error = 0.0f;
     enable_check_acc = true;
     
-    euler[0] = pitch;
-    euler[1] = roll;
-    euler[2] = yaw;
+    float euler[3] = {0};
     gen_dcm_by_euler(euler, dcm);
 
     lc_list_count = 0;
     std::fill(bias_omg, bias_omg + 3, 0.0f);
     std::fill(omg_threshold, omg_threshold + 3, 0.1f);
 
-    K_bias = 1.0f / 100.0f;
+    dt = period_ms * 1e-3f;
+    float fs = 1000.0f / period_ms;
+    K_bias = 1.0f / fs;
+    LC_WINDOW_SIZE = fs * LC_WINDOW_SEC;
+    LC_list = new float[LC_WINDOW_SIZE][3];
+    setInit((int)fs);
+}
+
+CPF::~CPF() {
+    delete[] LC_list;
 }
 
 void CPF::setInit(int fs) {
@@ -54,8 +62,6 @@ void CPF::setInit(int fs) {
     float accl_VRW = accl_VRW_ug_Hz_sqrt * 9.8e-6f; // to m/s/s^0.5
     float gyro_RRW = gyro_RRW_deg_hr_1_5 * (M_PI/180.0f) / pow(3600, 1.5); // to rad/s^1.5
 
-    float dt = 1.0f / fs;
-
     gyro_error = sqrt(pow(gyro_ARW, 2) * dt + pow(gyro_RRW, 2) * pow(dt, 3));
     acc_error = accl_VRW / g0 * sqrt(fs);
     weight = gyro_error / (gyro_error + acc_error);
@@ -67,11 +73,10 @@ void CPF::enableCheckACC(bool is_enable) {
     enable_check_acc = is_enable;
 }
 
-void CPF::update(float t, float omg[3], float acc[3]) {
-    if (time > 0) {
-        float dt = t - time;
-        if (dt <= 0) return;
-
+void CPF::update(float omg[3], float acc[3]) {
+    if (first_update) {
+        first_update = false;
+        
         if (lc_list_count < LC_WINDOW_SIZE) {
             std::copy(omg, omg + 3, LC_list[lc_list_count]);
             lc_list_count++;
@@ -128,7 +133,7 @@ void CPF::update(float t, float omg[3], float acc[3]) {
         euler[1] = r;
         gen_dcm_by_euler(euler, dcm);
     }
-    time = t;
+
     std::copy(omg, omg + 3, pre_omg);
     gen_euler_by_dcm(dcm, euler);
 }

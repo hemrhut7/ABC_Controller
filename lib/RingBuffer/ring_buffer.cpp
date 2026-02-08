@@ -8,9 +8,15 @@ void RingBuffer_Init(RingBuffer_t *rb, uint8_t *buffer, size_t size) {
     rb->tail = 0;
 }
 
-bool RingBuffer_Write(RingBuffer_t *rb, const uint8_t *data, size_t length) {
+bool RingBuffer_Write(RingBuffer_t *rb, const uint8_t *data, size_t length, bool overwrite) {
+    if (length > rb->size - 1) return false; // Data larger than buffer capacity
+
     if (RingBuffer_GetFreeSpace(rb) < length) {
-        return false; // Not enough space
+        if (!overwrite) return false; // Not enough space and overwrite not allowed
+
+        // Drop oldest data to make space
+        size_t needed = length - RingBuffer_GetFreeSpace(rb);
+        rb->tail = (rb->tail + needed) % rb->size;
     }
 
     for (size_t i = 0; i < length; i++) {

@@ -1,21 +1,26 @@
 #ifndef CPF_H
 #define CPF_H
 
-#define LC_WINDOW_SIZE 200
+#define LC_WINDOW_SEC 3
+#define LPF_FREQ_ACCL_CHECK 5
 
 #include "LPF.h"
+#include <Arduino.h>
+
 
 class CPF {
 public:
-    CPF(float pitch = 0, float roll = 0, float yaw = 0);
+    CPF(uint32_t period_ms);
+    ~CPF();
     void setInit(int fs = 100);
-    void update(float t, float omg[3], float acc[3]);
+    void update(float omg[3], float acc[3]);
     void getEuler(float euler[3]);
     void getBias(float bias[3]);
     void enableCheckACC(bool is_enable);
 
 private:
-    float time;
+    bool first_update = true;
+    float dt = 0.005f;
     float pre_omg[3];
     float g0;
     float weight;
@@ -26,8 +31,9 @@ private:
     float dcm[3][3];
     float euler[3];
 
-    float LC_list[LC_WINDOW_SIZE][3];
-    int lc_list_count;
+    float (*LC_list)[3];
+    uint16_t lc_list_count = 0;
+    uint16_t LC_WINDOW_SIZE = 0;
     float bias_omg[3];
     float omg_threshold[3];
     
