@@ -3,6 +3,7 @@
 #include "processing/prs_motor.h"
 #include "processing/prs_controll.h"
 #include "hal/hal_telemetry.h"
+#include "hal/hal_led.h"
 
 
 #define PRIORITY_SAFETY    25
@@ -34,6 +35,7 @@ TaskHandle_t CommTaskHandle;
 Processing_Motor motor(PERIOD_CONTROLL);
 Processing_AHRS ahrs(PERIOD_CONTROLL);
 Telemetry telemetry(Serial);
+HAL_LED system_led(LED_BUILTIN);
 
 Pitch_Controller pitch_ctrl(PITCH_KP, PITCH_KI, PITCH_KD);
 Rate_Controller rate_ctrl(RATE_KP, RATE_KI, RATE_KD);
@@ -44,6 +46,7 @@ void Control_Task(void *pvParameters) {
     const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_CONTROLL);
 
     // [初始化]：在此初始化 IMU (MPU6050) 與 PID 參數
+    system_led.set_state(INITIALIZING);
     ahrs.init();
     motor.set_target_rpms(0, 0);
     
@@ -51,6 +54,8 @@ void Control_Task(void *pvParameters) {
     pitch_ctrl.setOutputLimits(-300 * DEG_TO_RAD, 300 * DEG_TO_RAD); // 外環輸出為目標角速度 (deg/s)
     rate_ctrl.setOutputLimits(-300 * DEG_TO_RAD, 300 * DEG_TO_RAD);  // 內環輸出為馬達轉速 (RPM)
     yaw_ctrl.setOutputLimits(-100 * DEG_TO_RAD, 100 * DEG_TO_RAD);   // 轉向差速限制
+
+    system_led.set_state(WORKING);
 
     for (;;) {
         ahrs.update();
@@ -100,6 +105,8 @@ void Comm_Task(void *pvParameters) {
         // 將數據打包成 Binary 傳送至 VOFA+
         telemetry.queue_vofa_data(abc_state);
         telemetry.send_data();
+
+        system_led.update();
                 
         // 讀取與 RPi 通訊的 UART Buffer
         // 處理遙控器 (Xbox/Gamepad) 封包
