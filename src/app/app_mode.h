@@ -4,10 +4,11 @@
 #include "processing/prs_motor.h"
 #include "pid.h"
 #include "app_data_types.h"
+#include "hal/hal_storage.h"
 
 class AppMode {
 public:
-    AppMode(Processing_AHRS* ahrs, Processing_Motor* motor);
+    AppMode(Processing_AHRS* ahrs, Processing_Motor* motor, ConfigStore* config_store);
     void init();
     void update(float dt); // 必須傳入固定 dt
     void set_command(UserCommand_t cmd);
@@ -21,6 +22,7 @@ public:
 private:
     Processing_AHRS* _ahrs;
     Processing_Motor* _motor;
+    ConfigStore* _config_store;
     
     UserCommand_t _cmd;
     

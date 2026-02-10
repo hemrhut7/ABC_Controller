@@ -3,6 +3,7 @@
 #include "processing/prs_motor.h"
 #include "hal/hal_telemetry.h"
 #include "hal/hal_led.h"
+#include "hal/hal_storage.h"
 #include "app/app_mode.h"
 #include "app/app_script.h"
 
@@ -23,8 +24,9 @@ Processing_Motor motor(PERIOD_CONTROLL);
 Processing_AHRS ahrs(PERIOD_CONTROLL);
 Telemetry telemetry(Serial);
 HAL_LED system_led(LED_BUILTIN);
+ConfigStore config_store;
 
-AppMode app_mode(&ahrs, &motor);
+AppMode app_mode(&ahrs, &motor, &config_store);
 AppScript app_script(&app_mode);
 
 void Control_Task(void *pvParameters) {
@@ -71,6 +73,7 @@ void Comm_Task(void *pvParameters) {
         telemetry.send_data();
 
         system_led.update();
+        config_store.update();
                 
         // 讀取與 RPi 通訊的 UART Buffer
         // 支援 Serial, 未來可輕易擴充 BluetoothSerial 等

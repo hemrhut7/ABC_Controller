@@ -7,28 +7,30 @@
 // Factor = 0.0325 * 2 * 3.14159 / 60 ~= 0.003403
 #define RPM_TO_MS 0.003403f 
 
-AppMode::AppMode(Processing_AHRS* ahrs, Processing_Motor* motor) 
-    : _ahrs(ahrs), _motor(motor) {
+AppMode::AppMode(Processing_AHRS* ahrs, Processing_Motor* motor, ConfigStore* config_store) 
+    : _ahrs(ahrs), _motor(motor), _config_store(config_store) {
     _cmd.mode = MODE_STOP;
     _cmd.target_value = 0.0f;
     _cmd.target_yaw_rate = 0.0f;
 }
 
 void AppMode::init() {
-    // 初始化 PID 參數 (需根據實際機體調整)
+    // 初始化 ConfigStore 並讀取參數
+    _config_store->begin();
+    _config_store->load_config();
     
     // Level 4: Velocity Loop (外環) - 輸入 m/s, 輸出 Target Pitch (rad)
-    _pid_velocity.setTunings(0.2f, 0.01f, 0.0f);
+    _pid_velocity.setTunings(_config_store->data.velocity.p, _config_store->data.velocity.i, _config_store->data.velocity.d);
     _pid_velocity.setOutputLimits(-0.4f, 0.4f); // 限制最大傾角約 23 度
 
     // Level 3: Angle Loop (直立環) - 輸入 Pitch (rad), 輸出 Target Rate (rad/s)
-    _pid_angle.setTunings(4.5f, 0.0f, 0.1f);
+    _pid_angle.setTunings(_config_store->data.pitch.p, _config_store->data.pitch.i, _config_store->data.pitch.d);
     
     // Level 2: Rate Loop (角速度環) - 輸入 Rate (rad/s), 輸出 PWM/RPM 增量
-    _pid_rate.setTunings(1.2f, 15.0f, 0.01f);
+    _pid_rate.setTunings(_config_store->data.rate.p, _config_store->data.rate.i, _config_store->data.rate.d);
     
     // Yaw Loop (轉向環)
-    _pid_yaw.setTunings(1.0f, 0.0f, 0.0f);
+    _pid_yaw.setTunings(_config_store->data.yaw.p, _config_store->data.yaw.i, _config_store->data.yaw.d);
 }
 
 void AppMode::set_command(UserCommand_t cmd) {
@@ -120,9 +122,22 @@ void AppMode::update(float dt) {
 
 void AppMode::set_pid_gains(uint8_t pid_id, float kp, float ki, float kd) {
     switch (pid_id) {
-        case 0: _pid_velocity.setTunings(kp, ki, kd); break;
-        case 1: _pid_angle.setTunings(kp, ki, kd); break;
-        case 2: _pid_rate.setTunings(kp, ki, kd); break;
-        case 3: _pid_yaw.setTunings(kp, ki, kd); break;
+        case 0: 
+            _pid_velocity.setTunings(kp, ki, kd); 
+            _config_store->data.velocity = {kp, ki, kd};
+            break;
+        case 1: 
+            _pid_angle.setTunings(kp, ki, kd); 
+            _config_store->data.pitch = {kp, ki, kd};
+            break;
+        case 2: 
+            _pid_rate.setTunings(kp, ki, kd); 
+            _config_store->data.rate = {kp, ki, kd};
+            break;
+        case 3: 
+            _pid_yaw.setTunings(kp, ki, kd); 
+            _config_store->data.yaw = {kp, ki, kd};
+            break;
     }
+    _config_store->save_config();
 }
