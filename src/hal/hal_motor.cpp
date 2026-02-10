@@ -1,5 +1,10 @@
 #include "hal_motor.h"
 
+// 死區補償：馬達在低 PWM 時因靜摩擦力無法轉動，需補償基礎電壓
+#define MOTOR_DEADZONE 0  // 建議根據實測調整 (通常為 10~30)
+// 前饋增益：V = Kv * RPM，減輕 PID 負擔
+#define MOTOR_KV       0.0f 
+
 HAL_Motor::HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stdy_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin): 
 pwm_pin(pwm_pin), dir_pin1(dir_pin1), dir_pin2(dir_pin2), stdy_pin(stdy_pin), enc_a_pin(enc_a_pin), enc_b_pin(enc_b_pin) {
     init();
@@ -71,8 +76,21 @@ void HAL_Motor::update_rpm() {
 
 void HAL_Motor::set_target_rpm(int target_rpm) {
     last_target_rpm = target_rpm;
-    last_pwm_out = motor_pid.compute(dt, target_rpm, current_rpm);
-    last_pwm_out = constrain(last_pwm_out, -255, 255);
+    
+    // 1. PID 計算
+    float output = motor_pid.compute(dt, target_rpm, current_rpm);
+
+    // 2. 前饋控制 (Feedforward)
+    output += target_rpm * MOTOR_KV;
+
+    // 3. 死區補償 (Deadzone Compensation)
+    if (target_rpm != 0) {
+        if (output > 0) output += MOTOR_DEADZONE;
+        else if (output < 0) output -= MOTOR_DEADZONE;
+    }
+
+    // 4. 輸出限制
+    last_pwm_out = constrain(output, -255, 255);
     drive_moter(last_pwm_out * dir_forward);
 }
 
