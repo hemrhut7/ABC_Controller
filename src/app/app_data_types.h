@@ -7,6 +7,7 @@ typedef enum {
     MODE_ANGLE,         // 3. 控制傾角 (最常用的調試模式)
     MODE_VELOCITY,      // 4. 控制前進速度 (加上速度環)
     MODE_REMOTE,        // 5. 綜合遙控 (速度 + 轉向)
+    MODE_FREE,          // 6. 自由模式 (無動力/滑行)
 } Mode_t;
 
 typedef struct {

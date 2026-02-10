@@ -52,7 +52,7 @@ void HAL_Motor::init() {
     digitalWrite(stdy_pin, HIGH);
 
     count = 0;
-    motor_pid.reset();
+    pid.reset();
 }
 
 HAL_Motor::~HAL_Motor() {
@@ -78,7 +78,7 @@ void HAL_Motor::set_target_rpm(int target_rpm) {
     last_target_rpm = target_rpm;
     
     // 1. PID 計算
-    float output = motor_pid.compute(dt, target_rpm, current_rpm);
+    float output = pid.compute(dt, target_rpm, current_rpm);
 
     // 2. 前饋控制 (Feedforward)
     output += target_rpm * MOTOR_KV;
@@ -111,7 +111,19 @@ void HAL_Motor::setup_motor_dir(bool dir_forward) {
 }
 
 void HAL_Motor::set_pid_gains(int p, int i, int d) {
-    motor_pid.setTunings(p, i, d);
+    pid.setTunings(p, i, d);
+}
+
+void HAL_Motor::set_enable(bool enable) {
+    if (is_enable == enable) return;
+    is_enable = enable;
+    if (enable) {
+        digitalWrite(stdy_pin, HIGH);
+        pid.reset();
+    } else {
+        digitalWrite(stdy_pin, LOW); // 關閉 H-Bridge (高阻抗/滑行)
+        ledcWrite(pwm_channel, 0);   // 確保 PWM 為 0
+    }
 }
 
 int HAL_Motor::get_current_rpm() {

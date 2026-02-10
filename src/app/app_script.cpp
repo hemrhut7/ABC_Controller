@@ -45,12 +45,12 @@ void AppScript::parse_packet(const String& packet) {
     else if (cmd_line.startsWith("MODE")) {
         int mode;
         if (sscanf(cmd_line.c_str(), "MODE %d", &mode) == 1) {
-            // 安全檢查: Mode 範圍 (0-5)
-            if (mode >= 0 && mode <= 5) {
+            // 安全檢查: Mode 範圍 (0-6)
+            if (mode >= 0 && mode <= 6) {
                 _app_mode->set_mode((Mode_t)mode);
                 Serial.printf("[OK] Mode Set: %d\n", mode);
             } else {
-                Serial.println("[ERR] Invalid Mode (0-5)");
+                Serial.println("[ERR] Invalid Mode (0-6)");
             }
         } else {
             Serial.println("[ERR] Invalid MODE format. Usage: MODE <id>");

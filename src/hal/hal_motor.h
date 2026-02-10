@@ -44,6 +44,7 @@ class HAL_Motor {
         void update_rpm();
         void setup_motor_dir(bool dir_forward);
         void set_pid_gains(int p, int i, int d);
+        void set_enable(bool enable);
         int get_current_rpm();
         int get_target_rpm();
 
@@ -63,10 +64,11 @@ class HAL_Motor {
         int last_target_rpm = 0;
         int current_rpm = 0;
 
-        PID motor_pid;
+        PID pid;
         int dir_forward = 1;
         pcnt_unit_t pcnt_uint = PCNT_UNIT_0;  // Default to 0 for left motor, 1 for right motor
         uint8_t pwm_channel = 0;
+        bool is_enable = true;
 
         void init();
         void getPCNTCount();

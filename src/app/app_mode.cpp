@@ -38,9 +38,19 @@ void AppMode::set_command(UserCommand_t cmd) {
 }
 
 void AppMode::set_mode(Mode_t mode) {
+    if (_cmd.mode == mode) return; // 模式相同則不執行
+
     _cmd.mode = mode;
-    // 切換模式時重置 PID 積分項是個好習慣，視需求添加
-    // _pid_velocity.reset();
+
+    _pid_velocity.reset();
+    _pid_angle.reset();
+    _pid_rate.reset();
+    _pid_yaw.reset();
+
+    if (_cmd.mode == MODE_FREE)
+        _motor->set_enable(false);
+    else
+        _motor->set_enable(true);
 }
 
 void AppMode::set_target_val(float val) {
@@ -78,7 +88,7 @@ void AppMode::update(float dt) {
     }
 
     // Level 3: Angle Loop (直立環)
-    if (_cmd.mode >= MODE_ANGLE) {
+    if (_cmd.mode >= MODE_ANGLE && _cmd.mode != MODE_FREE) {
         // 輸入：目標角度，輸出：目標角速度
         _target_pitch_rate = _pid_angle.compute(dt, _target_pitch, current_pitch);
     } 
@@ -87,7 +97,7 @@ void AppMode::update(float dt) {
     }
 
     // Level 2: Rate Loop (角速度/阻尼環)
-    if (_cmd.mode >= MODE_RATE) {
+    if (_cmd.mode >= MODE_RATE && _cmd.mode != MODE_FREE) {
         // 輸入：目標角速度，輸出：馬達 PWM 或 RPM 增量
         _output_balance = _pid_rate.compute(dt, _target_pitch_rate, current_gyro_y);
     }

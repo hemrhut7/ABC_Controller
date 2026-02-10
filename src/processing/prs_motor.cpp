@@ -17,6 +17,11 @@ void Processing_Motor::set_target_rpms(int left_rpm, int right_rpm) {
     motor_r.set_target_rpm(right_rpm);
 }
 
+void Processing_Motor::set_enable(bool enable) {
+    motor_l.set_enable(enable);
+    motor_r.set_enable(enable);
+}
+
 void Processing_Motor::update_rpms() {
     motor_l.update_rpm();
     motor_r.update_rpm();
