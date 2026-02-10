@@ -45,6 +45,11 @@ void AppMode::set_target_val(float val) {
     _cmd.target_value = val;
 }
 
+void AppMode::set_target(float val, float yaw) {
+    _cmd.target_value = val;
+    _cmd.target_yaw_rate = yaw;
+}
+
 void AppMode::update(float dt) {
     // 1. 獲取狀態 (State Estimation)
     ahrs_data_t ahrs_state;

@@ -13,7 +13,6 @@ Processing_AHRS::~Processing_AHRS() {
 void Processing_AHRS::init()
 {
     hal_imu_init();
-    cpf.setInit(200); // 200 Hz
 }
 
 void Processing_AHRS::update()

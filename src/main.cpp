@@ -4,6 +4,7 @@
 #include "hal/hal_telemetry.h"
 #include "hal/hal_led.h"
 #include "app/app_mode.h"
+#include "app/app_script.h"
 
 
 #define PRIORITY_SAFETY    25
@@ -24,14 +25,13 @@ Telemetry telemetry(Serial);
 HAL_LED system_led(LED_BUILTIN);
 
 AppMode app_mode(&ahrs, &motor);
+AppScript app_script(&app_mode);
 
 void Control_Task(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_CONTROLL);
 
-    // [初始化]：在此初始化 IMU (MPU6050) 與 PID 參數
     system_led.set_state(INITIALIZING);
-    ahrs.init();
     motor.set_target_rpms(0, 0);
     app_mode.init();
     
@@ -73,9 +73,9 @@ void Comm_Task(void *pvParameters) {
         system_led.update();
                 
         // 讀取與 RPi 通訊的 UART Buffer
-        // 處理遙控器 (Xbox/Gamepad) 封包
-        // 藍芽/WIFI
-        
+        // 支援 Serial, 未來可輕易擴充 BluetoothSerial 等
+        app_script.check_serial(Serial);
+
         vTaskDelay(pdMS_TO_TICKS(PERIOD_COMM));
     }
 }

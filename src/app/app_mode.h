@@ -13,6 +13,7 @@ public:
     void set_command(UserCommand_t cmd);
     void set_mode(Mode_t mode);
     void set_target_val(float val);
+    void set_target(float val, float yaw);
     
     // 用於 Tuning 的接口
     void set_pid_gains(uint8_t pid_id, float kp, float ki, float kd);
