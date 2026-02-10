@@ -29,6 +29,7 @@ HAL_Motor::HAL_Motor(MotorPosition position, uint32_t period_ms) {
     }
     init();
     update_rate_hz = 1000 / period_ms;
+    dt = (float)period_ms * 1e-3f;
 }
 
 void HAL_Motor::init() {    
@@ -65,12 +66,12 @@ void HAL_Motor::update_rpm() {
     getPCNTCount();
     // dps = count * degrees_per_count * frequency
     float dps = (float)count * DEG_PER_CNT * update_rate_hz;
-    current_rpm = dps * DPS_2_RPM;
+    current_rpm = dps * DPS_2_RPM * dir_forward;
 }
 
 void HAL_Motor::set_target_rpm(int target_rpm) {
     last_target_rpm = target_rpm;
-    last_pwm_out += motor_pid.compute(target_rpm, current_rpm);
+    last_pwm_out = motor_pid.compute(dt, target_rpm, current_rpm);
     last_pwm_out = constrain(last_pwm_out, -255, 255);
     drive_moter(last_pwm_out * dir_forward);
 }

@@ -55,6 +55,7 @@ class HAL_Motor {
         uint8_t enc_a_pin;
         uint8_t enc_b_pin;
         uint16_t update_rate_hz = 100;
+        float dt = 1e-2f;
 
         volatile uint32_t last_time = 0;
         int16_t count;

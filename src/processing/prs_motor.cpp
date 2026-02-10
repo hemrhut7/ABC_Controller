@@ -1,4 +1,4 @@
-#include "processing_motor.h"
+#include "prs_motor.h"
 
 Processing_Motor::Processing_Motor(uint32_t period_ms) : motor_l(LEFT_MOTOR, period_ms), motor_r(RIGHT_MOTOR, period_ms) {
     // Constructor initializes the motors using member initializer list
