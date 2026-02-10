@@ -224,16 +224,16 @@ void Adafruit_MPU6050::setAccelerometerRange(mpu6050_accel_range_t new_range) {
   switch (new_range)
   {
   case MPU6050_RANGE_16_G:
-    accl_sf = 1 / 2048.0f;
+    accl_sf = SENSORS_GRAVITY_STANDARD / 2048.0f;
     break;
   case MPU6050_RANGE_8_G:
-    accl_sf = 1 / 4096.0f;
+    accl_sf = SENSORS_GRAVITY_STANDARD / 4096.0f;
     break;
   case MPU6050_RANGE_4_G:
-    accl_sf = 1 / 8192.0f;
+    accl_sf = SENSORS_GRAVITY_STANDARD / 8192.0f;
     break;
   case MPU6050_RANGE_2_G:
-    accl_sf = 1 / 16384.0f;  
+    accl_sf = SENSORS_GRAVITY_STANDARD / 16384.0f;  
     break;
   default:
     break;
@@ -272,16 +272,16 @@ void Adafruit_MPU6050::setGyroRange(mpu6050_gyro_range_t new_range) {
   switch (new_range)
   {
   case MPU6050_RANGE_2000_DEG:
-    gyro_sf = 1 / 16.4f;
+    gyro_sf = SENSORS_DPS_TO_RADS / 16.4f;
     break;
   case MPU6050_RANGE_1000_DEG:
-    gyro_sf = 1 / 32.8f;
+    gyro_sf = SENSORS_DPS_TO_RADS / 32.8f;
     break;
   case MPU6050_RANGE_500_DEG:
-    gyro_sf = 1 / 65.5f;
+    gyro_sf = SENSORS_DPS_TO_RADS / 65.5f;
     break;
   case MPU6050_RANGE_250_DEG:
-    gyro_sf = 1 / 131.0f;  
+    gyro_sf = SENSORS_DPS_TO_RADS / 131.0f;
     break;
   default:
     break;

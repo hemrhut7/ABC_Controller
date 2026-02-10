@@ -5,6 +5,7 @@
 const uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7f};
 
 Telemetry::Telemetry(HardwareSerial& serial) : serial_port(serial) {
+    spinlock = portMUX_INITIALIZER_UNLOCKED;
 }
 
 void Telemetry::init() {
@@ -30,18 +31,27 @@ void Telemetry::queue_vofa_data(ABC_state_t &abc_state) {
     data_packet[12] = abc_state.ahrs_data.imu_data.accl[1];
     data_packet[13] = abc_state.ahrs_data.imu_data.accl[2];
 
+    portENTER_CRITICAL(&spinlock);
     RingBuffer_Write(&rb, (uint8_t*)data_packet, sizeof(data_packet), true);
     RingBuffer_Write(&rb, vofa_tail, sizeof(vofa_tail), true);
+    portEXIT_CRITICAL(&spinlock);
 }
 
 void Telemetry::send_data() {
+    uint8_t temp_buffer[256]; // Send in chunks
+    size_t to_read = 0;
+
+    portENTER_CRITICAL(&spinlock);
     size_t data_len = RingBuffer_GetDataLength(&rb);
     if (data_len > 0) {
-        uint8_t temp_buffer[256]; // Send in chunks
-        size_t to_read = data_len > sizeof(temp_buffer) ? sizeof(temp_buffer) : data_len;
-        
-        if (RingBuffer_Read(&rb, temp_buffer, to_read)) {
-            serial_port.write(temp_buffer, to_read);
+        size_t len = data_len > sizeof(temp_buffer) ? sizeof(temp_buffer) : data_len;
+        if (RingBuffer_Read(&rb, temp_buffer, len)) {
+            to_read = len;
         }
+    }
+    portEXIT_CRITICAL(&spinlock);
+
+    if (to_read > 0) {
+        serial_port.write(temp_buffer, to_read);
     }
 }

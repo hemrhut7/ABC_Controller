@@ -11,11 +11,12 @@ class Telemetry {
 public:
     Telemetry(HardwareSerial& serial);
     void init();
-    void queue_vofa_data(ABC_state_t &ahrs_data);
+    void queue_vofa_data(ABC_state_t &abc_state);
     void send_data();
 
 private:
     RingBuffer_t rb;
     uint8_t buffer[TELEMETRY_BUFFER_SIZE];
     HardwareSerial& serial_port;
+    portMUX_TYPE spinlock;
 };

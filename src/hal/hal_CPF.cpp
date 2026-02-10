@@ -75,63 +75,59 @@ void CPF::enableCheckACC(bool is_enable) {
 
 void CPF::update(float omg[3], float acc[3]) {
     if (first_update) {
-        first_update = false;
-        
         if (lc_list_count < LC_WINDOW_SIZE) {
             std::copy(omg, omg + 3, LC_list[lc_list_count]);
             lc_list_count++;
         } else {
-            if (lc_list_count == LC_WINDOW_SIZE) {
-                for(int i=0; i<3; ++i) {
-                    float sum = 0;
-                    for(int j=0; j < LC_WINDOW_SIZE; ++j) {
-                        sum += LC_list[j][i];
-                    }
-                    bias_omg[i] = sum / LC_WINDOW_SIZE;
+            for(int i=0; i<3; ++i) {
+                float sum = 0;
+                for(int j=0; j < LC_WINDOW_SIZE; ++j) {
+                    sum += LC_list[j][i];
                 }
-                lc_list_count++; // Increment to prevent re-calculation
+                bias_omg[i] = sum / LC_WINDOW_SIZE;
             }
-            
-            float avg_omg[3];
-            Vec::add(omg, pre_omg, avg_omg);
-            Vec::scale(avg_omg, 0.5f, avg_omg);
-            
-            float vec_rotation[3];
-            Vec::sub(avg_omg, bias_omg, vec_rotation);
-            Vec::scale(vec_rotation, dt, vec_rotation);
-
-            rotate_dcm_by_vec_b(dcm, vec_rotation);
-            
-            float current_w = 0.0f;
-            check_acc(acc, current_w);
-            current_w *= weight;
-            
-            if (current_w > 0) {
-                float g_b[3] = {-dcm[2][0], -dcm[2][1], -dcm[2][2]};
-                float acc_norm_val = norm(acc);
-                if (acc_norm_val > 1e-6) {
-                    float acc_n[3];
-                    Vec::scale(acc, 1.0f / acc_norm_val, acc_n);
-
-                    float error_vec[3];
-                    cross_product(g_b, acc_n, error_vec);
-                    
-                    float correction_vec[3];
-                    Vec::scale(error_vec, current_w, correction_vec);
-                    rotate_dcm_by_vec_b(dcm, correction_vec);
-                    
-                    float bias_update[3];
-                    Vec::scale(error_vec, -current_w * K_bias, bias_update);
-                    Vec::add(bias_omg, bias_update, bias_omg);
-                }
-            }
+            float p, r;
+            accLeveling(acc, p, r);
+            euler[0] = p;
+            euler[1] = r;
+            gen_dcm_by_euler(euler, dcm);
+            first_update = false;
         }
-    } else {
-        float p, r;
-        accLeveling(acc, p, r);
-        euler[0] = p;
-        euler[1] = r;
-        gen_dcm_by_euler(euler, dcm);
+        return;
+    }
+
+    float avg_omg[3];
+    Vec::add(omg, pre_omg, avg_omg);
+    Vec::scale(avg_omg, 0.5f, avg_omg);
+    
+    float vec_rotation[3];
+    Vec::sub(avg_omg, bias_omg, vec_rotation);
+    Vec::scale(vec_rotation, dt, vec_rotation);
+
+    rotate_dcm_by_vec_b(dcm, vec_rotation);
+    
+    float current_w = 0.0f;
+    check_acc(acc, current_w);
+    current_w *= weight;
+    
+    if (current_w > 0) {
+        float g_b[3] = {-dcm[2][0], -dcm[2][1], -dcm[2][2]};
+        float acc_norm_val = norm(acc);
+        if (acc_norm_val > 1e-6) {
+            float acc_n[3];
+            Vec::scale(acc, 1.0f / acc_norm_val, acc_n);
+
+            float error_vec[3];
+            cross_product(g_b, acc_n, error_vec);
+            
+            float correction_vec[3];
+            Vec::scale(error_vec, current_w, correction_vec);
+            rotate_dcm_by_vec_b(dcm, correction_vec);
+            
+            float bias_update[3];
+            Vec::scale(error_vec, -current_w * K_bias, bias_update);
+            Vec::add(bias_omg, bias_update, bias_omg);
+        }
     }
 
     std::copy(omg, omg + 3, pre_omg);
