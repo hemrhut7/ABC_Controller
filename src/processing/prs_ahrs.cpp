@@ -17,6 +17,8 @@ void Processing_AHRS::init()
 
 void Processing_AHRS::update()
 {
+    if (!hal_imu_healthy()) return;
+    
     hal_imu_read(&ahrs_data.imu_data);
     cpf.update(ahrs_data.imu_data.gyro, ahrs_data.imu_data.accl);
     cpf.getEuler(ahrs_data.euler);

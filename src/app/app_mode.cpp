@@ -31,6 +31,8 @@ void AppMode::init() {
     
     // Yaw Loop (轉向環)
     _pid_yaw.setTunings(_config_store->data.yaw.p, _config_store->data.yaw.i, _config_store->data.yaw.d);
+
+    set_target_val(0.0f);
 }
 
 void AppMode::set_command(UserCommand_t cmd) {

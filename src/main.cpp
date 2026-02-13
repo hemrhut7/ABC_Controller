@@ -6,6 +6,7 @@
 #include "hal/hal_storage.h"
 #include "app/app_mode.h"
 #include "app/app_script.h"
+#include "app/app_fail_safe.h"
 
 
 #define PRIORITY_SAFETY    25
@@ -28,20 +29,14 @@ ConfigStore config_store;
 
 AppMode app_mode(&ahrs, &motor, &config_store);
 AppScript app_script(&app_mode);
+Failsafe failsafe;
+
+
+// 1. 控制任務 (Core 1)
 
 void Control_Task(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_CONTROLL);
-
-    system_led.set_state(INITIALIZING);
-    motor.set_target_rpms(0, 0);
-    app_mode.init();
-    
-    // Default to Pitch Mode (Balancing at 0 degrees)
-    app_mode.set_mode(MODE_ANGLE);
-    app_mode.set_target_val(0.0f);
-
-    system_led.set_state(WORKING);
 
     for (;;) {
         ahrs.update();
@@ -51,6 +46,12 @@ void Control_Task(void *pvParameters) {
         // app_mode 內部會自動獲取 ahrs 和 motor 的數據並計算
         // 計算結果會直接寫入 motor 物件的 target_rpm
         app_mode.update(PERIOD_CONTROLL * 0.001f);
+
+        ABC_state_t abc_state;
+        ahrs.get_ahrs_data(&abc_state.ahrs_data);
+        motor.get_motor_state(&abc_state.motor_state);
+        failsafe.check(abc_state.ahrs_data.euler[0], abc_state.ahrs_data.imu_data.gyro[0],
+                       abc_state.motor_state.rpm_L, abc_state.motor_state.rpm_R, millis());
 
         vTaskDelayUntil(&xLastWakeTime, xFrequency);  // 確保精確的執行頻率
     }
@@ -69,7 +70,7 @@ void Comm_Task(void *pvParameters) {
         motor.get_motor_state(&abc_state.motor_state);
 
         // 將數據打包成 Binary 傳送至 VOFA+
-        telemetry.queue_vofa_data(abc_state);
+        telemetry.queue_vofa_data(abc_state, failsafe.get_loop_time_ms());
         telemetry.send_data();
 
         system_led.update();
@@ -84,11 +85,19 @@ void Comm_Task(void *pvParameters) {
 }
 
 void setup() {
-    Serial.begin(115200);
+    system_led.set_state(INITIALIZING);
 
-    // 硬體初始化 (HAL 層)
-    motor.init();
+    Serial.begin(115200);
+    config_store.begin();
+    ahrs.init();
+    motor.init();    
     telemetry.init();
+
+    app_mode.init();
+    app_mode.set_mode(MODE_FREE);
+    app_mode.set_target_val(0.0f);
+
+    system_led.set_state(WORKING);
 
     // 建立任務 參數：函數名, 名稱, 堆棧, 參數, 優先級, Handle, 核心ID
     // Core 1   

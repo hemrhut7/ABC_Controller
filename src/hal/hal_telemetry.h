@@ -11,7 +11,7 @@ class Telemetry {
 public:
     Telemetry(HardwareSerial& serial);
     void init();
-    void queue_vofa_data(ABC_state_t &abc_state);
+    void queue_vofa_data(ABC_state_t &abc_state, uint32_t loop_time_ms);
     void send_data();
 
 private:

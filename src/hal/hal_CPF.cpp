@@ -33,8 +33,8 @@ CPF::CPF(uint32_t period_ms) : lpf_acc(1000 / period_ms, 5) {
     gyro_error = 0.0f;
     enable_check_acc = true;
     
-    float euler[3] = {0};
-    gen_dcm_by_euler(euler, dcm);
+    std::fill(euler, euler + 3, 0.0f); // 初始化成員變數 euler，而非宣告區域變數
+    gen_dcm_by_euler(this->euler, dcm);
 
     lc_list_count = 0;
     std::fill(bias_omg, bias_omg + 3, 0.0f);
@@ -90,6 +90,7 @@ void CPF::update(float omg[3], float acc[3]) {
             accLeveling(acc, p, r);
             euler[0] = p;
             euler[1] = r;
+            euler[2] = 0.0f; // 確保 Yaw 被初始化
             gen_dcm_by_euler(euler, dcm);
             first_update = false;
         }
@@ -210,8 +211,8 @@ void CPF::rotate_dcm_by_vec_b(float dcm[3][3], const float vec[3]) {
     float s = sin(theta);
     float c = 1 - cos(theta);
     
-    float R_update[3][3];
-    for(int i=0; i<3; ++i) R_update[i][i] = 1.0;
+    float R_update[3][3] = {0};
+    for(int i=0; i<3; ++i) R_update[i][i] = 1.0f;
 
     float sk_w_sq[3][3];
     mat_mult(sk_w, sk_w, sk_w_sq);

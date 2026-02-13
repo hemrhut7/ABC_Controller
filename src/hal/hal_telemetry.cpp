@@ -12,14 +12,14 @@ void Telemetry::init() {
     RingBuffer_Init(&rb, buffer, TELEMETRY_BUFFER_SIZE);
 }
 
-void Telemetry::queue_vofa_data(ABC_state_t &abc_state) {
+void Telemetry::queue_vofa_data(ABC_state_t &abc_state, uint32_t loop_time_ms) {
     // Pack data as floats for VOFA+
-    float data_packet[14];
+    float data_packet[15];
     float now = abc_state.ahrs_data.imu_data.timestamp;
     data_packet[0] = now;
-    data_packet[1] = abc_state.ahrs_data.euler[0];
-    data_packet[2] = abc_state.ahrs_data.euler[1];
-    data_packet[3] = abc_state.ahrs_data.euler[2];
+    data_packet[1] = abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
+    data_packet[2] = abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
+    data_packet[3] = abc_state.ahrs_data.euler[2] * RAD_TO_DEG;
     data_packet[4] = (float)abc_state.motor_state.rpm_L;
     data_packet[5] = (float)abc_state.motor_state.target_rpm_L;
     data_packet[6] = (float)abc_state.motor_state.rpm_R;
@@ -30,6 +30,7 @@ void Telemetry::queue_vofa_data(ABC_state_t &abc_state) {
     data_packet[11] = abc_state.ahrs_data.imu_data.accl[0];
     data_packet[12] = abc_state.ahrs_data.imu_data.accl[1];
     data_packet[13] = abc_state.ahrs_data.imu_data.accl[2];
+    data_packet[14] = (float)loop_time_ms;
 
     portENTER_CRITICAL(&spinlock);
     RingBuffer_Write(&rb, (uint8_t*)data_packet, sizeof(data_packet), true);

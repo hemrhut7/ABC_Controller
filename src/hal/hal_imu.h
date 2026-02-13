@@ -7,7 +7,7 @@
 
 
 void hal_imu_init();
-bool healthy();
+bool hal_imu_healthy();
 void hal_imu_read(imu_data_t *data);
 
 #endif // HAL_IMU_H

@@ -10,6 +10,7 @@ Processing_Motor::~Processing_Motor() {
 
 void Processing_Motor::init() {
     setupPCNT(); // This sets up the pulse counters for both motors.
+    set_target_rpms(0, 0);
 }
 
 void Processing_Motor::set_target_rpms(int left_rpm, int right_rpm) {
