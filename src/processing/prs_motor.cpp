@@ -35,3 +35,8 @@ void Processing_Motor::get_motor_state(motor_state_t *state) {
     state->target_rpm_L = motor_l.get_target_rpm();
     state->target_rpm_R = motor_r.get_target_rpm();
 }
+
+void Processing_Motor::set_pid_gains(float p, float i, float d) {
+    motor_l.set_pid_gains(p, i, d);
+    motor_r.set_pid_gains(p, i, d);
+}

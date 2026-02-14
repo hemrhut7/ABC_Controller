@@ -32,6 +32,9 @@ void AppMode::init() {
     // Yaw Loop (轉向環)
     _pid_yaw.setTunings(_config_store->data.yaw.p, _config_store->data.yaw.i, _config_store->data.yaw.d);
 
+    // Motor PID
+    _motor->set_pid_gains(_config_store->data.motor.p, _config_store->data.motor.i, _config_store->data.motor.d);
+
     set_target_val(0.0f);
 }
 
@@ -132,24 +135,52 @@ void AppMode::update(float dt) {
     }
 }
 
-void AppMode::set_pid_gains(uint8_t pid_id, float kp, float ki, float kd) {
+void AppMode::set_pid_gains(PID_id_t pid_id, float kp, float ki, float kd) {
     switch (pid_id) {
-        case 0: 
-            _pid_velocity.setTunings(kp, ki, kd); 
-            _config_store->data.velocity = {kp, ki, kd};
+        case PID_MOTOR:
+            _motor->set_pid_gains(kp, ki, kd);
+            _config_store->data.motor = {kp, ki, kd};
             break;
-        case 1: 
-            _pid_angle.setTunings(kp, ki, kd); 
-            _config_store->data.pitch = {kp, ki, kd};
-            break;
-        case 2: 
+        case PID_RATE: 
             _pid_rate.setTunings(kp, ki, kd); 
             _config_store->data.rate = {kp, ki, kd};
             break;
-        case 3: 
+        case PID_ANGLE: 
+            _pid_angle.setTunings(kp, ki, kd); 
+            _config_store->data.pitch = {kp, ki, kd};
+            break;
+        case PID_VELOCITY: 
+            _pid_velocity.setTunings(kp, ki, kd); 
+            _config_store->data.velocity = {kp, ki, kd};
+            break;
+        case PID_YAW: 
             _pid_yaw.setTunings(kp, ki, kd); 
             _config_store->data.yaw = {kp, ki, kd};
             break;
+        default:
+            // Optional: handle invalid ID
+            break;
     }
     _config_store->save_config();
+}
+
+PID_Params AppMode::get_pid_gains(PID_id_t pid_id) {
+    switch (pid_id) {
+        case PID_MOTOR:
+            return _config_store->data.motor;
+        case PID_RATE:
+            return _config_store->data.rate;
+        case PID_ANGLE:
+            return _config_store->data.pitch;
+        case PID_VELOCITY:
+            return _config_store->data.velocity;
+        case PID_YAW:
+            return _config_store->data.yaw;
+        default:
+            return {0, 0, 0}; // Should not happen
+    }
+}
+
+const SystemConfig& AppMode::get_pid_config() const {
+    return _config_store->data;
 }

@@ -17,7 +17,9 @@ public:
     void set_target(float val, float yaw);
     
     // 用於 Tuning 的接口
-    void set_pid_gains(uint8_t pid_id, float kp, float ki, float kd);
+    void set_pid_gains(PID_id_t pid_id, float kp, float ki, float kd);
+    PID_Params get_pid_gains(PID_id_t pid_id);
+    const SystemConfig& get_pid_config() const;
 
 private:
     Processing_AHRS* _ahrs;

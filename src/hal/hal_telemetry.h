@@ -12,6 +12,8 @@ public:
     Telemetry(HardwareSerial& serial);
     void init();
     void queue_vofa_data(ABC_state_t &abc_state, uint32_t loop_time_ms);
+    void queue_string(const char* str);
+    void queue_string(const String& str);
     void send_data();
 
 private:

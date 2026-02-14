@@ -38,6 +38,17 @@ void Telemetry::queue_vofa_data(ABC_state_t &abc_state, uint32_t loop_time_ms) {
     portEXIT_CRITICAL(&spinlock);
 }
 
+void Telemetry::queue_string(const char* str) {
+    if (!str) return;
+    portENTER_CRITICAL(&spinlock);
+    RingBuffer_Write(&rb, (uint8_t*)str, strlen(str), true);
+    portEXIT_CRITICAL(&spinlock);
+}
+
+void Telemetry::queue_string(const String& str) {
+    queue_string(str.c_str());
+}
+
 void Telemetry::send_data() {
     uint8_t temp_buffer[256]; // Send in chunks
     size_t to_read = 0;

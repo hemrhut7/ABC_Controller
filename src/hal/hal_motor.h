@@ -43,7 +43,7 @@ class HAL_Motor {
         void set_target_rpm(int target_rpm);
         void update_rpm();
         void setup_motor_dir(bool dir_forward);
-        void set_pid_gains(int p, int i, int d);
+        void set_pid_gains(float p, float i, float d);
         void set_enable(bool enable);
         int get_current_rpm();
         int get_target_rpm();

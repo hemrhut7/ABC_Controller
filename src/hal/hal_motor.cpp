@@ -110,7 +110,7 @@ void HAL_Motor::setup_motor_dir(bool dir_forward) {
     this->dir_forward = dir_forward ? 1 : -1;
 }
 
-void HAL_Motor::set_pid_gains(int p, int i, int d) {
+void HAL_Motor::set_pid_gains(float p, float i, float d) {
     pid.setTunings(p, i, d);
 }
 

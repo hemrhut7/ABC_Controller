@@ -1,7 +1,7 @@
 #ifndef CPF_H
 #define CPF_H
 
-#define LC_WINDOW_SEC 5
+#define LC_WINDOW_SEC 3
 #define LPF_FREQ_ACCL_CHECK 5
 
 #include "LPF.h"

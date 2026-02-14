@@ -13,6 +13,7 @@ public:
     void set_enable(bool enable);
     void update_rpms();
     void get_motor_state(motor_state_t *state);
+    void set_pid_gains(float p, float i, float d);
 
 private:
     HAL_Motor motor_l;

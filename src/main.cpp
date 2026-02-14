@@ -28,7 +28,7 @@ HAL_LED system_led(LED_BUILTIN);
 ConfigStore config_store;
 
 AppMode app_mode(&ahrs, &motor, &config_store);
-AppScript app_script(&app_mode);
+AppScript app_script(&app_mode, &telemetry);
 Failsafe failsafe(&ahrs, &motor, &system_led);
 
 

@@ -1,6 +1,6 @@
 #include "app_script.h"
 
-AppScript::AppScript(AppMode* app_mode) : _app_mode(app_mode) {
+AppScript::AppScript(AppMode* app_mode, Telemetry* telemetry) : _app_mode(app_mode), _telemetry(telemetry) {
 }
 
 void AppScript::check_serial(Stream& stream) {
@@ -14,7 +14,7 @@ void AppScript::check_serial(Stream& stream) {
 }
 
 void AppScript::parse_packet(const String& packet) {
-    if (!_app_mode) return;
+    if (!_app_mode || !_telemetry) return;
 
     // 1. 預處理：建立副本、轉大寫、去除空白，提升指令容錯率
     String cmd_line = packet;
@@ -23,37 +23,42 @@ void AppScript::parse_packet(const String& packet) {
 
     if (cmd_line.length() == 0) return;
 
+    char tx_buffer[256]; // Buffer for formatting response strings
+
     // 1. PID Tuning 指令: "PID <id> <kp> <ki> <kd>"
-    // ID Mapping: 0=Velocity, 1=Angle, 2=Rate, 3=Yaw
+    // ID Mapping: 0=MOTOR, 1=RATE, 2=ANGLE, 3=VELOCITY, 4=YAW
     if (cmd_line.startsWith("PID")) {
         int id;
         float kp, ki, kd;
         if (sscanf(cmd_line.c_str(), "PID %d %f %f %f", &id, &kp, &ki, &kd) == 4) {
-            // 安全檢查: ID 範圍 (0-3)
-            if (id >= 0 && id <= 3) {
-                _app_mode->set_pid_gains((uint8_t)id, kp, ki, kd);
-                Serial.printf("[OK] PID %d Updated: P=%.3f I=%.3f D=%.3f\n", id, kp, ki, kd);
+            // 安全檢查: ID 範圍
+            if (id >= 0 && id < PID_ID_COUNT) {
+                _app_mode->set_pid_gains((PID_id_t)id, kp, ki, kd);
+                snprintf(tx_buffer, sizeof(tx_buffer), "[OK] PID %d Updated: P=%.3f I=%.3f D=%.3f\n", id, kp, ki, kd);
+                _telemetry->queue_string(tx_buffer);
             } else {
-                Serial.println("[ERR] PID ID out of range (0-3)");
+                snprintf(tx_buffer, sizeof(tx_buffer), "[ERR] PID ID out of range (0-%d)\n", PID_ID_COUNT - 1);
+                _telemetry->queue_string(tx_buffer);
             }
         } else {
-            Serial.println("[ERR] Invalid PID format. Usage: PID <id> <kp> <ki> <kd>");
+            _telemetry->queue_string("[ERR] Invalid PID format. Usage: PID <id> <kp> <ki> <kd>\n");
         }
     }
     // 2. 模式切換指令: "MODE <mode>"
-    // Mode Mapping: 0=STOP, 3=ANGLE, 4=VELOCITY, 5=REMOTE
     else if (cmd_line.startsWith("MODE")) {
         int mode;
         if (sscanf(cmd_line.c_str(), "MODE %d", &mode) == 1) {
             // 安全檢查: Mode 範圍 (0-6)
-            if (mode >= 0 && mode <= 6) {
+            if (mode >= MODE_STOP && mode <= MODE_FREE) {
                 _app_mode->set_mode((Mode_t)mode);
-                Serial.printf("[OK] Mode Set: %d\n", mode);
+                snprintf(tx_buffer, sizeof(tx_buffer), "[OK] Mode Set: %d\n", mode);
+                _telemetry->queue_string(tx_buffer);
             } else {
-                Serial.println("[ERR] Invalid Mode (0-6)");
+                snprintf(tx_buffer, sizeof(tx_buffer), "[ERR] Invalid Mode (0-%d)\n", MODE_FREE);
+                _telemetry->queue_string(tx_buffer);
             }
         } else {
-            Serial.println("[ERR] Invalid MODE format. Usage: MODE <id>");
+            _telemetry->queue_string("[ERR] Invalid MODE format. Usage: MODE <id>\n");
         }
     }
     // 3. 控制指令: "VAL <val> <yaw>"
@@ -61,7 +66,30 @@ void AppScript::parse_packet(const String& packet) {
         float val, yaw;
         if (sscanf(cmd_line.c_str(), "VAL %f %f", &val, &yaw) == 2) {
             _app_mode->set_target(val, yaw);
-            // 高頻指令通常不回傳 Log 以節省頻寬
+        }
+    }
+    // 4. 讀取 PID 指令
+    else if (cmd_line.startsWith("GET PID")) {
+        int id;
+        // 檢查是 "GET PID <id>" 還是 "GET PID"
+        if (sscanf(cmd_line.c_str(), "GET PID %d", &id) == 1) {
+            // 獲取單個 PID
+            if (id >= 0 && id < PID_ID_COUNT) {
+                PID_Params p = _app_mode->get_pid_gains((PID_id_t)id);
+                snprintf(tx_buffer, sizeof(tx_buffer), "[OK] PID %d: P=%.3f, I=%.3f, D=%.3f\n", id, p.p, p.i, p.d);
+                _telemetry->queue_string(tx_buffer);
+            } else {
+                snprintf(tx_buffer, sizeof(tx_buffer), "[ERR] PID ID out of range (0-%d)\n", PID_ID_COUNT - 1);
+                _telemetry->queue_string(tx_buffer);
+            }
+        } else {
+            // 獲取所有 PID
+            const char* pid_names[] = {"MOTOR", "RATE", "ANGLE", "VELOCITY", "YAW"};
+            for (int i = 0; i < PID_ID_COUNT; i++) {
+                PID_Params p = _app_mode->get_pid_gains((PID_id_t)i);
+                snprintf(tx_buffer, sizeof(tx_buffer), "[OK] PID %d (%s): P=%.3f, I=%.3f, D=%.3f\n", i, pid_names[i], p.p, p.i, p.d);
+                _telemetry->queue_string(tx_buffer);
+            }
         }
     }
 }

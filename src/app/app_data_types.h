@@ -10,8 +10,17 @@ typedef enum {
     MODE_FREE,          // 6. 自由模式 (無動力/滑行)
 } Mode_t;
 
+typedef enum {
+    PID_MOTOR = 0,
+    PID_RATE,
+    PID_ANGLE,
+    PID_VELOCITY,
+    PID_YAW,
+    PID_ID_COUNT
+} PID_id_t;
+
 typedef struct {
-    Mode_t mode;
+    int mode;
     float target_value; // 根據模式不同，單位可能是 RPM, rad/s, rad, m/s
     float target_yaw_rate; // 轉向指令 (rad/s)
 } UserCommand_t;

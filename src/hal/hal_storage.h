@@ -14,6 +14,7 @@ struct PID_Params {
 struct SystemConfig {
     uint32_t magic_number; // 用來檢查 EEPROM 是否已初始化 (例如 0xAABBCCDD)
     
+    PID_Params motor;
     PID_Params pitch;
     PID_Params rate;
     PID_Params yaw;
