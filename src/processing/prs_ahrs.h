@@ -17,6 +17,8 @@ public:
 private:
     CPF cpf;
     ahrs_data_t ahrs_data;
+    uint32_t init_time;
+    bool is_stable = false;
 };
 
 #endif // PROCESSING_AHRS_H

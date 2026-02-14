@@ -13,13 +13,20 @@ Processing_AHRS::~Processing_AHRS() {
 void Processing_AHRS::init()
 {
     hal_imu_init();
+    init_time = millis();
+    is_stable = false;
 }
 
 void Processing_AHRS::update()
 {
     if (!hal_imu_healthy()) return;
-    
     hal_imu_read(&ahrs_data.imu_data);
+
+    if (!is_stable) { 
+        is_stable = millis() - init_time > 1000;
+        return;
+    }
+    
     cpf.update(ahrs_data.imu_data.gyro, ahrs_data.imu_data.accl);
     cpf.getEuler(ahrs_data.euler);
 }
