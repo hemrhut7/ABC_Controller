@@ -166,8 +166,17 @@ void CPF::getBias(float b[3]) {
 // Orientation and math helpers
 
 void CPF::accLeveling(const float acc[3], float& pitch, float& roll) {
-    pitch = atan2(-acc[1], -acc[2]);
-    roll = atan2(acc[0], sqrt(acc[1] * acc[1] + acc[2] * acc[2]));
+    float fx = acc[0];
+    float fy = acc[1];
+    float fz = acc[2];
+
+    pitch = atan2(fy, fmax(sqrt(fx * fx + fz * fz), 1e-8f));
+
+    if (fz > 0) {
+        roll = atan2(-fx, sqrt(fz * fz + 1e-6f * fx * fx));
+    } else {
+        roll = atan2(-fx, -sqrt(fz * fz + 1e-6f * fx * fx));
+    }
 }
 
 void CPF::gen_dcm_by_euler(const float euler[3], float dcm[3][3]) {
@@ -190,8 +199,8 @@ void CPF::gen_dcm_by_euler(const float euler[3], float dcm[3][3]) {
 
 void CPF::gen_euler_by_dcm(const float dcm[3][3], float euler[3]) {
     euler[0] = atan2(dcm[2][1], sqrt(dcm[0][1] * dcm[0][1] + dcm[1][1] * dcm[1][1]));
-    euler[1] = -atan2(-dcm[2][0], dcm[2][2]);
-    euler[2] = -atan2(-dcm[0][1], dcm[1][1]);
+    euler[1] = -atan2(dcm[2][0], dcm[2][2]);
+    euler[2] = -atan2(dcm[0][1], dcm[1][1]);
 }
 
 

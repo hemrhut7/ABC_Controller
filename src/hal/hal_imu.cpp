@@ -35,13 +35,13 @@ void hal_imu_read(imu_data_t *data) {
   mpu.getEvent(&a, &g, &temp);
 
   data->timestamp = (float)millis() * 1e-3f;
-  data->accl[0] = a.acceleration.x;
+  data->accl[0] = -a.acceleration.x;
   data->accl[1] = a.acceleration.y;
-  data->accl[2] = a.acceleration.z;
+  data->accl[2] = -a.acceleration.z;
 
-  data->gyro[0] = g.gyro.x;
+  data->gyro[0] = -g.gyro.x;
   data->gyro[1] = g.gyro.y;
-  data->gyro[2] = g.gyro.z;
+  data->gyro[2] = -g.gyro.z;
 
   data->temp = temp.temperature;
 }

@@ -15,10 +15,14 @@ public:
     void queue_string(const char* str);
     void queue_string(const String& str);
     void send_data();
+    void set_target_val(float val) { current_target_val = val; }
+    void add_channel(Stream& stream);
 
 private:
     RingBuffer_t rb;
     uint8_t buffer[TELEMETRY_BUFFER_SIZE];
     HardwareSerial& serial_port;
     portMUX_TYPE spinlock;
+    float current_target_val = 0;
+    Stream* extra_stream = nullptr;
 };

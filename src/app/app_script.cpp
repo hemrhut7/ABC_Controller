@@ -66,6 +66,7 @@ void AppScript::parse_packet(const String& packet) {
         float val, yaw;
         if (sscanf(cmd_line.c_str(), "VAL %f %f", &val, &yaw) == 2) {
             _app_mode->set_target(val, yaw);
+            _telemetry->set_target_val(val);
         }
     }
     // 4. 讀取 PID 指令

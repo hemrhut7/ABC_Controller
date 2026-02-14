@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <BluetoothSerial.h>
 #include "processing/prs_ahrs.h"
 #include "processing/prs_motor.h"
 #include "hal/hal_telemetry.h"
@@ -21,6 +22,7 @@
 TaskHandle_t ControlTaskHandle;
 TaskHandle_t CommTaskHandle;
 
+BluetoothSerial SerialBT;
 Processing_Motor motor(PERIOD_CONTROLL);
 Processing_AHRS ahrs(PERIOD_CONTROLL);
 Telemetry telemetry(Serial);
@@ -60,7 +62,7 @@ void Comm_Task(void *pvParameters) {
     // UART2_Init();
 
     for (;;) {
-        ABC_state_t abc_state;
+        ABC_state_t abc_state;  
 
         ahrs.get_ahrs_data(&abc_state.ahrs_data);
         motor.get_motor_state(&abc_state.motor_state);
@@ -75,6 +77,7 @@ void Comm_Task(void *pvParameters) {
         // 讀取與 RPi 通訊的 UART Buffer
         // 支援 Serial, 未來可輕易擴充 BluetoothSerial 等
         app_script.check_serial(Serial);
+        app_script.check_serial(SerialBT);
 
         vTaskDelay(pdMS_TO_TICKS(PERIOD_COMM));
     }
@@ -84,10 +87,12 @@ void setup() {
     system_led.set_state(INITIALIZING);
 
     Serial.begin(115200);
+    SerialBT.begin("ABC_Controller");
     config_store.begin();
     ahrs.init();
     motor.init();    
     telemetry.init();
+    telemetry.add_channel(SerialBT);
 
     app_mode.init();
     app_mode.set_mode(MODE_FREE);
