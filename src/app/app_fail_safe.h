@@ -1,30 +1,33 @@
 #pragma once
 
 #include <Arduino.h>
+#include "processing/prs_ahrs.h"
+#include "processing/prs_motor.h"
+#include "hal/hal_led.h"
 
 
 class Failsafe {
 public:
-    Failsafe();
+    Failsafe(Processing_AHRS* ahrs, Processing_Motor* motor, HAL_LED* led);
 
     void init();
 
     /**
      * @brief 核心安全檢查
-     * @param pitch_rad 當前傾角 (Rad)
-     * @param pitch_rate_rad 當前角速度 (Rad/s) - 用於拿起偵測
-     * @param rpm_l 左輪轉速 - 用於拿起偵測
-     * @param rpm_r 右輪轉速 - 用於拿起偵測
      * @param current_time_ms 當前系統時間
      * @return true: 安全 (ARMED), false: 危險 (DISARMED)
      */
-    bool check(float pitch_rad, float pitch_rate_rad, int rpm_l, int rpm_r, uint32_t current_time_ms);
+    bool check();
 
     bool is_armed();
 
     uint32_t get_loop_time_ms() { return loop_time_ms; }
 
 private:
+    Processing_AHRS* _ahrs;
+    Processing_Motor* _motor;
+    HAL_LED* _led;
+
     bool armed_state;
     
     // 時間相關變數

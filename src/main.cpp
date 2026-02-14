@@ -29,7 +29,7 @@ ConfigStore config_store;
 
 AppMode app_mode(&ahrs, &motor, &config_store);
 AppScript app_script(&app_mode);
-Failsafe failsafe;
+Failsafe failsafe(&ahrs, &motor, &system_led);
 
 
 // 1. 控制任務 (Core 1)
@@ -47,11 +47,7 @@ void Control_Task(void *pvParameters) {
         // 計算結果會直接寫入 motor 物件的 target_rpm
         app_mode.update(PERIOD_CONTROLL * 0.001f);
 
-        ABC_state_t abc_state;
-        ahrs.get_ahrs_data(&abc_state.ahrs_data);
-        motor.get_motor_state(&abc_state.motor_state);
-        failsafe.check(abc_state.ahrs_data.euler[0], abc_state.ahrs_data.imu_data.gyro[0],
-                       abc_state.motor_state.rpm_L, abc_state.motor_state.rpm_R, millis());
+        failsafe.check();
 
         vTaskDelayUntil(&xLastWakeTime, xFrequency);  // 確保精確的執行頻率
     }
@@ -96,8 +92,6 @@ void setup() {
     app_mode.init();
     app_mode.set_mode(MODE_FREE);
     app_mode.set_target_val(0.0f);
-
-    system_led.set_state(WORKING);
 
     // 建立任務 參數：函數名, 名稱, 堆棧, 參數, 優先級, Handle, 核心ID
     // Core 1   

@@ -1,6 +1,7 @@
 #include "app_fail_safe.h"
 
-Failsafe::Failsafe() {
+Failsafe::Failsafe(Processing_AHRS* ahrs, Processing_Motor* motor, HAL_LED* led) 
+    : _ahrs(ahrs), _motor(motor), _led(led) {
     armed_state = false;
     last_check_time = 0;
     pickup_start_time = 0;
@@ -12,9 +13,25 @@ void Failsafe::init() {
     last_check_time = millis();
 }
 
-bool Failsafe::check(float pitch_rad, float pitch_rate_rad, int rpm_l, int rpm_r, uint32_t current_time_ms) {
+bool Failsafe::check() {
+    
+    if (_ahrs->is_ready()) {
+        _led->set_state(WORKING);
+    }
+
+    ahrs_data_t ahrs_data;
+    _ahrs->get_ahrs_data(&ahrs_data);
+    
+    motor_state_t motor_state;
+    _motor->get_motor_state(&motor_state);
+
+    float pitch_rad = ahrs_data.euler[0];
+    float pitch_rate_rad = ahrs_data.imu_data.gyro[0];
+    int rpm_l = motor_state.rpm_L;
+    int rpm_r = motor_state.rpm_R;
     
     // --- [1. 性能檢驗 Loop Performance] ---
+    uint32_t current_time_ms = millis();
     uint32_t dt = current_time_ms - last_check_time;
     
     // 忽略第一次執行 (dt 會很大)

@@ -25,7 +25,7 @@ namespace Vec {
 
 
 CPF::CPF(uint32_t period_ms) : lpf_acc(1000 / period_ms, 5) {
-    first_update = true;
+    is_initialized = false;
     std::fill(pre_omg, pre_omg + 3, 0.0f);
     g0 = 9.80665f;
     weight = 0.01f;
@@ -74,7 +74,7 @@ void CPF::enableCheckACC(bool is_enable) {
 }
 
 void CPF::update(float omg[3], float acc[3]) {
-    if (first_update) {
+    if (!is_initialized) {
         if (lc_list_count < LC_WINDOW_SIZE) {
             std::copy(omg, omg + 3, LC_list[lc_list_count]);
             lc_list_count++;
@@ -92,7 +92,7 @@ void CPF::update(float omg[3], float acc[3]) {
             euler[1] = r;
             euler[2] = 0.0f; // 確保 Yaw 被初始化
             gen_dcm_by_euler(euler, dcm);
-            first_update = false;
+            is_initialized = true;
         }
         return;
     }

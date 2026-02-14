@@ -12,6 +12,7 @@ public:
     void init();
     void update();
     void get_ahrs_data(ahrs_data_t *data);
+    bool is_ready() { return cpf.is_ready(); }
 
 private:
     CPF cpf;

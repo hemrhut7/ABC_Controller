@@ -1,7 +1,7 @@
 #ifndef CPF_H
 #define CPF_H
 
-#define LC_WINDOW_SEC 3
+#define LC_WINDOW_SEC 5
 #define LPF_FREQ_ACCL_CHECK 5
 
 #include "LPF.h"
@@ -17,9 +17,10 @@ public:
     void getEuler(float euler[3]);
     void getBias(float bias[3]);
     void enableCheckACC(bool is_enable);
+    bool is_ready () { return is_initialized; }
 
 private:
-    bool first_update = true;
+    bool is_initialized = false;
     float dt = 0.005f;
     float pre_omg[3];
     float g0;
