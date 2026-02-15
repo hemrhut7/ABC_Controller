@@ -1,75 +1,106 @@
 #include "hal_telemetry.h"
-
+#include <math.h>
 
 // VOFA+ frame tail
 const uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7f};
 
-Telemetry::Telemetry(HardwareSerial& serial) : serial_port(serial) {
-    spinlock = portMUX_INITIALIZER_UNLOCKED;
+#define TELEMETRY_QUEUE_LENGTH 5
+
+Telemetry::Telemetry(Stream& stream) : port(stream) {
 }
 
 void Telemetry::init() {
-    RingBuffer_Init(&rb, buffer, TELEMETRY_BUFFER_SIZE);
+    data_queue = xQueueCreate(TELEMETRY_QUEUE_LENGTH, sizeof(system_state_t));
 }
 
-void Telemetry::add_channel(Stream& stream) {
-    extra_stream = &stream;
+void Telemetry::push_data(const system_state_t& packet) {
+    // If the queue is full, the oldest data will be overwritten.
+    // This is crucial to ensure the high-frequency control loop is never blocked.
+    if (data_queue != NULL) {
+        xQueueSend(data_queue, &packet, 0);
+    }
 }
 
-void Telemetry::queue_vofa_data(ABC_state_t &abc_state, uint32_t loop_time_ms) {
-    // Pack data as floats for VOFA+
-    float data_packet[14];
-    float now = abc_state.ahrs_data.imu_data.timestamp;
-    data_packet[0] = now;
-    data_packet[1] = abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
-    data_packet[2] = abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
-    data_packet[3] = abc_state.ahrs_data.euler[2] * RAD_TO_DEG;
-    data_packet[4] = (float)abc_state.motor_state.rpm_L;
-    data_packet[5] = (float)abc_state.motor_state.rpm_R;
-    data_packet[6] = abc_state.ahrs_data.imu_data.gyro[0] * RAD_TO_DEG;
-    data_packet[7] = abc_state.ahrs_data.imu_data.gyro[1] * RAD_TO_DEG;
-    data_packet[8] = abc_state.ahrs_data.imu_data.gyro[2] * RAD_TO_DEG;
-    data_packet[9] = abc_state.ahrs_data.imu_data.accl[0];
-    data_packet[10] = abc_state.ahrs_data.imu_data.accl[1];
-    data_packet[11] = abc_state.ahrs_data.imu_data.accl[2];
-    data_packet[12] = current_target_val;
-    data_packet[13] = (float)loop_time_ms;
+void Telemetry::process_serial_outgoing() {
+    system_state_t pkt;
 
-    portENTER_CRITICAL(&spinlock);
-    RingBuffer_Write(&rb, (uint8_t*)data_packet, sizeof(data_packet), true);
-    RingBuffer_Write(&rb, vofa_tail, sizeof(vofa_tail), true);
-    portEXIT_CRITICAL(&spinlock);
+    // Block and wait indefinitely for a packet to arrive in the queue.
+    if (xQueueReceive(data_queue, &pkt, portMAX_DELAY) == pdTRUE) {
+        // A packet was successfully received. 
+        // Now, manually flatten the nested struct into a float array for VOFA+.
+        float data_packet[15];
+        data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp;
+        data_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
+        data_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
+        data_packet[3] = pkt.abc_state.ahrs_data.euler[2] * RAD_TO_DEG;
+        data_packet[4] = (float)pkt.abc_state.motor_state.rpm_L;
+        data_packet[5] = (float)pkt.abc_state.motor_state.rpm_R;
+        data_packet[6] = pkt.abc_state.ahrs_data.imu_data.gyro[0] * RAD_TO_DEG;
+        data_packet[7] = pkt.abc_state.ahrs_data.imu_data.gyro[1] * RAD_TO_DEG;
+        data_packet[8] = pkt.abc_state.ahrs_data.imu_data.gyro[2] * RAD_TO_DEG;
+        data_packet[9] = pkt.abc_state.ahrs_data.imu_data.accl[0];
+        data_packet[10] = pkt.abc_state.ahrs_data.imu_data.accl[1];
+        data_packet[11] = pkt.abc_state.ahrs_data.imu_data.accl[2];
+        data_packet[12] = pkt.target_val;
+        data_packet[13] = (float)pkt.loop_time_ms;
+        data_packet[14] = (float)pkt.mode;
+
+        // Write the data packet and the tail to the serial port.
+        port.write((uint8_t*)data_packet, sizeof(data_packet));
+        port.write(vofa_tail, sizeof(vofa_tail));
+    }
+}
+
+void Telemetry::process_bt_outgoing() {
+    system_state_t pkt;
+    
+    if (xQueueReceive(data_queue, &pkt, portMAX_DELAY) == pdTRUE) {
+        // A packet was successfully received. 
+        // Now, manually flatten the nested struct into a float array for VOFA+.
+        float data_packet[4];
+        data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp;
+        data_packet[1] = pkt.target_val;
+
+        float val3 = NAN;
+        float val4 = NAN;
+
+        switch (pkt.mode) {
+            case MODE_MOTOR_TEST:
+                val3 = (float)pkt.abc_state.motor_state.rpm_L;
+                val4 = (float)pkt.abc_state.motor_state.rpm_R;
+                break;
+            case MODE_RATE:
+                val3 = pkt.abc_state.ahrs_data.imu_data.gyro[0];
+                break;
+            case MODE_ANGLE:
+                val3 = pkt.abc_state.ahrs_data.euler[0];
+                break;
+            case MODE_VELOCITY:
+                val3 = pkt.abc_state.velocity;
+                break;
+            case MODE_REMOTE:
+                val3 = pkt.abc_state.ahrs_data.imu_data.gyro[2];
+                break;
+            default:
+                break;
+        }
+
+        data_packet[2] = val3;
+        data_packet[3] = val4;
+
+        // Write the data packet and the tail to the serial port.
+        port.write((uint8_t*)data_packet, sizeof(data_packet));
+        port.write(vofa_tail, sizeof(vofa_tail));
+    }
 }
 
 void Telemetry::queue_string(const char* str) {
     if (!str) return;
-    portENTER_CRITICAL(&spinlock);
-    RingBuffer_Write(&rb, (uint8_t*)str, strlen(str), true);
-    portEXIT_CRITICAL(&spinlock);
+    // This function is called from a communication task, so direct writing is safe
+    // and won't interfere with the Control_Task.
+    port.print(str);
 }
 
 void Telemetry::queue_string(const String& str) {
     queue_string(str.c_str());
-}
-
-void Telemetry::send_data() {
-    uint8_t temp_buffer[256]; // Send in chunks
-    size_t to_read = 0;
-
-    portENTER_CRITICAL(&spinlock);
-    size_t data_len = RingBuffer_GetDataLength(&rb);
-    if (data_len > 0) {
-        size_t len = data_len > sizeof(temp_buffer) ? sizeof(temp_buffer) : data_len;
-        if (RingBuffer_Read(&rb, temp_buffer, len)) {
-            to_read = len;
-        }
-    }
-    portEXIT_CRITICAL(&spinlock);
-
-    if (to_read > 0) {
-        serial_port.write(temp_buffer, to_read);
-        if (extra_stream) {
-            extra_stream->write(temp_buffer, to_read);
-        }
-    }
 }

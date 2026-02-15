@@ -1,10 +1,11 @@
 #pragma once
 
+#include <Arduino.h>
 #include "processing/prs_ahrs.h"
 #include "processing/prs_motor.h"
 #include "pid.h"
-#include "app_data_types.h"
 #include "hal/hal_storage.h"
+
 
 class AppMode {
 public:
@@ -15,6 +16,9 @@ public:
     void set_mode(Mode_t mode);
     void set_target_val(float val);
     void set_target(float val, float yaw);
+    float get_current_target_val() const { return _cmd.target_value; }
+    Mode_t get_current_mode() const { return static_cast<Mode_t>(_cmd.mode); }
+    float get_current_velocity() const { return current_velocity; }
     
     // 用於 Tuning 的接口
     void set_pid_gains(PID_id_t pid_id, float kp, float ki, float kd);
@@ -39,4 +43,5 @@ private:
     float _target_pitch_rate;
     float _output_balance;
     float _output_turn;
+    float current_velocity;
 };

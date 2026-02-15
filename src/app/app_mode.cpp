@@ -74,7 +74,7 @@ void AppMode::update(float dt) {
     _ahrs->get_ahrs_data(&ahrs_state);
     _motor->get_motor_state(&motor_state);
 
-    float current_velocity = (motor_state.rpm_L + motor_state.rpm_R) * 0.5f * RPM_TO_MS; // 需定義轉換係數
+    current_velocity = (motor_state.rpm_L + motor_state.rpm_R) * 0.5f * RPM_TO_MS; // 需定義轉換係數
     float current_pitch = ahrs_state.euler[0]; // Rad
     float current_gyro_y = ahrs_state.imu_data.gyro[1]; // Rad/s
 
