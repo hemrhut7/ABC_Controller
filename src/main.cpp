@@ -16,8 +16,7 @@
 #define PRIORITY_COMM      10
 #define PRIORITY_BT        5
 
-
-#define PERIOD_CONTROLL       5    // 200Hz
+#define PERIOD_CONTROLL       10    // 100Hz
 #define PERIOD_COMM           20   // 50Hz
 #define PERIOD_BT             20   // 50Hz
 
@@ -74,9 +73,7 @@ void Comm_Task(void *pvParameters) {
     for (;;) {
         uart_telemetry.process_serial_outgoing(); 
         app_script.check_serial(Serial, &uart_telemetry);
-
         system_led.update();
-        config_store.update();
         
         vTaskDelay(pdMS_TO_TICKS(PERIOD_COMM));
     }
@@ -106,7 +103,6 @@ void setup() {
 
     app_mode.init();
     app_mode.set_mode(MODE_FREE);
-    app_mode.set_target_val(0.0f);
 
     // 建立任務 參數：函數名, 名稱, 堆棧, 參數, 優先級, Handle, 核心ID
     // Core 1   
@@ -114,7 +110,7 @@ void setup() {
     
     // Core 0
     xTaskCreatePinnedToCore(Comm_Task, "CommTask", 4096, NULL, PRIORITY_COMM, &CommTaskHandle, 0);
-    xTaskCreatePinnedToCore(BT_Task, "BT_Task", 4096, NULL, PRIORITY_BT, &BTTaskHandle, 0);
+    // xTaskCreatePinnedToCore(BT_Task,   "BT_Task" , 4096, NULL, PRIORITY_BT, &BTTaskHandle, 0);
 }
 
 void loop() {

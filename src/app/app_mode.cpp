@@ -35,7 +35,7 @@ void AppMode::init() {
     // Motor PID
     _motor->set_pid_gains(_config_store->data.motor.p, _config_store->data.motor.i, _config_store->data.motor.d);
 
-    set_target_val(0.0f);
+    set_target(0.0f, 0.0f);
 }
 
 void AppMode::set_command(UserCommand_t cmd) {
@@ -58,16 +58,18 @@ void AppMode::set_mode(Mode_t mode) {
         _motor->set_enable(true);
 }
 
-void AppMode::set_target_val(float val) {
-    _cmd.target_value = val;
-}
-
 void AppMode::set_target(float val, float yaw) {
     _cmd.target_value = val;
     _cmd.target_yaw_rate = yaw;
 }
 
 void AppMode::update(float dt) {
+    // 先處理MODE_PWM
+    if (_cmd.mode == MODE_PWM) {
+        _motor->set_pwm(_cmd.target_value, _cmd.target_value);
+        return;
+    }    
+
     // 1. 獲取狀態 (State Estimation)
     ahrs_data_t ahrs_state;
     motor_state_t motor_state;
@@ -106,7 +108,7 @@ void AppMode::update(float dt) {
         // 輸入：目標角速度，輸出：馬達 PWM 或 RPM 增量
         _output_balance = _pid_rate.compute(dt, _target_pitch_rate, current_gyro_y);
     }
-    else if (_cmd.mode == MODE_MOTOR_TEST) {
+    else if (_cmd.mode == MODE_MOTOR) {
         _output_balance = _cmd.target_value;
     }
     else {
@@ -161,7 +163,6 @@ void AppMode::set_pid_gains(PID_id_t pid_id, float kp, float ki, float kd) {
             // Optional: handle invalid ID
             break;
     }
-    _config_store->save_config();
 }
 
 PID_Params AppMode::get_pid_gains(PID_id_t pid_id) {

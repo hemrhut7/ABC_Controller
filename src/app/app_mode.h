@@ -14,7 +14,6 @@ public:
     void update(float dt); // 必須傳入固定 dt
     void set_command(UserCommand_t cmd);
     void set_mode(Mode_t mode);
-    void set_target_val(float val);
     void set_target(float val, float yaw);
     float get_current_target_val() const { return _cmd.target_value; }
     Mode_t get_current_mode() const { return static_cast<Mode_t>(_cmd.mode); }
@@ -22,6 +21,7 @@ public:
     
     // 用於 Tuning 的接口
     void set_pid_gains(PID_id_t pid_id, float kp, float ki, float kd);
+    void save_pid_gains() { _config_store->save_config(); }
     PID_Params get_pid_gains(PID_id_t pid_id);
     const SystemConfig& get_pid_config() const;
 

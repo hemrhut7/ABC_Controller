@@ -34,9 +34,6 @@ public:
     // 儲存目前設定到 EEPROM
     void save_config();
 
-    // 檢查並執行延遲寫入 (需在 Loop 中定期呼叫)
-    void update();
-
     // 重置為預設值
     void reset_defaults();
 
@@ -46,6 +43,5 @@ public:
 private:
     const uint32_t CONFIG_MAGIC = 0xCAFEBABE; // 識別碼
     const int EEPROM_ADDR = 0;                // 起始位址
-    uint32_t last_save_time = 0;
     bool _dirty = false;
 };

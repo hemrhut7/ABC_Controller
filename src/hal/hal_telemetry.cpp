@@ -65,7 +65,8 @@ void Telemetry::process_bt_outgoing() {
         float val4 = NAN;
 
         switch (pkt.mode) {
-            case MODE_MOTOR_TEST:
+            case MODE_PWM:
+            case MODE_MOTOR:
                 val3 = (float)pkt.abc_state.motor_state.rpm_L;
                 val4 = (float)pkt.abc_state.motor_state.rpm_R;
                 break;

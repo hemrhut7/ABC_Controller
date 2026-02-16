@@ -42,11 +42,11 @@ constexpr float GYRO_CAL_B2  = -0.01655f;
 
 void hal_imu_init() {
   if (!Wire.begin(SDA_PIN_MPU6050, SCL_PIN_MPU6050, 400000)) {
-    Serial.println("Failed to initialize I2C bus");
+    // Serial.println("Failed to initialize I2C bus");
     return;
   }
   if (!mpu.begin()) {
-    Serial.println("Failed to find MPU6050 chip");
+    // Serial.println("Failed to find MPU6050 chip");
     return;
   }
 

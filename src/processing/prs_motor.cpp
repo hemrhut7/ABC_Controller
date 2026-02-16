@@ -23,6 +23,12 @@ void Processing_Motor::set_enable(bool enable) {
     motor_r.set_enable(enable);
 }
 
+void Processing_Motor::set_pwm(int left_pwm, int right_pwm) {
+    motor_l.drive_moter(left_pwm);
+    motor_r.drive_moter(right_pwm);
+}
+
+
 void Processing_Motor::update_rpms() {
     motor_l.update_rpm();
     motor_r.update_rpm();

@@ -28,6 +28,13 @@ void AppScript::parse_packet(const String& packet, Telemetry *telemetry) {
     // 1. PID Tuning 指令: "PID <id> <kp> <ki> <kd>"
     // ID Mapping: 0=MOTOR, 1=RATE, 2=ANGLE, 3=VELOCITY, 4=YAW
     if (cmd_line.startsWith("PID")) {
+        if (cmd_line == "PID SAVE") {
+            _app_mode->save_pid_gains();
+            snprintf(tx_buffer, sizeof(tx_buffer), "[OK] PID Config Saved to EEPROM\n");
+            telemetry->queue_string(tx_buffer);
+            return;
+        }
+
         int id;
         float kp, ki, kd;
         if (sscanf(cmd_line.c_str(), "PID %d %f %f %f", &id, &kp, &ki, &kd) == 4) {

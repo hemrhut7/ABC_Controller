@@ -5,14 +5,20 @@
 #include "pid.h"
 
 
-const int PPR = 500;           // 每轉脈衝數 (300線)
-const float GEAR_RATIO = 30.0; // 減速比
-const int QUADRATURE = 1;      // 1倍頻 (1Pin * RISING)
-const float CPR = PPR * QUADRATURE * GEAR_RATIO; // 每轉計數 (500 * 1 * 30 = 15000)
-const float DEG_PER_CNT = 360.0f / CPR;
-const float DPS_2_RPM = 60.0f / 360.0f;
-const int PWM_FREQ = 20000;
-const int PWM_RES = 8;
+constexpr int PPR = 500;           // 每轉脈衝數 (300線)
+constexpr float GEAR_RATIO = 30.0f; // 減速比
+constexpr int QUADRATURE = 1;      // 1倍頻 (1Pin * RISING)
+constexpr float CPR = PPR * QUADRATURE * GEAR_RATIO; // 每轉計數 (500 * 1 * 30 = 15000)
+constexpr float DEG_PER_CNT = 360.0f / CPR;
+constexpr float DPS_2_RPM = 60.0f / 360.0f;
+constexpr int PWM_FREQ = 20000;
+constexpr int PWM_RES = 8;
+
+
+#define MOTOR_DEADZONE 17
+#define MOTOR_KV       0.73f 
+#define MAX_MOTOR_RPM 230
+#define MAX_MOTOR_RPM_RATE 2500
 
 #define MOTOR_L_DIR1_PIN    5
 #define MOTOR_L_DIR2_PIN    18
@@ -23,7 +29,7 @@ const int PWM_RES = 8;
 
 #define MOTOR_R_DIR1_PIN    4
 #define MOTOR_R_DIR2_PIN    0
-#define MOTOR_R_PWM_PIN     2
+#define MOTOR_R_PWM_PIN     15
 #define MOTOR_R_DTBY_PIN    MOTOR_L_DTBY_PIN
 #define MOTOR_R_E2A_PIN     25
 #define MOTOR_R_E2B_PIN     26
@@ -47,6 +53,7 @@ class HAL_Motor {
         void set_enable(bool enable);
         int get_current_rpm();
         int get_target_rpm();
+        void drive_moter(int pmw);
 
     private:
         uint8_t pwm_pin;
@@ -57,11 +64,13 @@ class HAL_Motor {
         uint8_t enc_b_pin;
         uint16_t update_rate_hz = 100;
         float dt = 1e-2f;
+        int MAX_MOTOR_DELTA_RPM = MAX_MOTOR_RPM_RATE * dt;
 
         volatile uint32_t last_time = 0;
         int16_t count;
         int last_pwm_out = 0;
         int last_target_rpm = 0;
+        int last_rpm = 0;
         int current_rpm = 0;
 
         PID pid;
@@ -72,8 +81,6 @@ class HAL_Motor {
 
         void init();
         void getPCNTCount();
-        void drive_moter(int pmw);
-
 };
 
 void setupPCNT();

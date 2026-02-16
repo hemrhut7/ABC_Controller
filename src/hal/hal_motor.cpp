@@ -1,9 +1,5 @@
 #include "hal_motor.h"
 
-// 死區補償：馬達在低 PWM 時因靜摩擦力無法轉動，需補償基礎電壓
-#define MOTOR_DEADZONE 0  // 建議根據實測調整 (通常為 10~30)
-// 前饋增益：V = Kv * RPM，減輕 PID 負擔
-#define MOTOR_KV       0.0f 
 
 HAL_Motor::HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stdy_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin): 
 pwm_pin(pwm_pin), dir_pin1(dir_pin1), dir_pin2(dir_pin2), stdy_pin(stdy_pin), enc_a_pin(enc_a_pin), enc_b_pin(enc_b_pin) {
@@ -35,12 +31,14 @@ HAL_Motor::HAL_Motor(MotorPosition position, uint32_t period_ms) {
     init();
     update_rate_hz = 1000 / period_ms;
     dt = (float)period_ms * 1e-3f;
+    MAX_MOTOR_DELTA_RPM = MAX_MOTOR_RPM_RATE * dt;
 }
 
 void HAL_Motor::init() {    
     pinMode(pwm_pin, OUTPUT);
     pinMode(dir_pin1, OUTPUT);
     pinMode(dir_pin2, OUTPUT);
+    pinMode(stdy_pin, OUTPUT);
     pinMode(enc_a_pin, INPUT);
     pinMode(enc_b_pin, INPUT);
 
@@ -49,7 +47,7 @@ void HAL_Motor::init() {
     ledcWrite(pwm_channel, 0);
     digitalWrite(dir_pin1, HIGH);
     digitalWrite(dir_pin2, LOW);
-    digitalWrite(stdy_pin, HIGH);
+    digitalWrite(stdy_pin, LOW);
 
     count = 0;
     pid.reset();
@@ -75,23 +73,33 @@ void HAL_Motor::update_rpm() {
 }
 
 void HAL_Motor::set_target_rpm(int target_rpm) {
-    last_target_rpm = target_rpm;
-    
+    target_rpm = constrain(target_rpm, -MAX_MOTOR_RPM, MAX_MOTOR_RPM);
+    if (last_target_rpm - target_rpm > MAX_MOTOR_DELTA_RPM) {
+        target_rpm = last_target_rpm - MAX_MOTOR_DELTA_RPM;
+    } else if (target_rpm - last_target_rpm > MAX_MOTOR_DELTA_RPM) {
+        target_rpm = last_target_rpm + MAX_MOTOR_DELTA_RPM;
+    }
+
     // 1. PID 計算
-    float output = pid.compute(dt, target_rpm, current_rpm);
+    // float output = pid.compute(dt, target_rpm, current_rpm);
+    float derivative = (dt > 0) ? -(current_rpm - last_rpm) * update_rate_hz : 0;
+    float output = pid.compute(dt, target_rpm, current_rpm, derivative); // 加入 P、I、D 計算
 
     // 2. 前饋控制 (Feedforward)
     output += target_rpm * MOTOR_KV;
 
     // 3. 死區補償 (Deadzone Compensation)
     if (target_rpm != 0) {
-        if (output > 0) output += MOTOR_DEADZONE;
-        else if (output < 0) output -= MOTOR_DEADZONE;
+        if (output > 0 && output < MOTOR_DEADZONE) output = MOTOR_DEADZONE;
+        else if (output < 0 && output > -MOTOR_DEADZONE) output = -MOTOR_DEADZONE;
     }
 
     // 4. 輸出限制
     last_pwm_out = constrain(output, -255, 255);
-    drive_moter(last_pwm_out * dir_forward);
+    drive_moter(last_pwm_out);
+
+    last_target_rpm = target_rpm;
+    last_rpm = current_rpm;
 }
 
 void HAL_Motor::drive_moter(int pmw) {

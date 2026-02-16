@@ -32,40 +32,34 @@ void ConfigStore::load_config() {
 
     // 檢查 Magic Number，如果不符合代表是新晶片或資料損毀
     if (data.magic_number != CONFIG_MAGIC) {
-        Serial.println("Config invalid (magic number mismatch), resetting to defaults...");
+        // Serial.println("Config invalid (magic number mismatch), resetting to defaults...");
         needs_reset = true;
     } else if (isnan(data.motor.p) || isnan(data.motor.i) || isnan(data.motor.d) ||
                isnan(data.pitch.p) || isnan(data.pitch.i) || isnan(data.pitch.d) ||
                isnan(data.rate.p) || isnan(data.rate.i) || isnan(data.rate.d) ||
                isnan(data.yaw.p) || isnan(data.yaw.i) || isnan(data.yaw.d) ||
                isnan(data.velocity.p) || isnan(data.velocity.i) || isnan(data.velocity.d)) {
-        Serial.println("Config invalid (contains NaN), resetting to defaults...");
+        // Serial.println("Config invalid (contains NaN), resetting to defaults...");
         needs_reset = true;
     }
 
     if (needs_reset) {
         reset_defaults();
     } else {
-        Serial.println("Config loaded from EEPROM.");
+        // Serial.println("Config loaded from EEPROM.");
     }
 }
 
 void ConfigStore::save_config() {
-    _dirty = true;
-}
+    // 為了避免過度寫入 Flash，只有在資料改變時才寫入
+    SystemConfig old_data;
+    EEPROM.get(EEPROM_ADDR, old_data);
+    if (memcmp(&data, &old_data, sizeof(SystemConfig)) == 0) return;
 
-void ConfigStore::update() {
-    if (!_dirty) return;
+    EEPROM.put(EEPROM_ADDR, data);
 
-    uint32_t now = millis();
-    if (now - last_save_time > 1000) {
-        last_save_time = now;
-        _dirty = false;
-        EEPROM.put(EEPROM_ADDR, data);
-        
-        // ESP 系列需要 commit 才會真正寫入 Flash
-        #if defined(ESP32) || defined(ESP8266)
-            EEPROM.commit();
-        #endif
-    }
+    // ESP 系列需要 commit 才會真正寫入 Flash
+    #if defined(ESP32) || defined(ESP8266)
+        EEPROM.commit();
+    #endif
 }
