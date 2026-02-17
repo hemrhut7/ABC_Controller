@@ -13,7 +13,7 @@ Processing_AHRS::~Processing_AHRS() {
 void Processing_AHRS::init()
 {
     hal_imu_init();
-    init_time = millis();
+    last_time = micros();
     is_stable = false;
 }
 
@@ -21,13 +21,21 @@ void Processing_AHRS::update()
 {
     if (!hal_imu_healthy()) return;
     hal_imu_read(&ahrs_data.imu_data);
+    const uint64_t now = ahrs_data.imu_data.timestamp;
 
     if (!is_stable) { 
-        is_stable = millis() - init_time > 1000;
+        if (now - last_time > 1000000) {
+            is_stable = true;
+            last_time = now; // 穩定後重置時間，確保第一幀的 dt 正確
+        }
         return;
     }
+
+    float dt = (now - last_time) * 1e-6f;
+    last_time = now;
+    if (dt <= 0.0f || dt > 0.1f) dt = 0.01f; // 保護性濾波，避免異常 dt
     
-    cpf.update(ahrs_data.imu_data.gyro, ahrs_data.imu_data.accl);
+    cpf.update(ahrs_data.imu_data.gyro, ahrs_data.imu_data.accl, dt);
     cpf.getEuler(ahrs_data.euler);
 }
 

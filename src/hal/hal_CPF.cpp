@@ -73,7 +73,11 @@ void CPF::enableCheckACC(bool is_enable) {
     enable_check_acc = is_enable;
 }
 
-void CPF::update(float omg[3], float acc[3]) {
+void CPF::update(float omg[3], float acc[3], float dt) {
+    this->dt = dt;
+    // K_bias 原本是 1/fs，即 dt
+    this->K_bias = dt;
+
     if (!is_initialized) {
         if (lc_list_count < LC_WINDOW_SIZE) {
             std::copy(omg, omg + 3, LC_list[lc_list_count]);

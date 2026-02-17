@@ -31,7 +31,7 @@ typedef struct {
 
 
 typedef struct {
-    float timestamp;
+    uint64_t timestamp;
     float gyro[3];
     float accl[3];
     float temp;

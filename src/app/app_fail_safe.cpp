@@ -1,7 +1,7 @@
 #include "app_fail_safe.h"
 
-Failsafe::Failsafe(Processing_AHRS* ahrs, Processing_Motor* motor, HAL_LED* led) 
-    : _ahrs(ahrs), _motor(motor), _led(led) {
+Failsafe::Failsafe(Processing_Motor* motor, HAL_LED* led) 
+    : _motor(motor), _led(led) {
     armed_state = false;
     last_check_time = 0;
     pickup_start_time = 0;
@@ -13,15 +13,7 @@ void Failsafe::init() {
     last_check_time = millis();
 }
 
-bool Failsafe::check() {
-    
-    if (_ahrs->is_ready()) {
-        _led->set_state(WORKING);
-    }
-
-    ahrs_data_t ahrs_data;
-    _ahrs->get_ahrs_data(&ahrs_data);
-    
+bool Failsafe::check(const ahrs_data_t &ahrs_data) {
     motor_state_t motor_state;
     _motor->get_motor_state(&motor_state);
 
@@ -39,6 +31,7 @@ bool Failsafe::check() {
         // 選項：您可以選擇只印出警告，或是嚴格一點直接 Disarm
         // 這裡我們先做嚴格檢查：系統太慢就斷電
         armed_state = false; 
+        delay_counter++;
         // Serial.printf("Loop too slow: %d ms\n", dt);
     }
     last_check_time = current_time_ms;
@@ -88,6 +81,16 @@ bool Failsafe::check() {
     }
 
     return true; // ARMED & Safe
+}
+
+void Failsafe::set_ahrs_ready(bool ready) {
+    // 如果 AHRS 還沒準備好，強制 Disarm
+    if (!ready) {
+        armed_state = false;
+    } else {
+        armed_state = true;
+        _led->set_state(WORKING);
+    }
 }
 
 

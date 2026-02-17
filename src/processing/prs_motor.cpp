@@ -29,9 +29,9 @@ void Processing_Motor::set_pwm(int left_pwm, int right_pwm) {
 }
 
 
-void Processing_Motor::update_rpms() {
-    motor_l.update_rpm();
-    motor_r.update_rpm();
+void Processing_Motor::update_rpms(float dt) {
+    motor_l.update_rpm(dt);
+    motor_r.update_rpm(dt);
 }
 
 

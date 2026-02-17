@@ -29,7 +29,7 @@ void Telemetry::process_serial_outgoing() {
         // A packet was successfully received. 
         // Now, manually flatten the nested struct into a float array for VOFA+.
         float data_packet[15];
-        data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp;
+        data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
         data_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
         data_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
         data_packet[3] = pkt.abc_state.ahrs_data.euler[2] * RAD_TO_DEG;
@@ -58,7 +58,7 @@ void Telemetry::process_bt_outgoing() {
         // A packet was successfully received. 
         // Now, manually flatten the nested struct into a float array for VOFA+.
         float data_packet[4];
-        data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp;
+        data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
         data_packet[1] = pkt.target_val;
 
         float val3 = NAN;

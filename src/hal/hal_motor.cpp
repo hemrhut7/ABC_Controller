@@ -65,7 +65,12 @@ void HAL_Motor::getPCNTCount() {
     pcnt_counter_clear(pcnt_uint); // 讀取後清零
 }
 
-void HAL_Motor::update_rpm() {
+void HAL_Motor::update_rpm(float dt) {
+    this->dt = dt;
+    this->update_rate_hz = 1.0f / dt;
+    // 更新最大變化率限制 (因為 dt 改變了)
+    this->MAX_MOTOR_DELTA_RPM = MAX_MOTOR_RPM_RATE * dt;
+
     getPCNTCount();
     // dps = count * degrees_per_count * frequency
     float dps = (float)count * DEG_PER_CNT * update_rate_hz;

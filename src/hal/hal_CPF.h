@@ -13,7 +13,7 @@ public:
     CPF(uint32_t period_ms);
     ~CPF();
     void setInit(int fs = 100);
-    void update(float omg[3], float acc[3]);
+    void update(float omg[3], float acc[3], float dt);
     void getEuler(float euler[3]);
     void getBias(float bias[3]);
     void enableCheckACC(bool is_enable);

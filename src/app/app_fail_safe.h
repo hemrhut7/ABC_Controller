@@ -8,7 +8,7 @@
 
 class Failsafe {
 public:
-    Failsafe(Processing_AHRS* ahrs, Processing_Motor* motor, HAL_LED* led);
+    Failsafe(Processing_Motor* motor, HAL_LED* led);
 
     void init();
 
@@ -17,14 +17,16 @@ public:
      * @param current_time_ms 當前系統時間
      * @return true: 安全 (ARMED), false: 危險 (DISARMED)
      */
-    bool check();
+    bool check(const ahrs_data_t &ahrs_data);
 
     bool is_armed();
 
     uint32_t get_loop_time_ms() { return loop_time_ms; }
+    uint16_t get_delay_count() { return delay_counter; }
+
+    void set_ahrs_ready(bool ready);
 
 private:
-    Processing_AHRS* _ahrs;
     Processing_Motor* _motor;
     HAL_LED* _led;
 
@@ -38,8 +40,7 @@ private:
     // --- 閾值設定 ---
 
     // 1. 迴圈性能限制
-    // 如果迴圈超過 20ms (50Hz) 沒更新，視為系統卡頓
-    const uint32_t MAX_LOOP_TIME_MS = 20; 
+    const uint32_t MAX_LOOP_TIME_MS = 15; 
 
     // 2. 倒地保護角度 (45度)
     const float CRITICAL_ANGLE_RAD = 45.0f * 0.0174533f; 
@@ -50,5 +51,5 @@ private:
     const float PICKUP_GYRO_THRESHOLD = 15.0f * 0.0174533f; // 且角速度小於 15 deg/s
     const uint32_t PICKUP_CONFIRM_MS = 500;   // 持續 0.5 秒才觸發
     uint32_t loop_time_ms = 0;
-
+    uint16_t delay_counter = 0;
 };

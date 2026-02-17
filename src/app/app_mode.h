@@ -9,9 +9,9 @@
 
 class AppMode {
 public:
-    AppMode(Processing_AHRS* ahrs, Processing_Motor* motor, ConfigStore* config_store);
+    AppMode(Processing_Motor* motor, ConfigStore* config_store);
     void init();
-    void update(float dt); // 必須傳入固定 dt
+    void update(float dt, const ahrs_data_t &ahrs_state);
     void set_command(UserCommand_t cmd);
     void set_mode(Mode_t mode);
     void set_target(float val, float yaw);
@@ -26,7 +26,6 @@ public:
     const SystemConfig& get_pid_config() const;
 
 private:
-    Processing_AHRS* _ahrs;
     Processing_Motor* _motor;
     ConfigStore* _config_store;
     

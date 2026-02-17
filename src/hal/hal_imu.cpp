@@ -65,7 +65,7 @@ void hal_imu_read(imu_data_t *data) {
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
-  data->timestamp = (float)millis() * 1e-3f;
+  data->timestamp = micros();
 
   float raw_x = -a.acceleration.x;
   float raw_y = a.acceleration.y;

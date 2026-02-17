@@ -12,7 +12,7 @@ public:
     void set_target_rpms(int left_rpm, int right_rpm);
     void set_enable(bool enable);
     void set_pwm(int left_pwm, int right_pwm);
-    void update_rpms();
+    void update_rpms(float dt);
     void get_motor_state(motor_state_t *state);
     void set_pid_gains(float p, float i, float d);
 

@@ -7,8 +7,8 @@
 // Factor = 0.0325 * 2 * 3.14159 / 60 ~= 0.003403
 #define RPM_TO_MS 0.003403f 
 
-AppMode::AppMode(Processing_AHRS* ahrs, Processing_Motor* motor, ConfigStore* config_store) 
-    : _ahrs(ahrs), _motor(motor), _config_store(config_store) {
+AppMode::AppMode(Processing_Motor* motor, ConfigStore* config_store) 
+    : _motor(motor), _config_store(config_store) {
     _cmd.mode = MODE_STOP;
     _cmd.target_value = 0.0f;
     _cmd.target_yaw_rate = 0.0f;
@@ -63,7 +63,7 @@ void AppMode::set_target(float val, float yaw) {
     _cmd.target_yaw_rate = yaw;
 }
 
-void AppMode::update(float dt) {
+void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     // 先處理MODE_PWM
     if (_cmd.mode == MODE_PWM) {
         _motor->set_pwm(_cmd.target_value, _cmd.target_value);
@@ -71,9 +71,7 @@ void AppMode::update(float dt) {
     }    
 
     // 1. 獲取狀態 (State Estimation)
-    ahrs_data_t ahrs_state;
     motor_state_t motor_state;
-    _ahrs->get_ahrs_data(&ahrs_state);
     _motor->get_motor_state(&motor_state);
 
     current_velocity = (motor_state.rpm_L + motor_state.rpm_R) * 0.5f * RPM_TO_MS; // 需定義轉換係數
