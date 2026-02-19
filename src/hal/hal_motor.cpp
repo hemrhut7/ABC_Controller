@@ -1,10 +1,10 @@
 #include "hal_motor.h"
 
 
-HAL_Motor::HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stdy_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin): 
-pwm_pin(pwm_pin), dir_pin1(dir_pin1), dir_pin2(dir_pin2), stdy_pin(stdy_pin), enc_a_pin(enc_a_pin), enc_b_pin(enc_b_pin) {
-    init();
-}
+// HAL_Motor::HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stdy_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin): 
+// pwm_pin(pwm_pin), dir_pin1(dir_pin1), dir_pin2(dir_pin2), stdy_pin(stdy_pin), enc_a_pin(enc_a_pin), enc_b_pin(enc_b_pin) {
+//     init();
+// }
 
 HAL_Motor::HAL_Motor(MotorPosition position, uint32_t period_ms) {
     if (position == LEFT_MOTOR) {
@@ -51,6 +51,7 @@ void HAL_Motor::init() {
 
     count = 0;
     pid.reset();
+    pid.setOutputLimits(-MAX_PWM_DUTY, MAX_PWM_DUTY);
 }
 
 HAL_Motor::~HAL_Motor() {
@@ -85,37 +86,31 @@ void HAL_Motor::set_target_rpm(int target_rpm) {
         target_rpm = last_target_rpm + MAX_MOTOR_DELTA_RPM;
     }
 
-    // 1. PID 計算
-    // float output = pid.compute(dt, target_rpm, current_rpm);
     float derivative = (dt > 0) ? -(current_rpm - last_rpm) * update_rate_hz : 0;
     float output = pid.compute(dt, target_rpm, current_rpm, derivative); // 加入 P、I、D 計算
-
-    // 2. 前饋控制 (Feedforward)
     output += target_rpm * MOTOR_KV;
 
-    // 3. 死區補償 (Deadzone Compensation)
-    if (target_rpm != 0) {
-        if (output > 0 && output < MOTOR_DEADZONE) output = MOTOR_DEADZONE;
-        else if (output < 0 && output > -MOTOR_DEADZONE) output = -MOTOR_DEADZONE;
-    }
-
-    // 4. 輸出限制
-    last_pwm_out = constrain(output, -255, 255);
-    drive_moter(last_pwm_out);
+    drive_moter(output);
 
     last_target_rpm = target_rpm;
     last_rpm = current_rpm;
 }
 
-void HAL_Motor::drive_moter(int pmw) {
-    if(pmw >= 0) {
+void HAL_Motor::drive_moter(int pwm) {
+    if (pwm < MOTOR_DEADZONE && pwm > -MOTOR_DEADZONE && current_rpm == 0 && pwm != 0) {
+        pwm += dither_dir * MOTOR_DITHER;
+        dither_dir *= -1;
+    }
+    last_pwm_out = constrain(pwm, -MAX_PWM_DUTY, MAX_PWM_DUTY);
+
+    if(last_pwm_out >= 0) {
         digitalWrite(dir_pin1, HIGH);
         digitalWrite(dir_pin2, LOW);
-        ledcWrite(pwm_channel, pmw);
+        ledcWrite(pwm_channel, last_pwm_out);
     } else {
         digitalWrite(dir_pin1, LOW);
         digitalWrite(dir_pin2, HIGH);
-        ledcWrite(pwm_channel, -pmw);
+        ledcWrite(pwm_channel, -last_pwm_out);
     }
 }
 
@@ -148,39 +143,71 @@ int HAL_Motor::get_target_rpm() {
 }
 
 void setupPCNT() {
-    // 配置左電機 (Unit 0)
-    pcnt_config_t pcnt_config_l = {
+    // 配置左電機 (Unit 0) - Channel 0
+    pcnt_config_t pcnt_config_l_ch0 = {
         .pulse_gpio_num = MOTOR_L_E1A_PIN, // A 相
         .ctrl_gpio_num = MOTOR_L_E1B_PIN,  // B 相
         .lctrl_mode = PCNT_MODE_REVERSE,   // B 相低電平反轉計數（減）
         .hctrl_mode = PCNT_MODE_KEEP,      // B 相高電平保持計數（增）
         .pos_mode = PCNT_COUNT_INC,        // A 相上升沿增計數
-        .neg_mode = PCNT_COUNT_DIS,        // A 相下降沿禁用
+        .neg_mode = PCNT_COUNT_DEC,        // A 相下降沿減計數
         .counter_h_lim = 32767,
         .counter_l_lim = -32768,
         .unit = PCNT_UNIT_0,
         .channel = PCNT_CHANNEL_0
     };
-    pcnt_unit_config(&pcnt_config_l);
-    pcnt_set_filter_value(PCNT_UNIT_0, 10); // 濾波 10 個 APB 週期 (~125ns @ 80MHz)
+    pcnt_unit_config(&pcnt_config_l_ch0);
+
+    // 配置左電機 (Unit 0) - Channel 1 (新增以實現 4 倍頻)
+    pcnt_config_t pcnt_config_l_ch1 = {
+        .pulse_gpio_num = MOTOR_L_E1B_PIN, // B 相
+        .ctrl_gpio_num = MOTOR_L_E1A_PIN,  // A 相
+        .lctrl_mode = PCNT_MODE_KEEP,      // A 相低電平保持 (配合 Ch0 邏輯)
+        .hctrl_mode = PCNT_MODE_REVERSE,   // A 相高電平反轉
+        .pos_mode = PCNT_COUNT_INC,        // B 相上升沿
+        .neg_mode = PCNT_COUNT_DEC,        // B 相下降沿
+        .counter_h_lim = 32767,
+        .counter_l_lim = -32768,
+        .unit = PCNT_UNIT_0,
+        .channel = PCNT_CHANNEL_1
+    };
+    pcnt_unit_config(&pcnt_config_l_ch1);
+
+    pcnt_set_filter_value(PCNT_UNIT_0, 100); // 濾波 10 個 APB 週期 (~125ns @ 80MHz)
     pcnt_filter_enable(PCNT_UNIT_0);
     pcnt_counter_clear(PCNT_UNIT_0);
 
-    // 配置右電機 (Unit 1)
-    pcnt_config_t pcnt_config_r = {
+    // 配置右電機 (Unit 1) - Channel 0
+    pcnt_config_t pcnt_config_r_ch0 = {
         .pulse_gpio_num = MOTOR_R_E2A_PIN,
         .ctrl_gpio_num = MOTOR_R_E2B_PIN,
         .lctrl_mode = PCNT_MODE_REVERSE,
         .hctrl_mode = PCNT_MODE_KEEP,
         .pos_mode = PCNT_COUNT_INC,
-        .neg_mode = PCNT_COUNT_DIS,
+        .neg_mode = PCNT_COUNT_DEC,
         .counter_h_lim = 32767,
         .counter_l_lim = -32768,
         .unit = PCNT_UNIT_1,
         .channel = PCNT_CHANNEL_0
     };
-    pcnt_unit_config(&pcnt_config_r);
-    pcnt_set_filter_value(PCNT_UNIT_1, 10);
+    pcnt_unit_config(&pcnt_config_r_ch0);
+
+    // 配置右電機 (Unit 1) - Channel 1
+    pcnt_config_t pcnt_config_r_ch1 = {
+        .pulse_gpio_num = MOTOR_R_E2B_PIN,
+        .ctrl_gpio_num = MOTOR_R_E2A_PIN,
+        .lctrl_mode = PCNT_MODE_KEEP,
+        .hctrl_mode = PCNT_MODE_REVERSE,
+        .pos_mode = PCNT_COUNT_INC,
+        .neg_mode = PCNT_COUNT_DEC,
+        .counter_h_lim = 32767,
+        .counter_l_lim = -32768,
+        .unit = PCNT_UNIT_1,
+        .channel = PCNT_CHANNEL_1
+    };
+    pcnt_unit_config(&pcnt_config_r_ch1);
+
+    pcnt_set_filter_value(PCNT_UNIT_1, 100);
     pcnt_filter_enable(PCNT_UNIT_1);
     pcnt_counter_clear(PCNT_UNIT_1);
 }

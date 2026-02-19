@@ -15,10 +15,10 @@
 #define PRIORITY_COMM      10
 #define PRIORITY_BT        5
 
-#define PERIOD_CONTROLL       10    // 100Hz
-#define PERIOD_AHRS           10    // 100Hz
-#define PERIOD_COMM           20   // 50Hz
-#define PERIOD_BT             20   // 50Hz
+#define PERIOD_CONTROLL       10                    // 100Hz
+#define PERIOD_AHRS           PERIOD_CONTROLL       // 100Hz
+#define PERIOD_COMM           20                    // 50Hz
+#define PERIOD_BT             25                    // 40Hz
 
 TaskHandle_t ControlTaskHandle;
 TaskHandle_t AHRSTaskHandle;
@@ -102,7 +102,7 @@ void AHRS_Task(void *pvParameters) {
         ahrs.get_ahrs_data(&ahrs_data);
 
         // 將 AHRS 資料推送到 Queue
-        // xQueueSend(ahrs_queue, &ahrs_data, 0);
+        xQueueSend(ahrs_queue, &ahrs_data, 0);
         xQueueOverwrite(ahrs_queue, &ahrs_data); // 使用 Overwrite 以確保最新資料可用
         vTaskDelayUntil(&xLastWakeTime, xFrequency);  // 確保精確的執行頻率
     }
@@ -153,7 +153,7 @@ void setup() {
     
     // Core 0
     xTaskCreatePinnedToCore(Comm_Task, "CommTask", 4096, NULL, PRIORITY_COMM, &CommTaskHandle, 0);
-    // xTaskCreatePinnedToCore(BT_Task,   "BT_Task" , 4096, NULL, PRIORITY_BT, &BTTaskHandle, 0);
+    xTaskCreatePinnedToCore(BT_Task,   "BT_Task" , 4096, NULL, PRIORITY_BT, &BTTaskHandle, 0);
 }
 
 void loop() {

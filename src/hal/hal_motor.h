@@ -3,21 +3,24 @@
 #include <Arduino.h>
 #include <driver/pcnt.h>
 #include "pid.h"
+#include "LPF.h"
 
 
 constexpr int PPR = 500;           // 每轉脈衝數 (300線)
 constexpr float GEAR_RATIO = 30.0f; // 減速比
-constexpr int QUADRATURE = 1;      // 1倍頻 (1Pin * RISING)
+constexpr int QUADRATURE = 4;      // 4倍頻 (2Pin * CHANGE)
 constexpr float CPR = PPR * QUADRATURE * GEAR_RATIO; // 每轉計數 (500 * 1 * 30 = 15000)
 constexpr float DEG_PER_CNT = 360.0f / CPR;
 constexpr float DPS_2_RPM = 60.0f / 360.0f;
 constexpr int PWM_FREQ = 20000;
-constexpr int PWM_RES = 8;
+constexpr int PWM_RES = 10;
+constexpr int MAX_PWM_DUTY = (1 << PWM_RES) - 1; // 1023
 
 
-#define MOTOR_DEADZONE 17
-#define MOTOR_KV       0.73f 
-#define MAX_MOTOR_RPM 230
+#define MOTOR_DEADZONE 55
+#define MOTOR_DITHER 40
+#define MOTOR_KV       0.3525f
+#define MAX_MOTOR_RPM 160
 #define MAX_MOTOR_RPM_RATE 2500
 
 #define MOTOR_L_DIR1_PIN    5
@@ -43,7 +46,7 @@ enum MotorPosition {
 
 class HAL_Motor {
     public:
-        HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stdy_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin);
+        // HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stdy_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin);
         HAL_Motor(MotorPosition position, uint32_t period_ms);
         ~HAL_Motor();
         void set_target_rpm(int target_rpm);
@@ -53,7 +56,7 @@ class HAL_Motor {
         void set_enable(bool enable);
         int get_current_rpm();
         int get_target_rpm();
-        void drive_moter(int pmw);
+        void drive_moter(int pwm);
 
     private:
         uint8_t pwm_pin;
@@ -78,6 +81,7 @@ class HAL_Motor {
         pcnt_unit_t pcnt_uint = PCNT_UNIT_0;  // Default to 0 for left motor, 1 for right motor
         uint8_t pwm_channel = 0;
         bool is_enable = true;
+        int8_t dither_dir = 1;
 
         void init();
         void getPCNTCount();
