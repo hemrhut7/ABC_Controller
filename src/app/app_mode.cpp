@@ -7,8 +7,10 @@
 // Factor = 0.0325 * 2 * 3.14159 / 60 ~= 0.003403
 #define RPM_TO_MS 0.003403f 
 
-AppMode::AppMode(Processing_Motor* motor, ConfigStore* config_store) 
-    : _motor(motor), _config_store(config_store) {
+AppMode::AppMode(Processing_Motor* motor, ConfigStore* config_store, int interval_ms) 
+    : _motor(motor), _config_store(config_store), 
+    lpf_angle(1000 / interval_ms, 20), lpf_rate(1000 / interval_ms, 20), 
+    lpf_velocity(1000 / interval_ms, 20), lpf_yaw(1000 / interval_ms, 20) {
     _cmd.mode = MODE_STOP;
     _cmd.target_value = 0.0f;
     _cmd.target_yaw_rate = 0.0f;
@@ -76,36 +78,28 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
 
     current_velocity = (motor_state.rpm_L + motor_state.rpm_R) * 0.5f * RPM_TO_MS; // 需定義轉換係數
     float current_pitch = ahrs_state.euler[0]; // Rad
-    float current_gyro_y = ahrs_state.imu_data.gyro[1]; // Rad/s
+    float current_gyro_x = ahrs_state.imu_data_calibrated.gyro[0]; // Rad/s
 
     // --- 串級控制邏輯 (The Cascade) ---
     
     // Level 4: Velocity Loop (速度環)
-    if (_cmd.mode == MODE_VELOCITY || _cmd.mode == MODE_REMOTE) {
         // 輸入：目標速度 (m/s)，輸出：目標角度 (rad)
-        _target_pitch = _pid_velocity.compute(dt, _cmd.target_value, current_velocity);
-        
-        // 安全限幅：物理上不可能傾斜超過 45 度還能救回來
-        _target_pitch = constrain(_target_pitch, -0.5f, 0.5f); 
+    if (_cmd.mode == MODE_VELOCITY || _cmd.mode == MODE_REMOTE) {
+        float target_velocity = lpf_velocity.update(_cmd.target_value); // 速度指令的低通濾波
+        _target_pitch = _pid_velocity.compute(dt, target_velocity, current_velocity);
+        _target_pitch = lpf_angle.update(_target_pitch); // 角度指令的低通濾波
+        _target_pitch = constrain(_target_pitch, -0.5f, 0.5f);
     } 
     else if (_cmd.mode == MODE_ANGLE) {
-        _target_pitch = _cmd.target_value;
+        _target_pitch = lpf_angle.update(_cmd.target_value); // 角度指令的低通濾波
+        _target_pitch = constrain(_target_pitch, -0.5f, 0.5f);
     }
 
     // Level 3: Angle Loop (直立環)
+    // 輸入：目標角度，輸出：目標角速度
     if (_cmd.mode >= MODE_ANGLE && _cmd.mode != MODE_FREE) {
-        // 輸入：目標角度，輸出：目標角速度
-        _target_pitch_rate = _pid_angle.compute(dt, _target_pitch, current_pitch);
+        _output_balance = _pid_angle.compute(dt, _target_pitch, current_pitch);
     } 
-    else if (_cmd.mode == MODE_RATE) {
-        _target_pitch_rate = _cmd.target_value;
-    }
-
-    // Level 2: Rate Loop (角速度/阻尼環)
-    if (_cmd.mode >= MODE_RATE && _cmd.mode != MODE_FREE) {
-        // 輸入：目標角速度，輸出：馬達 PWM 或 RPM 增量
-        _output_balance = _pid_rate.compute(dt, _target_pitch_rate, current_gyro_y);
-    }
     else if (_cmd.mode == MODE_MOTOR) {
         _output_balance = _cmd.target_value;
     }
@@ -115,8 +109,8 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
 
     // Yaw Loop (獨立的轉向環)
     if (_cmd.mode == MODE_REMOTE || _cmd.mode == MODE_VELOCITY) {
-        float current_yaw_rate = ahrs_state.imu_data.gyro[2];
-        _output_turn = _pid_yaw.compute(dt, _cmd.target_yaw_rate, current_yaw_rate);
+        float target_yaw_rate = lpf_yaw.update(_cmd.target_yaw_rate);
+        _output_turn = _pid_yaw.compute(dt, target_yaw_rate, ahrs_state.imu_data.gyro[2]);
     } else {
         _output_turn = 0;
     }

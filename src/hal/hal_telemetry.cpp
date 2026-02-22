@@ -71,7 +71,7 @@ void Telemetry::process_bt_outgoing() {
                 val4 = (float)pkt.abc_state.motor_state.rpm_R;
                 break;
             case MODE_RATE:
-                val3 = pkt.abc_state.ahrs_data.imu_data.gyro[0];
+                val3 = pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[0];
                 break;
             case MODE_ANGLE:
                 val3 = pkt.abc_state.ahrs_data.euler[0];

@@ -49,13 +49,13 @@ class HAL_Motor {
         // HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stdy_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin);
         HAL_Motor(MotorPosition position, uint32_t period_ms);
         ~HAL_Motor();
-        void set_target_rpm(int target_rpm);
+        void set_target_rpm(float target_rpm);
         void update_rpm(float dt);
         void setup_motor_dir(bool dir_forward);
         void set_pid_gains(float p, float i, float d);
         void set_enable(bool enable);
-        int get_current_rpm();
-        int get_target_rpm();
+        float get_current_rpm() { return current_rpm;}
+        float get_target_rpm() { return last_target_rpm; }
         void drive_moter(int pwm);
 
     private:
@@ -67,14 +67,14 @@ class HAL_Motor {
         uint8_t enc_b_pin;
         uint16_t update_rate_hz = 100;
         float dt = 1e-2f;
-        int MAX_MOTOR_DELTA_RPM = MAX_MOTOR_RPM_RATE * dt;
+        float MAX_MOTOR_DELTA_RPM = MAX_MOTOR_RPM_RATE * dt;
 
         volatile uint32_t last_time = 0;
         int16_t count;
         int last_pwm_out = 0;
-        int last_target_rpm = 0;
-        int last_rpm = 0;
-        int current_rpm = 0;
+        float last_target_rpm = 0;
+        float last_rpm = 0;
+        float current_rpm = 0;
 
         PID pid;
         int dir_forward = 1;
@@ -83,6 +83,8 @@ class HAL_Motor {
         bool is_enable = true;
         int8_t dither_dir = 1;
 
+        LPF_1D lpf_rpm;
+        
         void init();
         void getPCNTCount();
 };

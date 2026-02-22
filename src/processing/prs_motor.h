@@ -9,7 +9,7 @@ public:
     ~Processing_Motor();
 
     void init();
-    void set_target_rpms(int left_rpm, int right_rpm);
+    void set_target_rpms(float left_rpm, float right_rpm);
     void set_enable(bool enable);
     void set_pwm(int left_pwm, int right_pwm);
     void update_rpms(float dt);

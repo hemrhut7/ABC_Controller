@@ -39,14 +39,15 @@ typedef struct {
 
 typedef struct {   
     imu_data_t imu_data;
+    imu_data_t imu_data_calibrated;
     float euler[3];
 } ahrs_data_t;
 
 
 typedef struct
 {
-    int rpm_L, rpm_R;
-    int target_rpm_L, target_rpm_R;
+    float rpm_L, rpm_R;
+    float target_rpm_L, target_rpm_R;
 } motor_state_t;
 
 typedef struct

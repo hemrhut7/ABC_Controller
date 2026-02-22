@@ -13,7 +13,7 @@ void Processing_Motor::init() {
     set_target_rpms(0, 0);
 }
 
-void Processing_Motor::set_target_rpms(int left_rpm, int right_rpm) {
+void Processing_Motor::set_target_rpms(float left_rpm, float right_rpm) {
     motor_l.set_target_rpm(left_rpm);
     motor_r.set_target_rpm(right_rpm);
 }

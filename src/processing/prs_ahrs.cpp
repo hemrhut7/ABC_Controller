@@ -37,6 +37,13 @@ void Processing_AHRS::update()
     
     cpf.update(ahrs_data.imu_data.gyro, ahrs_data.imu_data.accl, dt);
     cpf.getEuler(ahrs_data.euler);
+
+    float bias[3];
+    cpf.getBias(bias);
+    ahrs_data.imu_data_calibrated = ahrs_data.imu_data;
+    ahrs_data.imu_data_calibrated.gyro[0] -= bias[0];
+    ahrs_data.imu_data_calibrated.gyro[1] -= bias[1];
+    ahrs_data.imu_data_calibrated.gyro[2] -= bias[2];
 }
 
 void Processing_AHRS::get_ahrs_data(ahrs_data_t *data)

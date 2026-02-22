@@ -45,6 +45,7 @@ void hal_imu_init() {
     // Serial.println("Failed to initialize I2C bus");
     return;
   }
+  Wire.setTimeOut(5);
   if (!mpu.begin()) {
     // Serial.println("Failed to find MPU6050 chip");
     return;

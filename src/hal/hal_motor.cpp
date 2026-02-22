@@ -6,7 +6,7 @@
 //     init();
 // }
 
-HAL_Motor::HAL_Motor(MotorPosition position, uint32_t period_ms) {
+HAL_Motor::HAL_Motor(MotorPosition position, uint32_t period_ms): lpf_rpm(1000 / period_ms, 50) {
     if (position == LEFT_MOTOR) {
         pwm_pin = MOTOR_L_PWM_PIN;
         dir_pin1 = MOTOR_L_DIR1_PIN;
@@ -45,7 +45,7 @@ void HAL_Motor::init() {
     ledcSetup(pwm_channel, PWM_FREQ, PWM_RES);
     ledcAttachPin(pwm_pin, pwm_channel);
     ledcWrite(pwm_channel, 0);
-    digitalWrite(dir_pin1, HIGH);
+    digitalWrite(dir_pin1, LOW);
     digitalWrite(dir_pin2, LOW);
     digitalWrite(stdy_pin, LOW);
 
@@ -56,7 +56,7 @@ void HAL_Motor::init() {
 
 HAL_Motor::~HAL_Motor() {
     ledcWrite(pwm_channel, 0);
-    digitalWrite(dir_pin1, HIGH);
+    digitalWrite(dir_pin1, LOW);
     digitalWrite(dir_pin2, LOW);
     digitalWrite(stdy_pin, LOW);
 }
@@ -73,12 +73,11 @@ void HAL_Motor::update_rpm(float dt) {
     this->MAX_MOTOR_DELTA_RPM = MAX_MOTOR_RPM_RATE * dt;
 
     getPCNTCount();
-    // dps = count * degrees_per_count * frequency
     float dps = (float)count * DEG_PER_CNT * update_rate_hz;
-    current_rpm = dps * DPS_2_RPM * dir_forward;
+    current_rpm = lpf_rpm.update(dps * DPS_2_RPM * dir_forward);
 }
 
-void HAL_Motor::set_target_rpm(int target_rpm) {
+void HAL_Motor::set_target_rpm(float target_rpm) {
     target_rpm = constrain(target_rpm, -MAX_MOTOR_RPM, MAX_MOTOR_RPM);
     if (last_target_rpm - target_rpm > MAX_MOTOR_DELTA_RPM) {
         target_rpm = last_target_rpm - MAX_MOTOR_DELTA_RPM;
@@ -97,12 +96,19 @@ void HAL_Motor::set_target_rpm(int target_rpm) {
 }
 
 void HAL_Motor::drive_moter(int pwm) {
-    if (pwm < MOTOR_DEADZONE && pwm > -MOTOR_DEADZONE && current_rpm == 0 && pwm != 0) {
+    if (pwm == 0) {
+        ledcWrite(pwm_channel, 0);
+        digitalWrite(dir_pin1, LOW);
+        digitalWrite(dir_pin2, LOW);
+        return;
+    }
+
+    if (pwm < MOTOR_DEADZONE && pwm > -MOTOR_DEADZONE && current_rpm == 0) {
         pwm += dither_dir * MOTOR_DITHER;
         dither_dir *= -1;
     }
+    
     last_pwm_out = constrain(pwm, -MAX_PWM_DUTY, MAX_PWM_DUTY);
-
     if(last_pwm_out >= 0) {
         digitalWrite(dir_pin1, HIGH);
         digitalWrite(dir_pin2, LOW);
@@ -132,14 +138,6 @@ void HAL_Motor::set_enable(bool enable) {
         digitalWrite(stdy_pin, LOW); // 關閉 H-Bridge (高阻抗/滑行)
         ledcWrite(pwm_channel, 0);   // 確保 PWM 為 0
     }
-}
-
-int HAL_Motor::get_current_rpm() {
-    return current_rpm;
-}
-
-int HAL_Motor::get_target_rpm() {
-    return last_target_rpm;
 }
 
 void setupPCNT() {

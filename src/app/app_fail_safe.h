@@ -8,7 +8,7 @@
 
 class Failsafe {
 public:
-    Failsafe(Processing_Motor* motor, HAL_LED* led);
+    Failsafe(uint16_t period_ms, Processing_Motor* motor, HAL_LED* led);
 
     void init();
 
@@ -40,7 +40,7 @@ private:
     // --- 閾值設定 ---
 
     // 1. 迴圈性能限制
-    const uint32_t MAX_LOOP_TIME_MS = 15; 
+    uint32_t MAX_LOOP_TIME_MS = 15; 
 
     // 2. 倒地保護角度 (45度)
     const float CRITICAL_ANGLE_RAD = 45.0f * 0.0174533f; 

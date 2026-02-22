@@ -4,12 +4,13 @@
 #include "processing/prs_ahrs.h"
 #include "processing/prs_motor.h"
 #include "pid.h"
+#include "LPF.h"
 #include "hal/hal_storage.h"
 
 
 class AppMode {
 public:
-    AppMode(Processing_Motor* motor, ConfigStore* config_store);
+    AppMode(Processing_Motor* motor, ConfigStore* config_store, int interval_ms);
     void init();
     void update(float dt, const ahrs_data_t &ahrs_state);
     void set_command(UserCommand_t cmd);
@@ -36,6 +37,11 @@ private:
     PID _pid_angle;    // 中環
     PID _pid_rate;     // 內環 (阻尼)
     PID _pid_yaw;      // 轉向
+
+    LPF_1D lpf_rate; // 角速度環的低通濾波器 
+    LPF_1D lpf_angle; // 傾角的低通濾波器
+    LPF_1D lpf_velocity; // 速度的低通濾波器
+    LPF_1D lpf_yaw; // 轉向的低通濾波器
 
     // 中間變數 (便於 Telemetry 觀察)
     float _target_pitch;

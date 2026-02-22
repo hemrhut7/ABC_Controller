@@ -1,10 +1,11 @@
 #include "app_fail_safe.h"
 
-Failsafe::Failsafe(Processing_Motor* motor, HAL_LED* led) 
+Failsafe::Failsafe(uint16_t period_ms, Processing_Motor* motor, HAL_LED* led) 
     : _motor(motor), _led(led) {
     armed_state = false;
     last_check_time = 0;
     pickup_start_time = 0;
+    MAX_LOOP_TIME_MS = period_ms * 1.2;
     is_pickup_condition_met = false;
 }
 
@@ -28,11 +29,8 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data) {
     
     // 忽略第一次執行 (dt 會很大)
     if (last_check_time != 0 && dt > MAX_LOOP_TIME_MS) {
-        // 選項：您可以選擇只印出警告，或是嚴格一點直接 Disarm
-        // 這裡我們先做嚴格檢查：系統太慢就斷電
         armed_state = false; 
         delay_counter++;
-        // Serial.printf("Loop too slow: %d ms\n", dt);
     }
     last_check_time = current_time_ms;
     loop_time_ms = dt;
