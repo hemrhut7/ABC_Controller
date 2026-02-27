@@ -47,7 +47,7 @@ typedef struct {
 typedef struct
 {
     float rpm_L, rpm_R;
-    float target_rpm_L, target_rpm_R;
+    float pwm_out_L, pwm_out_R;
 } motor_state_t;
 
 typedef struct
@@ -58,9 +58,17 @@ typedef struct
 } ABC_state_t;
 
 typedef struct {
+    float rpm_L, rpm_R;
+    float pitch;
+    float velocity;
+    float yaw_rate;
+} PID_target_t;
+
+typedef struct {
     ABC_state_t abc_state;
     uint32_t loop_time_ms;
     float target_val;
+    PID_target_t pid_target;
     Mode_t mode;
 } system_state_t;
 

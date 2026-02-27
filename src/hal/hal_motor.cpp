@@ -69,15 +69,15 @@ void HAL_Motor::getPCNTCount() {
 void HAL_Motor::update_rpm(float dt) {
     this->dt = dt;
     this->update_rate_hz = 1.0f / dt;
-    // 更新最大變化率限制 (因為 dt 改變了)
     this->MAX_MOTOR_DELTA_RPM = MAX_MOTOR_RPM_RATE * dt;
 
     getPCNTCount();
     float dps = (float)count * DEG_PER_CNT * update_rate_hz;
-    current_rpm = lpf_rpm.update(dps * DPS_2_RPM * dir_forward);
+    current_rpm = dps * DPS_2_RPM * dir_forward;
 }
 
 void HAL_Motor::set_target_rpm(float target_rpm) {
+    target_rpm = lpf_rpm.update(target_rpm);
     target_rpm = constrain(target_rpm, -MAX_MOTOR_RPM, MAX_MOTOR_RPM);
     if (last_target_rpm - target_rpm > MAX_MOTOR_DELTA_RPM) {
         target_rpm = last_target_rpm - MAX_MOTOR_DELTA_RPM;

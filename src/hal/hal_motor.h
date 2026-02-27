@@ -54,8 +54,9 @@ class HAL_Motor {
         void setup_motor_dir(bool dir_forward);
         void set_pid_gains(float p, float i, float d);
         void set_enable(bool enable);
-        float get_current_rpm() { return current_rpm;}
+        float get_rpm() { return current_rpm;}
         float get_target_rpm() { return last_target_rpm; }
+        float get_pwm_out() { return last_pwm_out; }
         void drive_moter(int pwm);
 
     private:

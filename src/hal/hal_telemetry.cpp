@@ -1,5 +1,6 @@
 #include "hal_telemetry.h"
 #include <math.h>
+#include <cstring>
 
 // VOFA+ frame tail
 const uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7f};
@@ -46,8 +47,10 @@ void Telemetry::process_serial_outgoing() {
         data_packet[14] = (float)pkt.mode;
 
         // Write the data packet and the tail to the serial port.
-        port.write((uint8_t*)data_packet, sizeof(data_packet));
-        port.write(vofa_tail, sizeof(vofa_tail));
+        uint8_t send_buffer[sizeof(data_packet) + sizeof(vofa_tail)];
+        memcpy(send_buffer, data_packet, sizeof(data_packet));
+        memcpy(send_buffer + sizeof(data_packet), vofa_tail, sizeof(vofa_tail));
+        port.write(send_buffer, sizeof(send_buffer));
     }
 }
 
@@ -57,41 +60,27 @@ void Telemetry::process_bt_outgoing() {
     if (xQueueReceive(data_queue, &pkt, portMAX_DELAY) == pdTRUE) {
         // A packet was successfully received. 
         // Now, manually flatten the nested struct into a float array for VOFA+.
-        float data_packet[4];
+        float data_packet[14];
         data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
         data_packet[1] = pkt.target_val;
-
-        float val3 = NAN;
-        float val4 = NAN;
-
-        switch (pkt.mode) {
-            case MODE_PWM:
-            case MODE_MOTOR:
-                val3 = (float)pkt.abc_state.motor_state.rpm_L;
-                val4 = (float)pkt.abc_state.motor_state.rpm_R;
-                break;
-            case MODE_RATE:
-                val3 = pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[0];
-                break;
-            case MODE_ANGLE:
-                val3 = pkt.abc_state.ahrs_data.euler[0];
-                break;
-            case MODE_VELOCITY:
-                val3 = pkt.abc_state.velocity;
-                break;
-            case MODE_REMOTE:
-                val3 = pkt.abc_state.ahrs_data.imu_data.gyro[2];
-                break;
-            default:
-                break;
-        }
-
-        data_packet[2] = val3;
-        data_packet[3] = val4;
+        data_packet[2] = pkt.pid_target.rpm_L;
+        data_packet[3] = pkt.pid_target.rpm_R;
+        data_packet[4] = pkt.pid_target.pitch * RAD_TO_DEG;
+        data_packet[5] = pkt.pid_target.velocity;
+        data_packet[6] = pkt.pid_target.yaw_rate * RAD_TO_DEG;
+        data_packet[7] = (float)pkt.abc_state.motor_state.pwm_out_L;
+        data_packet[8] = (float)pkt.abc_state.motor_state.pwm_out_R;
+        data_packet[9] = (float)pkt.abc_state.motor_state.rpm_L;
+        data_packet[10] = (float)pkt.abc_state.motor_state.rpm_R;
+        data_packet[11] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
+        data_packet[12] = pkt.abc_state.velocity;
+        data_packet[13] = pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[2] * RAD_TO_DEG;
 
         // Write the data packet and the tail to the serial port.
-        port.write((uint8_t*)data_packet, sizeof(data_packet));
-        port.write(vofa_tail, sizeof(vofa_tail));
+        uint8_t send_buffer[sizeof(data_packet) + sizeof(vofa_tail)];
+        memcpy(send_buffer, data_packet, sizeof(data_packet));
+        memcpy(send_buffer + sizeof(data_packet), vofa_tail, sizeof(vofa_tail));
+        port.write(send_buffer, sizeof(send_buffer));
     }
 }
 

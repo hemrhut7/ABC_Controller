@@ -15,9 +15,9 @@
 #define PRIORITY_COMM      10
 #define PRIORITY_BT        5
 
-#define PERIOD_CONTROLL       5                    // 100Hz
+#define PERIOD_CONTROLL       5                    // 200Hz
 #define PERIOD_COMM           20                    // 50Hz
-#define PERIOD_BT             25                    // 40Hz
+#define PERIOD_BT             20                    // 50Hz
 
 TaskHandle_t ControlTaskHandle;
 TaskHandle_t AHRSTaskHandle;
@@ -38,7 +38,6 @@ Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led);
 
 
 // 1. 控制任務 (Core 1)
-
 void Control_Task(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_CONTROLL);
@@ -71,9 +70,10 @@ void Control_Task(void *pvParameters) {
 
         // 2. Push fresh data to the telemetry queues (non-blocking)
         current_sys_state.loop_time_ms = failsafe.get_delay_count();
-        current_sys_state.target_val = app_mode.get_current_target_val();
-        current_sys_state.mode = app_mode.get_current_mode();
-        current_sys_state.abc_state.velocity = app_mode.get_current_velocity();
+        current_sys_state.target_val = app_mode.get_target_val();
+        current_sys_state.mode = app_mode.get_mode();
+        current_sys_state.abc_state.velocity = app_mode.get_velocity();
+        current_sys_state.pid_target = app_mode.get_pid_target();
         
         uart_telemetry.push_data(current_sys_state);
         bt_telemetry.push_data(current_sys_state);
@@ -84,22 +84,26 @@ void Control_Task(void *pvParameters) {
 
 // 2. 通訊與管理任務 (Core 0)
 void Comm_Task(void *pvParameters) {
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
     for (;;) {
         uart_telemetry.process_serial_outgoing(); 
         app_script.check_serial(Serial, &uart_telemetry);
         system_led.update();
         
-        vTaskDelay(pdMS_TO_TICKS(PERIOD_COMM));
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }
 
 // 3. 藍牙遙測發送任務 (Core 0)
 void BT_Task(void *pvParameters) {
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_BT);
     for (;;) {
         bt_telemetry.process_bt_outgoing();
         app_script.check_serial(SerialBT, &bt_telemetry);
 
-        vTaskDelay(pdMS_TO_TICKS(PERIOD_BT));
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }
 

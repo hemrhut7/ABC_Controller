@@ -36,10 +36,10 @@ void Processing_Motor::update_rpms(float dt) {
 
 
 void Processing_Motor::get_motor_state(motor_state_t *state) {
-    state->rpm_L = motor_l.get_current_rpm();
-    state->rpm_R = motor_r.get_current_rpm();
-    state->target_rpm_L = motor_l.get_target_rpm();
-    state->target_rpm_R = motor_r.get_target_rpm();
+    state->rpm_L = motor_l.get_rpm();
+    state->rpm_R = motor_r.get_rpm();
+    state->pwm_out_L = motor_l.get_pwm_out();
+    state->pwm_out_R = motor_r.get_pwm_out();
 }
 
 void Processing_Motor::set_pid_gains(float p, float i, float d) {

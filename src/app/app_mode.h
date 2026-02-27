@@ -16,9 +16,10 @@ public:
     void set_command(UserCommand_t cmd);
     void set_mode(Mode_t mode);
     void set_target(float val, float yaw);
-    float get_current_target_val() const { return _cmd.target_value; }
-    Mode_t get_current_mode() const { return static_cast<Mode_t>(_cmd.mode); }
-    float get_current_velocity() const { return current_velocity; }
+    float get_target_val() const { return _cmd.target_value; }
+    Mode_t get_mode() const { return static_cast<Mode_t>(_cmd.mode); }
+    float get_velocity() const { return current_velocity; }
+    PID_target_t get_pid_target () const { return _pid_target; }
     
     // 用於 Tuning 的接口
     void set_pid_gains(PID_id_t pid_id, float kp, float ki, float kd);
@@ -38,15 +39,11 @@ private:
     PID _pid_rate;     // 內環 (阻尼)
     PID _pid_yaw;      // 轉向
 
-    LPF_1D lpf_rate; // 角速度環的低通濾波器 
     LPF_1D lpf_angle; // 傾角的低通濾波器
     LPF_1D lpf_velocity; // 速度的低通濾波器
     LPF_1D lpf_yaw; // 轉向的低通濾波器
 
     // 中間變數 (便於 Telemetry 觀察)
-    float _target_pitch;
-    float _target_pitch_rate;
-    float _output_balance;
-    float _output_turn;
+    PID_target_t _pid_target;
     float current_velocity;
 };
