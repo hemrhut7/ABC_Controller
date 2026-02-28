@@ -11,6 +11,7 @@ public:
 
     void init();
     void update();
+    void reset_att() { should_reset_att = true; }
     void get_ahrs_data(ahrs_data_t *data);
     bool is_ready() { return cpf.is_ready(); }
 
@@ -19,6 +20,7 @@ private:
     ahrs_data_t ahrs_data;
     uint64_t last_time = 0;
     bool is_stable = false;
+    bool should_reset_att = false;
 };
 
 #endif // PROCESSING_AHRS_H

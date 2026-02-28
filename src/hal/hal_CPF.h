@@ -14,6 +14,7 @@ public:
     ~CPF();
     void setInit(int fs = 100);
     void update(float omg[3], float acc[3], float dt);
+    void reset_att(float acc[3]);
     void getEuler(float euler[3]);
     void getBias(float bias[3]);
     void enableCheckACC(bool is_enable);

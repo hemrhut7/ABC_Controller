@@ -139,6 +139,15 @@ void CPF::update(float omg[3], float acc[3], float dt) {
     gen_euler_by_dcm(dcm, euler);
 }
 
+void CPF::reset_att(float acc[3]) {
+    float p, r;
+    accLeveling(acc, p, r);
+    euler[0] = p;
+    euler[1] = r;
+    euler[2] = 0.0f; // 確保 Yaw 被初始化
+    gen_dcm_by_euler(euler, dcm);
+}
+
 void CPF::check_acc(const float acc[3], float& current_weight) {
     if (enable_check_acc) {
         float acc_filtered[3];

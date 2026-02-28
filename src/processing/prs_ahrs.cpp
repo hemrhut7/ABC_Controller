@@ -31,10 +31,16 @@ void Processing_AHRS::update()
         return;
     }
 
+    if (should_reset_att) {
+        cpf.reset_att(ahrs_data.imu_data.accl);
+        should_reset_att = false;
+        return;
+    }
+    
     float dt = (now - last_time) * 1e-6f;
     last_time = now;
     if (dt <= 0.0f || dt > 0.1f) dt = 0.01f; // 保護性濾波，避免異常 dt
-    
+
     cpf.update(ahrs_data.imu_data.gyro, ahrs_data.imu_data.accl, dt);
     cpf.getEuler(ahrs_data.euler);
 

@@ -7,6 +7,15 @@
 #include "LPF.h"
 #include "hal/hal_storage.h"
 
+// 物理參數定義
+// 假設輪徑 65mm => 半徑 0.0325m
+// 速度 (m/s) = (RPM / 60) * 2 * PI * R
+// Factor = 0.0325 * 2 * 3.14159 / 60 ~= 0.003403
+#define RPM_TO_MS 0.003403f 
+#define MAX_PITCH 0.25f // rad, 約 14.3 deg
+#define MAX_VELOCITY 0.5f // m/s, equal to ~150 RPM for 65mm wheel
+#define MAX_YAW_RATE 1.57f // rad/s, 約 90 deg/s
+
 
 class AppMode {
 public:
@@ -36,7 +45,6 @@ private:
     // PIDs
     PID _pid_velocity; // 外環
     PID _pid_angle;    // 中環
-    PID _pid_rate;     // 內環 (阻尼)
     PID _pid_yaw;      // 轉向
 
     LPF_1D lpf_angle; // 傾角的低通濾波器

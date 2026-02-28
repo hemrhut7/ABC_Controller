@@ -1,7 +1,7 @@
 #include "hal_led.h"
 
 HAL_LED::HAL_LED(uint8_t pin) : pin(pin) {
-    current_state = STOP;
+    current_state = DISARMED;
     last_toggle_time = 0;
     blink_interval = 0;
     init();
@@ -32,8 +32,12 @@ void HAL_LED::set_state(SYSTEM_STATE state) {
         case INITIALIZING:
             blink_interval = 100;
             break;
-        case WORKING:
+        case ARMED:
             blink_interval = 1000;
+            break;
+        case DISARMED:
+            blink_interval = 0;
+            on();
             break;
         default:
             blink_interval = 0;

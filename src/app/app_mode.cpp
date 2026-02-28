@@ -1,11 +1,6 @@
 #include "app_mode.h"
 #include <Arduino.h> // For constrain, abs, etc.
 
-// 物理參數定義
-// 假設輪徑 65mm => 半徑 0.0325m
-// 速度 (m/s) = (RPM / 60) * 2 * PI * R
-// Factor = 0.0325 * 2 * 3.14159 / 60 ~= 0.003403
-#define RPM_TO_MS 0.003403f 
 
 AppMode::AppMode(Processing_Motor* motor, ConfigStore* config_store, int interval_ms) 
     : _motor(motor), _config_store(config_store), 
@@ -23,13 +18,10 @@ void AppMode::init() {
     
     // Level 4: Velocity Loop (外環) - 輸入 m/s, 輸出 Target Pitch (rad)
     _pid_velocity.setTunings(_config_store->data.velocity.p, _config_store->data.velocity.i, _config_store->data.velocity.d);
-    _pid_velocity.setOutputLimits(-0.4f, 0.4f); // 限制最大傾角約 23 度
+    _pid_velocity.setOutputLimits(-MAX_PITCH, MAX_PITCH);
 
     // Level 3: Angle Loop (直立環) - 輸入 Pitch (rad), 輸出 Target Rate (rad/s)
     _pid_angle.setTunings(_config_store->data.pitch.p, _config_store->data.pitch.i, _config_store->data.pitch.d);
-    
-    // Level 2: Rate Loop (角速度環) - 輸入 Rate (rad/s), 輸出 PWM/RPM 增量
-    _pid_rate.setTunings(_config_store->data.rate.p, _config_store->data.rate.i, _config_store->data.rate.d);
     
     // Yaw Loop (轉向環)
     _pid_yaw.setTunings(_config_store->data.yaw.p, _config_store->data.yaw.i, _config_store->data.yaw.d);
@@ -51,7 +43,6 @@ void AppMode::set_mode(Mode_t mode) {
 
     _pid_velocity.reset();
     _pid_angle.reset();
-    _pid_rate.reset();
     _pid_yaw.reset();
 
     if (_cmd.mode == MODE_FREE)
@@ -88,13 +79,14 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     float target_pitch = 0;
     if (_cmd.mode == MODE_VELOCITY || _cmd.mode == MODE_REMOTE) {
         target_velocity = lpf_velocity.update(_cmd.target_value); // 速度指令的低通濾波
-        target_pitch = -_pid_velocity.compute(dt, target_velocity, current_velocity);
+        target_velocity = constrain(target_velocity, -MAX_VELOCITY, MAX_VELOCITY);
+        target_pitch = -_pid_velocity.compute(dt, target_velocity, current_velocity); 
         target_pitch = lpf_angle.update(target_pitch); // 角度指令的低通濾波
-        target_pitch = constrain(target_pitch, -0.5f, 0.5f);
+        target_pitch = constrain(target_pitch, -MAX_PITCH, MAX_PITCH);
     } 
     else if (_cmd.mode == MODE_ANGLE) {
-        target_pitch = lpf_angle.update(_cmd.target_value); // 角度指令的低通濾波
-        target_pitch = constrain(target_pitch, -0.5f, 0.5f);
+        target_pitch = lpf_angle.update(_cmd.target_value * DEG_TO_RAD); // 角度指令的低通濾波
+        target_pitch = constrain(target_pitch, -MAX_PITCH, MAX_PITCH);
     }
 
     // Level 3: Angle Loop (直立環)
@@ -113,8 +105,9 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     // Yaw Loop (獨立的轉向環)
     float output_turn;
     float target_yaw_rate = 0;
-    if (_cmd.mode == MODE_REMOTE || _cmd.mode == MODE_VELOCITY) {
-        target_yaw_rate = lpf_yaw.update(_cmd.target_yaw_rate);
+    if (_cmd.mode == MODE_REMOTE) {
+        target_yaw_rate = lpf_yaw.update(_cmd.target_yaw_rate * DEG_TO_RAD); // 轉向指令的低通濾波
+        target_yaw_rate = constrain(target_yaw_rate, -MAX_YAW_RATE, MAX_YAW_RATE);
         output_turn = _pid_yaw.compute(dt, target_yaw_rate, ahrs_state.imu_data.gyro[2]);
     } else {
         output_turn = 0;
@@ -123,8 +116,8 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     // --- Mixer (混合器) ---
     // 平衡輸出加在兩輪同向，轉向輸出加在兩輪反向
     // 注意：這裡假設 output 直接對應 RPM，如果 Processing_Motor 吃的是 PWM，這裡單位要注意
-    float target_rpm_L = output_balance + output_turn;
-    float target_rpm_R = output_balance - output_turn;
+    float target_rpm_L = output_balance - output_turn;
+    float target_rpm_R = output_balance + output_turn;
 
     // --- Actuation (執行) ---
     if (_cmd.mode != MODE_STOP) {
@@ -145,10 +138,6 @@ void AppMode::set_pid_gains(PID_id_t pid_id, float kp, float ki, float kd) {
         case PID_MOTOR:
             _motor->set_pid_gains(kp, ki, kd);
             _config_store->data.motor = {kp, ki, kd};
-            break;
-        case PID_RATE: 
-            _pid_rate.setTunings(kp, ki, kd); 
-            _config_store->data.rate = {kp, ki, kd};
             break;
         case PID_ANGLE: 
             _pid_angle.setTunings(kp, ki, kd); 

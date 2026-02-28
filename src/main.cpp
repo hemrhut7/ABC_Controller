@@ -42,7 +42,6 @@ void Control_Task(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_CONTROLL);
     unsigned long last_micros = micros();
-    bool ahrs_ready_notified = false;
 
     for (;;) {
         unsigned long current_micros = micros();
@@ -55,10 +54,6 @@ void Control_Task(void *pvParameters) {
 
         // Update IMU/AHRS state
         ahrs.update();
-        if (!ahrs_ready_notified && ahrs.is_ready()) {
-            failsafe.set_ahrs_ready(true);
-            ahrs_ready_notified = true;
-        }
         ahrs.get_ahrs_data(&current_sys_state.abc_state.ahrs_data);
 
         // update Motor State
@@ -66,7 +61,13 @@ void Control_Task(void *pvParameters) {
         motor.get_motor_state(&current_sys_state.abc_state.motor_state);
 
         app_mode.update(dt, current_sys_state.abc_state.ahrs_data);
-        failsafe.check(current_sys_state.abc_state.ahrs_data);
+        
+        if (!failsafe.check(current_sys_state.abc_state.ahrs_data, ahrs.is_ready())) {
+            app_mode.set_mode(MODE_FREE);
+            if (failsafe.get_error_state() == FS_ERROR_LOOP_SLOW) {
+                ahrs.reset_att();
+            }
+        }
 
         // 2. Push fresh data to the telemetry queues (non-blocking)
         current_sys_state.loop_time_ms = failsafe.get_delay_count();

@@ -5,32 +5,29 @@
 #include "processing/prs_motor.h"
 #include "hal/hal_led.h"
 
+typedef enum {
+    FS_ERROR_LOOP_SLOW,
+    FS_ERROR_AHRS_UNREADY,
+    FS_ERROR_CRITICAL_ANGLE,
+    FS_ERROR_PICKUP_DETECTED,
+    FS_ERROR_NONE,  // should always be last
+} failsafe_error_t;
 
 class Failsafe {
 public:
     Failsafe(uint16_t period_ms, Processing_Motor* motor, HAL_LED* led);
 
     void init();
-
-    /**
-     * @brief 核心安全檢查
-     * @param current_time_ms 當前系統時間
-     * @return true: 安全 (ARMED), false: 危險 (DISARMED)
-     */
-    bool check(const ahrs_data_t &ahrs_data);
-
-    bool is_armed();
+    bool check(const ahrs_data_t &ahrs_data, bool ahrs_ready);
 
     uint32_t get_loop_time_ms() { return loop_time_ms; }
     uint16_t get_delay_count() { return delay_counter; }
-
-    void set_ahrs_ready(bool ready);
+    failsafe_error_t get_error_state() const { return error_state; }
 
 private:
     Processing_Motor* _motor;
     HAL_LED* _led;
-
-    bool armed_state;
+    failsafe_error_t error_state = FS_ERROR_NONE;
     
     // 時間相關變數
     uint32_t last_check_time;

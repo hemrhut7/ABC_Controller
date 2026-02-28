@@ -4,9 +4,9 @@
 
 
 typedef enum {
-  INITIALIZING,  // 快閃
-  WORKING,       // 慢閃
-  STOP           // 停止
+  INITIALIZING,   // 快閃
+  ARMED,        // 慢閃
+  DISARMED        // 解鎖狀態
 } SYSTEM_STATE;
 
 class HAL_LED {

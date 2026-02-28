@@ -8,8 +8,6 @@ void PID::setTunings(float kp, float ki, float kd) {
 
 void PID::setOutputLimits(float min, float max) {
     if (min >= max) return;
-    outMin = min;
-    outMax = max;
 }
 
 float PID::compute(float target, float current) {
@@ -28,15 +26,14 @@ float PID::compute(float target, float current) {
     // Anti-windup: 限制積分項
     if (ki != 0) {
         float iTerm = integral * ki;
-        if (iTerm > outMax) integral = outMax / ki;
-        else if (iTerm < outMin) integral = outMin / ki;
+        if (MAX_iTerm != 0) {
+            if (iTerm > MAX_iTerm) integral = MAX_iTerm / ki;
+            else if (iTerm < -MAX_iTerm) integral = -MAX_iTerm / ki;
+        }
     }
 
     float derivative = (dt > 0) ? (error - lastError) / dt : 0;
     float output = kp * error + ki * integral + kd * derivative;
-
-    if (output > outMax) output = outMax;
-    else if (output < outMin) output = outMin;
 
     lastError = error;
 
@@ -51,15 +48,14 @@ float PID::compute(float dt, float target, float current) {
     // Anti-windup: 限制積分項
     if (ki != 0) {
         float iTerm = integral * ki;
-        if (iTerm > outMax) integral = outMax / ki;
-        else if (iTerm < outMin) integral = outMin / ki;
+        if (MAX_iTerm != 0) {
+            if (iTerm > MAX_iTerm) integral = MAX_iTerm / ki;
+            else if (iTerm < -MAX_iTerm) integral = -MAX_iTerm / ki;
+        }
     }
 
     float derivative = (dt > 0) ? (error - lastError) / dt : 0;
     float output = kp * error + ki * integral + kd * derivative;
-
-    if (output > outMax) output = outMax;
-    else if (output < outMin) output = outMin;
 
     lastError = error;
 
@@ -73,14 +69,13 @@ float PID::compute(float dt, float target, float current, float derivative) {
     // Anti-windup: 限制積分項
     if (ki != 0) {
         float iTerm = integral * ki;
-        if (iTerm > outMax) integral = outMax / ki;
-        else if (iTerm < outMin) integral = outMin / ki;
+        if (MAX_iTerm != 0) {
+            if (iTerm > MAX_iTerm) integral = MAX_iTerm / ki;
+            else if (iTerm < -MAX_iTerm) integral = -MAX_iTerm / ki;
+        }
     }
 
     float output = kp * error + ki * integral + kd * derivative;
-
-    if (output > outMax) output = outMax;
-    else if (output < outMin) output = outMin;
 
     lastError = error;
 

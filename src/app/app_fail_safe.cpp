@@ -2,19 +2,17 @@
 
 Failsafe::Failsafe(uint16_t period_ms, Processing_Motor* motor, HAL_LED* led) 
     : _motor(motor), _led(led) {
-    armed_state = false;
     last_check_time = 0;
     pickup_start_time = 0;
-    MAX_LOOP_TIME_MS = period_ms * 1.2;
+    MAX_LOOP_TIME_MS = period_ms * 3 + 2; // 增加容錯空間，避免因系統抖動誤觸發
     is_pickup_condition_met = false;
 }
 
 void Failsafe::init() {
-    armed_state = false;
-    last_check_time = millis();
+    last_check_time = 0;
 }
 
-bool Failsafe::check(const ahrs_data_t &ahrs_data) {
+bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready) {
     motor_state_t motor_state;
     _motor->get_motor_state(&motor_state);
 
@@ -22,21 +20,31 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data) {
     float pitch_rate_rad = ahrs_data.imu_data.gyro[0];
     int rpm_l = motor_state.rpm_L;
     int rpm_r = motor_state.rpm_R;
-    
-    // --- [1. 性能檢驗 Loop Performance] ---
+
+    failsafe_error_t current_error_state = FS_ERROR_NONE;
+    // 檢查迴圈性能
     uint32_t current_time_ms = millis();
     uint32_t dt = current_time_ms - last_check_time;
-    
-    // 忽略第一次執行 (dt 會很大)
     if (last_check_time != 0 && dt > MAX_LOOP_TIME_MS) {
-        armed_state = false; 
+        current_error_state = min(current_error_state, FS_ERROR_LOOP_SLOW);
         delay_counter++;
     }
     last_check_time = current_time_ms;
     loop_time_ms = dt;
 
+    // 檢查 AHRS
+    if (!ahrs_ready) {
+        current_error_state = min(current_error_state, FS_ERROR_AHRS_UNREADY);
+    }
 
-    // --- [2. 拿起偵測 Pickup Detection] ---
+    // 倒地偵測
+    if (abs(pitch_rad) > CRITICAL_ANGLE_RAD) {
+        current_error_state = min(current_error_state, FS_ERROR_CRITICAL_ANGLE);
+    } else if (error_state == FS_ERROR_CRITICAL_ANGLE && abs(pitch_rad) > RECOVERY_ANGLE_RAD) {
+        current_error_state = min(current_error_state, FS_ERROR_CRITICAL_ANGLE);
+    }
+
+    // 拿起偵測
     // 邏輯：兩個輪子轉速都很快，但機身卻幾乎不動 (Gyro 很小)
     bool high_rpm = (abs(rpm_l) > PICKUP_RPM_THRESHOLD) && (abs(rpm_r) > PICKUP_RPM_THRESHOLD);
     bool low_motion = abs(pitch_rate_rad) < PICKUP_GYRO_THRESHOLD;
@@ -49,7 +57,7 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data) {
         } else {
             // 持續偵測中，檢查時間是否超過閾值
             if (current_time_ms - pickup_start_time > PICKUP_CONFIRM_MS) {
-                armed_state = false; // 確認被拿起，切斷動力
+                current_error_state = min(current_error_state, FS_ERROR_PICKUP_DETECTED);
             }
         }
     } else {
@@ -57,41 +65,19 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data) {
         is_pickup_condition_met = false;
     }
 
-    // --- [3. 狀態管理與倒地保護] ---
-    
-    // 如果已經 Disarmed (倒地或被拿起)
-    if (!armed_state) {
-        // 嘗試恢復 (Arming)：只有在「非」拿起狀態 且 角度很正 時才恢復
-        // 增加一個保護：被拿起時絕對不能恢復，不然放回地上瞬間會暴衝
-        bool is_safe_angle = abs(pitch_rad) < RECOVERY_ANGLE_RAD;
-        
-        if (is_safe_angle && !is_pickup_condition_met) {
-            armed_state = true;
-        } else {
-            return false; // 繼續保持鎖定
-        }
+    error_state = current_error_state;
+    switch (error_state)
+    {
+    case FS_ERROR_NONE:
+        _led->set_state(SYSTEM_STATE::ARMED);
+        break;
+    case FS_ERROR_AHRS_UNREADY:
+        _led->set_state(SYSTEM_STATE::INITIALIZING);
+        break;
+    default:
+        _led->set_state(SYSTEM_STATE::DISARMED);
+        break;
     }
 
-    // 檢查倒地 (基本保護)
-    if (abs(pitch_rad) > CRITICAL_ANGLE_RAD) {
-        armed_state = false;
-        return false;
-    }
-
-    return true; // ARMED & Safe
-}
-
-void Failsafe::set_ahrs_ready(bool ready) {
-    // 如果 AHRS 還沒準備好，強制 Disarm
-    if (!ready) {
-        armed_state = false;
-    } else {
-        armed_state = true;
-        _led->set_state(WORKING);
-    }
-}
-
-
-bool Failsafe::is_armed() {
-    return armed_state;
+    return error_state == FS_ERROR_NONE;
 }

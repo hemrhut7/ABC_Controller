@@ -21,6 +21,5 @@ class PID {
         float lastError = 0;
         unsigned long lastTime = 0;
         float integral = 0;
-        float outMin = -255;
-        float outMax = 255;
+        float MAX_iTerm = 0;
 };
