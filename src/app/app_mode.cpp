@@ -82,7 +82,6 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
         target_velocity = lpf_velocity.update(target_velocity); // 速度指令的低通濾波
         target_pitch = -_pid_velocity.compute(dt, target_velocity, current_velocity); 
         target_pitch = constrain(target_pitch, -MAX_PITCH, MAX_PITCH);
-        target_pitch = lpf_angle.update(target_pitch); // 角度指令的低通濾波
     } 
     else if (_cmd.mode == MODE_ANGLE) {
         target_pitch = constrain(_cmd.target_value * DEG_TO_RAD, -MAX_PITCH, MAX_PITCH);
