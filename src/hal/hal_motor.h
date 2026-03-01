@@ -84,8 +84,6 @@ class HAL_Motor {
         bool is_enable = true;
         int8_t dither_dir = 1;
 
-        LPF_1D lpf_rpm;
-        
         void init();
         void getPCNTCount();
 };

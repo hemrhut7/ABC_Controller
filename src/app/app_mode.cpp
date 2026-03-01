@@ -4,7 +4,7 @@
 
 AppMode::AppMode(Processing_Motor* motor, ConfigStore* config_store, int interval_ms) 
     : _motor(motor), _config_store(config_store), 
-    lpf_angle(1000 / interval_ms, 10),
+    lpf_angle(1000 / interval_ms, 50),
     lpf_velocity(1000 / interval_ms, 10), lpf_yaw(1000 / interval_ms, 10) {
     _cmd.mode = MODE_STOP;
     _cmd.target_value = 0.0f;
@@ -78,15 +78,15 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     float target_velocity = 0;
     float target_pitch = 0;
     if (_cmd.mode == MODE_VELOCITY || _cmd.mode == MODE_REMOTE) {
-        target_velocity = lpf_velocity.update(_cmd.target_value); // 速度指令的低通濾波
-        target_velocity = constrain(target_velocity, -MAX_VELOCITY, MAX_VELOCITY);
+        target_velocity = constrain(_cmd.target_value, -MAX_VELOCITY, MAX_VELOCITY);
+        target_velocity = lpf_velocity.update(target_velocity); // 速度指令的低通濾波
         target_pitch = -_pid_velocity.compute(dt, target_velocity, current_velocity); 
-        target_pitch = lpf_angle.update(target_pitch); // 角度指令的低通濾波
         target_pitch = constrain(target_pitch, -MAX_PITCH, MAX_PITCH);
+        target_pitch = lpf_angle.update(target_pitch); // 角度指令的低通濾波
     } 
     else if (_cmd.mode == MODE_ANGLE) {
-        target_pitch = lpf_angle.update(_cmd.target_value * DEG_TO_RAD); // 角度指令的低通濾波
-        target_pitch = constrain(target_pitch, -MAX_PITCH, MAX_PITCH);
+        target_pitch = constrain(_cmd.target_value * DEG_TO_RAD, -MAX_PITCH, MAX_PITCH);
+        target_pitch = lpf_angle.update(target_pitch); // 角度指令的低通濾波
     }
 
     // Level 3: Angle Loop (直立環)
@@ -106,8 +106,8 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     float output_turn;
     float target_yaw_rate = 0;
     if (_cmd.mode == MODE_REMOTE) {
-        target_yaw_rate = lpf_yaw.update(_cmd.target_yaw_rate * DEG_TO_RAD); // 轉向指令的低通濾波
-        target_yaw_rate = constrain(target_yaw_rate, -MAX_YAW_RATE, MAX_YAW_RATE);
+        target_yaw_rate = constrain(_cmd.target_yaw_rate, -MAX_YAW_RATE, MAX_YAW_RATE);
+        target_yaw_rate = lpf_yaw.update(target_yaw_rate * DEG_TO_RAD); // 轉向指令的低通濾波
         output_turn = _pid_yaw.compute(dt, target_yaw_rate, ahrs_state.imu_data.gyro[2]);
     } else {
         output_turn = 0;

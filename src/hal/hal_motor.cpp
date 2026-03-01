@@ -6,7 +6,7 @@
 //     init();
 // }
 
-HAL_Motor::HAL_Motor(MotorPosition position, uint32_t period_ms): lpf_rpm(1000 / period_ms, 50) {
+HAL_Motor::HAL_Motor(MotorPosition position, uint32_t period_ms) {
     if (position == LEFT_MOTOR) {
         pwm_pin = MOTOR_L_PWM_PIN;
         dir_pin1 = MOTOR_L_DIR1_PIN;
@@ -77,7 +77,6 @@ void HAL_Motor::update_rpm(float dt) {
 }
 
 void HAL_Motor::set_target_rpm(float target_rpm) {
-    target_rpm = lpf_rpm.update(target_rpm);
     target_rpm = constrain(target_rpm, -MAX_MOTOR_RPM, MAX_MOTOR_RPM);
     if (last_target_rpm - target_rpm > MAX_MOTOR_DELTA_RPM) {
         target_rpm = last_target_rpm - MAX_MOTOR_DELTA_RPM;
