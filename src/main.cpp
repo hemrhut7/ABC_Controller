@@ -26,8 +26,8 @@ TaskHandle_t BTTaskHandle;
 BluetoothSerial SerialBT;
 Processing_Motor motor(PERIOD_CONTROLL);
 Processing_AHRS ahrs(PERIOD_CONTROLL);
-Telemetry uart_telemetry(Serial);
-Telemetry bt_telemetry(SerialBT);
+Telemetry uart_telemetry(Serial, PORT_USB);
+Telemetry bt_telemetry(SerialBT, PORT_BT);
 HAL_LED system_led(LED_BUILTIN);
 ConfigStore config_store;
 
@@ -101,7 +101,7 @@ void BT_Task(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_BT);
   for (;;) {
-    bt_telemetry.process_bt_outgoing();
+    bt_telemetry.process_serial_outgoing();
     app_script.check_serial(SerialBT, &bt_telemetry);
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);

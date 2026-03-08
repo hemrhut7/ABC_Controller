@@ -7,7 +7,7 @@ const uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7f};
 
 #define TELEMETRY_QUEUE_LENGTH 5
 
-Telemetry::Telemetry(Stream &stream) : port(stream) {}
+Telemetry::Telemetry(Stream &stream, TelemetryPort_t port_id) : port(stream), port_id(port_id) {}
 
 void Telemetry::init(uint16_t base_freq) {
   _base_freq = base_freq;
@@ -52,7 +52,7 @@ void Telemetry::process_serial_outgoing() {
       return;
 
     // 3. Select format (currently only format 0 is implemented as original)
-    if (_format == 0) {
+    if (_format == FORMAT_DEFAULT) {
       // A packet was successfully received.
       // Now, manually flatten the nested struct into a float array for VOFA+.
       float data_packet[15];
@@ -77,27 +77,8 @@ void Telemetry::process_serial_outgoing() {
       memcpy(send_buffer, data_packet, sizeof(data_packet));
       memcpy(send_buffer + sizeof(data_packet), vofa_tail, sizeof(vofa_tail));
       port.write(send_buffer, sizeof(send_buffer));
-    }
-  }
-}
-
-void Telemetry::process_bt_outgoing() {
-  system_state_t pkt;
-
-  if (xQueueReceive(data_queue, &pkt, pdMS_TO_TICKS(1)) == pdTRUE) {
-    // 1. Check if enabled
-    if (!_enabled)
-      return;
-
-    // 2. Control data rate using divider
-    _packet_counter++;
-    if (_packet_counter % _divider != 0)
-      return;
-
-    // 3. Select format (currently only format 0 is implemented as original)
-    if (_format == 0) {
-      // A packet was successfully received.
-      // Now, manually flatten the nested struct into a float array for VOFA+.
+    } 
+    else if (FORMAT_PID == 1) {
       float data_packet[14];
       data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
       data_packet[1] = pkt.target_val;
@@ -112,8 +93,7 @@ void Telemetry::process_bt_outgoing() {
       data_packet[10] = (float)pkt.abc_state.motor_state.rpm_R;
       data_packet[11] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
       data_packet[12] = pkt.abc_state.velocity;
-      data_packet[13] =
-          pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[2] * RAD_TO_DEG;
+      data_packet[13] = pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[2] * RAD_TO_DEG;
 
       // Write the data packet and the tail to the serial port.
       uint8_t send_buffer[sizeof(data_packet) + sizeof(vofa_tail)];

@@ -109,11 +109,13 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
       }
     }
   }
-  // 5. 遙測控制指令: "TELE <enabled> <format> <freq_hz>"
+  // 5. 遙測控制指令: "TELE <enabled> <port_id> <format> <freq_hz>"
   else if (cmd_line.startsWith("TELE")) {
-    int enabled, format, freq_hz;
-    if (sscanf(cmd_line.c_str(), "TELE %d %d %d", &enabled, &format,
-               &freq_hz) == 3) {
+    int enabled, port_id, format, freq_hz;
+    if (sscanf(cmd_line.c_str(), "TELE %d %d %d %d", &enabled, &port_id, &format,
+               &freq_hz) == 4) {
+      if (port_id != telemetry->get_port_id()) return;
+
       telemetry->set_config(enabled != 0, (uint8_t)format, (uint16_t)freq_hz);
       snprintf(tx_buffer, sizeof(tx_buffer),
                "[OK] Telemetry: En=%d, Fmt=%d, Freq=%dHz\n", enabled, format,

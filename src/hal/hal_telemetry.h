@@ -5,9 +5,21 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
+
+enum TelemetryFormat {
+  FORMAT_DEFAULT = 0,
+  FORMAT_PID = 1,
+};
+
+typedef enum TelemetryPort {
+  PORT_USB = 0,
+  PORT_BT = 1,
+} TelemetryPort_t;
+
+
 class Telemetry {
 public:
-  Telemetry(Stream &stream);
+  Telemetry(Stream &stream, TelemetryPort_t port_id);
   void init(uint16_t base_freq = 200);
 
   // Called by Control_Task to push data into the queue (non-blocking).
@@ -19,15 +31,17 @@ public:
   // Called by a dedicated task to process and send data from the queue
   // (blocking).
   void process_serial_outgoing();
-  void process_bt_outgoing();
 
   // For logging strings, can be handled separately or integrated if needed.
   void queue_string(const char *str);
   void queue_string(const String &str);
 
+  TelemetryPort_t get_port_id() const { return port_id; };
+
 private:
   QueueHandle_t data_queue;
   Stream &port;
+  TelemetryPort_t port_id = PORT_USB;
 
   // Config
   bool _enabled = false;
