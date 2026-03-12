@@ -78,29 +78,55 @@ void CPF::update(float omg[3], float acc[3], float dt) {
     // K_bias 原本是 1/fs，即 dt
     this->K_bias = dt;
 
+    // ==========================================
+    // Phase 1: 嚴格的靜態初始化 (Rigorous Static Initialization)
+    // ==========================================
     if (!is_initialized) {
         if (lc_list_count < LC_WINDOW_SIZE) {
             std::copy(omg, omg + 3, LC_list[lc_list_count]);
             lc_list_count++;
         } else {
+            // 1. 計算平均值 (Mean)
+            float mean[3] = {0.0f, 0.0f, 0.0f};
             for(int i=0; i<3; ++i) {
                 float sum = 0;
-                for(int j=0; j < LC_WINDOW_SIZE; ++j) {
-                    sum += LC_list[j][i];
-                }
-                bias_omg[i] = sum / LC_WINDOW_SIZE;
+                for(int j=0; j < LC_WINDOW_SIZE; ++j) sum += LC_list[j][i];
+                mean[i] = sum / LC_WINDOW_SIZE;
             }
+
+            // 2. 計算變異數 (Variance)
+            float var[3] = {0.0f, 0.0f, 0.0f};
+            for(int i=0; i<3; ++i) {
+                float sq_sum = 0;
+                for(int j=0; j < LC_WINDOW_SIZE; ++j) {
+                    float diff = LC_list[j][i] - mean[i];
+                    sq_sum += diff * diff;
+                }
+                var[i] = sq_sum / LC_WINDOW_SIZE;
+            }
+
+            // 3. 靜態條件防呆檢定
+            float threshold_sq = omg_threshold[0] * omg_threshold[0]; 
+            if (var[0] > threshold_sq || var[1] > threshold_sq || var[2] > threshold_sq) {
+                // 機體受到擾動，放棄此次校準，重新收集數據
+                lc_list_count = 0; 
+                return; 
+            }
+
+            // 4. 通過檢測，安全寫入初始狀態
+            std::copy(mean, mean + 3, bias_omg);
             float p, r;
             accLeveling(acc, p, r);
-            euler[0] = p;
-            euler[1] = r;
-            euler[2] = 0.0f; // 確保 Yaw 被初始化
+            euler[0] = p; euler[1] = r; euler[2] = 0.0f;
             gen_dcm_by_euler(euler, dcm);
             is_initialized = true;
         }
         return;
     }
 
+    // ==========================================
+    // Phase 2: 機械化預測 (Mechanization / Prediction)
+    // ==========================================
     float avg_omg[3];
     Vec::add(omg, pre_omg, avg_omg);
     Vec::scale(avg_omg, 0.5f, avg_omg);
@@ -111,9 +137,17 @@ void CPF::update(float omg[3], float acc[3], float dt) {
 
     rotate_dcm_by_vec_b(dcm, vec_rotation);
     
+    // ==========================================
+    // Phase 3: 觀測更新與自適應權重 (Correction & Adaptive Weighting)
+    // ==========================================
     float current_w = 0.0f;
-    check_acc(acc, current_w);
-    current_w *= weight;
+    check_acc(acc, current_w); //
+    current_w *= weight; // 基礎權重
+    
+    // 【新增】大角度自適應衰減 (Adaptive weight decay for large tilt)
+    // dcm[2][2] 等同於 cos(Pitch)*cos(Roll)，代表重力在機體 Z 軸的投影比例
+    float angle_confidence = std::abs(dcm[2][2]); 
+    current_w = current_w * angle_confidence; 
     
     if (current_w > 0) {
         float g_b[3] = {-dcm[2][0], -dcm[2][1], -dcm[2][2]};
