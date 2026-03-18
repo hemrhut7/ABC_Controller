@@ -29,6 +29,7 @@ private:
     float acc_error;
     float gyro_error;
     bool enable_check_acc;
+    float lever_arm[3] = {-0.01, 0, 0.08};
 
     float dcm[3][3];
     float euler[3];

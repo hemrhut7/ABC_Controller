@@ -126,22 +126,30 @@ void CPF::update(float omg[3], float acc[3], float dt) {
 
     // ==========================================
     // Phase 2: 機械化預測 (Mechanization / Prediction)
-    // ==========================================
-    float avg_omg[3];
-    Vec::add(omg, pre_omg, avg_omg);
-    Vec::scale(avg_omg, 0.5f, avg_omg);
-    
+    // ==========================================    
+    float omg_calibrated[3];
+    Vec::sub(omg, bias_omg, omg_calibrated);
+
     float vec_rotation[3];
-    Vec::sub(avg_omg, bias_omg, vec_rotation);
-    Vec::scale(vec_rotation, dt, vec_rotation);
+    Vec::scale(omg_calibrated, dt, vec_rotation);
 
     rotate_dcm_by_vec_b(dcm, vec_rotation);
     
+    // centripetal acceleration compensation
+    float w_cross_r[3];  // w x r = v
+    cross_product(omg_calibrated, lever_arm, w_cross_r);
+
+    float acc_cen[3];  // w x v = a
+    cross_product(omg_calibrated, w_cross_r, acc_cen);
+
+    float acc_cg[3];
+    Vec::sub(acc, acc_cen, acc_cg);
+
     // ==========================================
     // Phase 3: 觀測更新與自適應權重 (Correction & Adaptive Weighting)
     // ==========================================
     float current_w = 0.0f;
-    check_acc(acc, current_w); //
+    check_acc(acc_cg, current_w); //
     current_w *= weight; // 基礎權重
     
     // 【新增】大角度自適應衰減 (Adaptive weight decay for large tilt)
@@ -151,10 +159,10 @@ void CPF::update(float omg[3], float acc[3], float dt) {
     
     if (current_w > 0) {
         float g_b[3] = {-dcm[2][0], -dcm[2][1], -dcm[2][2]};
-        float acc_norm_val = norm(acc);
+        float acc_norm_val = norm(acc_cg);
         if (acc_norm_val > 1e-6) {
             float acc_n[3];
-            Vec::scale(acc, 1.0f / acc_norm_val, acc_n);
+            Vec::scale(acc_cg, 1.0f / acc_norm_val, acc_n);
 
             float error_vec[3];
             cross_product(g_b, acc_n, error_vec);

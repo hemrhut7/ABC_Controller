@@ -53,7 +53,7 @@ void hal_imu_init() {
 
   mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
   mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-  mpu.setFilterBandwidth(MPU6050_BAND_44_HZ);
+  mpu.setFilterBandwidth(MPU6050_BAND_94_HZ);
   mpu.setSampleRateDivisor(0);
   is_initialized = true;
 }
