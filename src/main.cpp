@@ -14,31 +14,33 @@
 #define PRIORITY_COMM 10
 #define PRIORITY_BT 5
 
-#define PERIOD_CONTROLL 5 // 200Hz
+#define PERIOD_INTERNAL_CONTROLL 5 // 200Hz
+#define PERIOD_EXTERNAL_CONTROLL 20 // 50Hz
 #define PERIOD_COMM 5     // 200Hz
 #define PERIOD_BT 5       // 200Hz
 
-TaskHandle_t ControlTaskHandle;
+TaskHandle_t InternalControlTaskHandle;
+TaskHandle_t ExternalControlTaskHandle;
 TaskHandle_t AHRSTaskHandle;
 TaskHandle_t CommTaskHandle;
 TaskHandle_t BTTaskHandle;
 
 BluetoothSerial SerialBT;
-Processing_Motor motor(PERIOD_CONTROLL);
-Processing_AHRS ahrs(PERIOD_CONTROLL);
+Processing_Motor motor(PERIOD_INTERNAL_CONTROLL);
+Processing_AHRS ahrs(PERIOD_INTERNAL_CONTROLL);
 Telemetry uart_telemetry(Serial, PORT_USB);
 Telemetry bt_telemetry(SerialBT, PORT_BT);
 HAL_LED system_led(LED_BUILTIN);
 ConfigStore config_store;
 
-AppMode app_mode(&motor, &config_store, PERIOD_CONTROLL);
+AppMode app_mode(&motor, &config_store, PERIOD_INTERNAL_CONTROLL);
 AppScript app_script(&app_mode);
-Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led);
+Failsafe failsafe(PERIOD_EXTERNAL_CONTROLL, &motor, &system_led);
 
-// 1. 控制任務 (Core 1)
-void Control_Task(void *pvParameters) {
+// 內環控制任務 (Core 1) 200Hz
+void Internal_Control_Task(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_CONTROLL);
+  const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_INTERNAL_CONTROLL);
   unsigned long last_micros = micros();
 
   for (;;) {
@@ -49,7 +51,7 @@ void Control_Task(void *pvParameters) {
 
     // 簡單的濾波/保護，避免 dt 異常 (例如第一次執行或溢位)
     if (dt <= 0.0f || dt > 0.1f)
-      dt = PERIOD_CONTROLL * 0.001f;
+      dt = PERIOD_INTERNAL_CONTROLL * 0.001f;
 
     // Update IMU/AHRS state
     ahrs.update();
@@ -59,7 +61,42 @@ void Control_Task(void *pvParameters) {
     motor.update_rpms(dt);
     motor.get_motor_state(&current_sys_state.abc_state.motor_state);
 
-    app_mode.update(dt, current_sys_state.abc_state.ahrs_data);
+    app_mode.update_internal(dt, current_sys_state.abc_state.ahrs_data);
+
+    // 2. Push fresh data to the telemetry queues (non-blocking)
+    current_sys_state.loop_time_ms = failsafe.get_delay_count();
+    current_sys_state.target_val = app_mode.get_target_val();
+    current_sys_state.mode = app_mode.get_mode();
+    current_sys_state.abc_state.velocity = app_mode.get_velocity();
+    current_sys_state.pid_target = app_mode.get_pid_target();
+
+    uart_telemetry.push_data(current_sys_state);
+    bt_telemetry.push_data(current_sys_state);
+
+    vTaskDelayUntil(&xLastWakeTime, xFrequency); // 確保精確的執行頻率
+  }
+}
+
+// 外環控制任務 (Core 1) 50Hz
+void External_Control_Task(void *pvParameters) {
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_EXTERNAL_CONTROLL);
+  unsigned long last_micros = micros();
+
+  for (;;) {
+    unsigned long current_micros = micros();
+    float dt = (current_micros - last_micros) * 1e-6f;
+    last_micros = current_micros;
+    system_state_t current_sys_state;
+
+    // 簡單的濾波/保護，避免 dt 異常 (例如第一次執行或溢位)
+    if (dt <= 0.0f || dt > 0.1f)
+      dt = PERIOD_EXTERNAL_CONTROLL * 0.001f;
+
+    ahrs.get_ahrs_data(&current_sys_state.abc_state.ahrs_data);
+    app_mode.update_external(dt, current_sys_state.abc_state.ahrs_data);
+
+    // Failsafe Check
     Mode_t current_mode = app_mode.get_mode();
 
     if (!failsafe.check(current_sys_state.abc_state.ahrs_data,
@@ -74,16 +111,6 @@ void Control_Task(void *pvParameters) {
       app_mode.set_mode(MODE_REMOTE);
       current_mode = MODE_REMOTE;
     }
-
-    // 2. Push fresh data to the telemetry queues (non-blocking)
-    current_sys_state.loop_time_ms = failsafe.get_delay_count();
-    current_sys_state.target_val = app_mode.get_target_val();
-    current_sys_state.mode = current_mode;
-    current_sys_state.abc_state.velocity = app_mode.get_velocity();
-    current_sys_state.pid_target = app_mode.get_pid_target();
-
-    uart_telemetry.push_data(current_sys_state);
-    bt_telemetry.push_data(current_sys_state);
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency); // 確保精確的執行頻率
   }
@@ -130,8 +157,10 @@ void setup() {
 
   // 建立任務 參數：函數名, 名稱, 堆棧, 參數, 優先級, Handle, 核心ID
   // Core 1
-  xTaskCreatePinnedToCore(Control_Task, "ControlTask", 8192, NULL,
-                          PRIORITY_CONTROL, &ControlTaskHandle, 1);
+  xTaskCreatePinnedToCore(Internal_Control_Task, "InternalControlTask", 8192, NULL,
+                          PRIORITY_CONTROL, &InternalControlTaskHandle, 1);
+  xTaskCreatePinnedToCore(External_Control_Task, "ExternalControlTask", 4096, NULL,
+                          PRIORITY_CONTROL, &ExternalControlTaskHandle, 1);
 
   // Core 0
   xTaskCreatePinnedToCore(Comm_Task, "CommTask", 4096, NULL, PRIORITY_COMM,

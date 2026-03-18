@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 #include "processing/prs_ahrs.h"
 #include "processing/prs_motor.h"
 #include "pid.h"
@@ -23,7 +25,8 @@ class AppMode {
 public:
     AppMode(Processing_Motor* motor, ConfigStore* config_store, int interval_ms);
     void init();
-    void update(float dt, const ahrs_data_t &ahrs_state);
+    void update_internal(float dt, const ahrs_data_t &ahrs_state);
+    void update_external(float dt, const ahrs_data_t &ahrs_state);
     void set_command(UserCommand_t cmd);
     void set_mode(Mode_t mode);
     void set_target(float val, float yaw);
@@ -54,6 +57,9 @@ private:
     LPF_1D lpf_yaw; // 轉向的低通濾波器
     LPF_1D lpf_current_velocity; // 當前速度的低通濾波器
 
+    QueueHandle_t pitch_queue;
+    QueueHandle_t turn_queue;
+    
     // 中間變數 (便於 Telemetry 觀察)
     PID_target_t _pid_target;
     float current_velocity;
