@@ -60,19 +60,25 @@ void Control_Task(void *pvParameters) {
     motor.get_motor_state(&current_sys_state.abc_state.motor_state);
 
     app_mode.update(dt, current_sys_state.abc_state.ahrs_data);
+    Mode_t current_mode = app_mode.get_mode();
 
     if (!failsafe.check(current_sys_state.abc_state.ahrs_data,
                         ahrs.is_ready())) {
-      app_mode.set_mode(MODE_FREE);
+      app_mode.set_mode(MODE_STOP);
+      current_mode = MODE_STOP;
+      
       if (failsafe.get_error_state() == FS_ERROR_LOOP_SLOW) {
         ahrs.reset_att();
       }
+    } else if ((current_mode == MODE_STOP || current_mode == MODE_STOP) && failsafe.is_ready_auto_start()){
+      app_mode.set_mode(MODE_REMOTE);
+      current_mode = MODE_REMOTE;
     }
 
     // 2. Push fresh data to the telemetry queues (non-blocking)
     current_sys_state.loop_time_ms = failsafe.get_delay_count();
     current_sys_state.target_val = app_mode.get_target_val();
-    current_sys_state.mode = app_mode.get_mode();
+    current_sys_state.mode = current_mode;
     current_sys_state.abc_state.velocity = app_mode.get_velocity();
     current_sys_state.pid_target = app_mode.get_pid_target();
 

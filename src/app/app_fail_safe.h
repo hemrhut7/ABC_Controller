@@ -23,6 +23,7 @@ public:
     uint32_t get_loop_time_ms() { return loop_time_ms; }
     uint16_t get_delay_count() { return delay_counter; }
     failsafe_error_t get_error_state() const { return error_state; }
+    bool is_ready_auto_start() const { return ready_auto_start; }
 
 private:
     Processing_Motor* _motor;
@@ -40,13 +41,11 @@ private:
     uint32_t MAX_LOOP_TIME_MS = 15; 
 
     // 2. 倒地保護角度 (45度)
-    const float CRITICAL_ANGLE_RAD = 45.0f * DEG_TO_RAD; 
+    const float CRITICAL_ANGLE_RAD = 60.0f * DEG_TO_RAD; 
     const float RECOVERY_ANGLE_RAD = 5.0f * DEG_TO_RAD;
 
-    // 3. 拿起偵測參數
-    const int PICKUP_RPM_THRESHOLD = 300;     // 轉速超過 300 RPM
-    const float PICKUP_GYRO_THRESHOLD = 15.0f * DEG_TO_RAD; // 且角速度小於 15 deg/s
-    const uint32_t PICKUP_CONFIRM_MS = 500;   // 持續 0.5 秒才觸發
     uint32_t loop_time_ms = 0;
     uint16_t delay_counter = 0;
+    uint32_t last_disarm_time_ms = 0;
+    bool ready_auto_start = false;
 };

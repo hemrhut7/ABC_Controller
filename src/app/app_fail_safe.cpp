@@ -44,38 +44,23 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready) {
         current_error_state = min(current_error_state, FS_ERROR_CRITICAL_ANGLE);
     }
 
-    // 拿起偵測
-    // 邏輯：兩個輪子轉速都很快，但機身卻幾乎不動 (Gyro 很小)
-    bool high_rpm = (abs(rpm_l) > PICKUP_RPM_THRESHOLD) && (abs(rpm_r) > PICKUP_RPM_THRESHOLD);
-    bool low_motion = abs(pitch_rate_rad) < PICKUP_GYRO_THRESHOLD;
-
-    if (high_rpm && low_motion) {
-        if (!is_pickup_condition_met) {
-            // 剛開始偵測到異常，記錄時間
-            pickup_start_time = current_time_ms;
-            is_pickup_condition_met = true;
-        } else {
-            // 持續偵測中，檢查時間是否超過閾值
-            if (current_time_ms - pickup_start_time > PICKUP_CONFIRM_MS) {
-                current_error_state = min(current_error_state, FS_ERROR_PICKUP_DETECTED);
-            }
-        }
-    } else {
-        // 條件消失，重置計時器
-        is_pickup_condition_met = false;
-    }
-
     error_state = current_error_state;
     switch (error_state)
     {
     case FS_ERROR_NONE:
         _led->set_state(SYSTEM_STATE::ARMED);
+        if (!ready_auto_start && current_time_ms - last_disarm_time_ms > 3000) 
+            ready_auto_start = true;
         break;
     case FS_ERROR_AHRS_UNREADY:
         _led->set_state(SYSTEM_STATE::INITIALIZING);
+        last_disarm_time_ms = current_time_ms;
+        ready_auto_start = false;
         break;
     default:
         _led->set_state(SYSTEM_STATE::DISARMED);
+        last_disarm_time_ms = current_time_ms;
+        ready_auto_start = false;
         break;
     }
 

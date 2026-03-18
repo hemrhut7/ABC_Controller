@@ -5,7 +5,9 @@
 AppMode::AppMode(Processing_Motor* motor, ConfigStore* config_store, int interval_ms) 
     : _motor(motor), _config_store(config_store), 
     lpf_angle(1000 / interval_ms, 50),
-    lpf_velocity(1000 / interval_ms, 10), lpf_yaw(1000 / interval_ms, 10) {
+    lpf_velocity(1000 / interval_ms, 5), 
+    lpf_yaw(1000 / interval_ms, 10),
+    lpf_current_velocity(1000 / interval_ms, 10) {
     _cmd.mode = MODE_STOP;
     _cmd.target_value = 0.0f;
     _cmd.target_yaw_rate = 0.0f;
@@ -68,6 +70,7 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     _motor->get_motor_state(&motor_state);
 
     current_velocity = (motor_state.rpm_L + motor_state.rpm_R) * 0.5f * RPM_TO_MS; // 需定義轉換係數
+    current_velocity = lpf_current_velocity.update(current_velocity); // 50Hz 低通濾波
     float current_pitch = ahrs_state.euler[0]; // Rad
     float current_gyro_x = ahrs_state.imu_data_calibrated.gyro[0]; // Rad/s
 
@@ -105,18 +108,29 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     float output_turn;
     float target_yaw_rate = 0;
     if (_cmd.mode == MODE_REMOTE) {
-        target_yaw_rate = constrain(_cmd.target_yaw_rate, -MAX_YAW_RATE, MAX_YAW_RATE);
-        target_yaw_rate = lpf_yaw.update(target_yaw_rate * DEG_TO_RAD); // 轉向指令的低通濾波
+        float target_yaw_rate_rads = _cmd.target_yaw_rate * DEG_TO_RAD;
+        target_yaw_rate = constrain(target_yaw_rate_rads, -MAX_YAW_RATE, MAX_YAW_RATE);
+        target_yaw_rate = lpf_yaw.update(target_yaw_rate); // 轉向指令的低通濾波
         output_turn = _pid_yaw.compute(dt, target_yaw_rate, ahrs_state.imu_data.gyro[2]);
     } else {
         output_turn = 0;
     }
+    output_turn = constrain(output_turn, -MAX_TURN_RPM , MAX_TURN_RPM);
 
     // --- Mixer (混合器) ---
     // 平衡輸出加在兩輪同向，轉向輸出加在兩輪反向
     // 注意：這裡假設 output 直接對應 RPM，如果 Processing_Motor 吃的是 PWM，這裡單位要注意
     float target_rpm_L = output_balance - output_turn;
     float target_rpm_R = output_balance + output_turn;
+        
+    if (target_rpm_R > MAX_RPM) {
+        target_rpm_R = MAX_RPM;
+        target_rpm_L = MAX_RPM - 2 * output_turn;
+    } else if (target_rpm_L < -MAX_RPM) {
+        target_rpm_L = -MAX_RPM;
+        target_rpm_R = -MAX_RPM + 2 * output_turn;
+    }
+    
 
     // --- Actuation (執行) ---
     if (_cmd.mode != MODE_STOP) {

@@ -11,10 +11,12 @@
 // 假設輪徑 65mm => 半徑 0.0325m
 // 速度 (m/s) = (RPM / 60) * 2 * PI * R
 // Factor = 0.0325 * 2 * 3.14159 / 60 ~= 0.003403
+#define MAX_RPM      150
 #define RPM_TO_MS 0.003403f 
 #define MAX_PITCH 0.25f // rad, 約 14.3 deg
 #define MAX_VELOCITY 0.5f // m/s, equal to ~150 RPM for 65mm wheel
-#define MAX_YAW_RATE 1.57f // rad/s, 約 90 deg/s
+#define MAX_YAW_RATE 10.0f / 180.0f * 3.1416f // rad/s, 約 10 deg/s 
+#define MAX_TURN_RPM (MAX_RPM*0.25f)
 
 
 class AppMode {
@@ -50,6 +52,7 @@ private:
     LPF_1D lpf_angle; // 傾角的低通濾波器
     LPF_1D lpf_velocity; // 速度的低通濾波器
     LPF_1D lpf_yaw; // 轉向的低通濾波器
+    LPF_1D lpf_current_velocity; // 當前速度的低通濾波器
 
     // 中間變數 (便於 Telemetry 觀察)
     PID_target_t _pid_target;
