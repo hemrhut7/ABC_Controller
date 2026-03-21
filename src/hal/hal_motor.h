@@ -58,6 +58,7 @@ class HAL_Motor {
         float get_target_rpm() { return last_target_rpm; }
         float get_pwm_out() { return last_pwm_out; }
         void drive_moter(int pwm);
+        void resetPID() { pid.reset(); }
 
     private:
         uint8_t pwm_pin;

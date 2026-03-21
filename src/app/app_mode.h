@@ -6,6 +6,7 @@
 #include "pid.h"
 #include "LPF.h"
 #include "hal/hal_storage.h"
+#include <freertos/queue.h>
 
 // 物理參數定義
 // 假設輪徑 65mm => 半徑 0.0325m
@@ -14,19 +15,20 @@
 #define MAX_RPM      150
 #define RPM_TO_MS 0.003403f 
 #define MAX_PITCH 0.25f // rad, 約 14.3 deg
+#define MAX_PITCH_RATE 15 // dps
 #define MAX_VELOCITY 0.5f // m/s, equal to ~150 RPM for 65mm wheel
 #define MAX_YAW_RATE 10.0f / 180.0f * 3.1416f // rad/s, 約 10 deg/s 
 #define MAX_TURN_RPM (MAX_RPM*0.25f)
-
 
 class AppMode {
 public:
     AppMode(Processing_Motor* motor, ConfigStore* config_store, int interval_ms);
     void init();
     void update(float dt, const ahrs_data_t &ahrs_state);
-    void set_command(UserCommand_t cmd);
     void set_mode(Mode_t mode);
     void set_target(float val, float yaw);
+    bool enqueue_mode(Mode_t mode);
+    bool enqueue_target(float val, float yaw);
     float get_target_val() const { return _cmd.target_value; }
     Mode_t get_mode() const { return static_cast<Mode_t>(_cmd.mode); }
     float get_velocity() const { return current_velocity; }
@@ -39,10 +41,26 @@ public:
     const SystemConfig& get_pid_config() const;
 
 private:
+    enum AppCommandType : uint8_t {
+        APP_CMD_SET_MODE = 0,
+        APP_CMD_SET_TARGET,
+    };
+
+    struct AppCommand {
+        AppCommandType type;
+        int mode;
+        float target_value;
+        float target_yaw_rate;
+    };
+
     static constexpr uint8_t OUTER_LOOP_DIVIDER = 4;
+    static constexpr uint8_t COMMAND_QUEUE_LEN = 16;
+
+    void process_command_queue();
 
     Processing_Motor* _motor;
     ConfigStore* _config_store;
+    QueueHandle_t _cmd_queue;
     
     UserCommand_t _cmd;
     
@@ -58,7 +76,7 @@ private:
 
     // 中間變數 (便於 Telemetry 觀察)
     PID_target_t _pid_target;
-    float current_velocity;
+    float current_velocity = 0;
     float output_turn = 0;
     float velocity_loop_dt = 0.0f;
     float yaw_loop_dt = 0.0f;

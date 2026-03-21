@@ -51,7 +51,7 @@ void HAL_Motor::init() {
 
     count = 0;
     pid.reset();
-    pid.setOutputLimits(-MAX_PWM_DUTY, MAX_PWM_DUTY);
+    pid.setOutputLimits(MAX_PWM_DUTY);
 }
 
 HAL_Motor::~HAL_Motor() {

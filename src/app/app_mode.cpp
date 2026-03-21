@@ -3,14 +3,15 @@
 
 
 AppMode::AppMode(Processing_Motor* motor, ConfigStore* config_store, int interval_ms) 
-    : _motor(motor), _config_store(config_store), 
-    lpf_angle(1000 / interval_ms, 50),
+    : _motor(motor), _config_store(config_store), _cmd_queue(nullptr),
+    lpf_angle(1000 / interval_ms, 10),
     lpf_velocity(1000 / interval_ms, 5), 
-    lpf_yaw(1000 / interval_ms, 10),
-    lpf_current_velocity(1000 / interval_ms, 10) {
+    lpf_yaw(1000 / interval_ms, 5),
+    lpf_current_velocity(1000 / interval_ms, 2) {
     _cmd.mode = MODE_STOP;
     _cmd.target_value = 0.0f;
     _cmd.target_yaw_rate = 0.0f;
+    _cmd_queue = xQueueCreate(COMMAND_QUEUE_LEN, sizeof(AppCommand));
 }
 
 void AppMode::init() {
@@ -20,12 +21,15 @@ void AppMode::init() {
     
     // Level 4: Velocity Loop (外環) - 輸入 m/s, 輸出 Target Pitch (rad)
     _pid_velocity.setTunings(_config_store->data.velocity.p, _config_store->data.velocity.i, _config_store->data.velocity.d);
+    _pid_velocity.setOutputLimits(MAX_PITCH);
 
-    // Level 3: Angle Loop (直立環) - 輸入 Pitch (rad), 輸出 Target Rate (rad/s)
+    // Level 3: Angle Loop (直立環) - 輸入 Pitch (rad), 輸出 RPM
     _pid_angle.setTunings(_config_store->data.pitch.p, _config_store->data.pitch.i, _config_store->data.pitch.d);
-    
+    _pid_angle.setOutputLimits(MAX_RPM);
+
     // Yaw Loop (轉向環)
     _pid_yaw.setTunings(_config_store->data.yaw.p, _config_store->data.yaw.i, _config_store->data.yaw.d);
+    _pid_yaw.setOutputLimits(MAX_TURN_RPM);
 
     // Motor PID
     _motor->set_pid_gains(_config_store->data.motor.p, _config_store->data.motor.i, _config_store->data.motor.d);
@@ -33,18 +37,35 @@ void AppMode::init() {
     set_target(0.0f, 0.0f);
 }
 
-void AppMode::set_command(UserCommand_t cmd) {
-    _cmd = cmd;
+bool AppMode::enqueue_mode(Mode_t mode) {
+    if (_cmd_queue == nullptr) return false;
+    AppCommand cmd = {APP_CMD_SET_MODE, static_cast<int>(mode), 0.0f, 0.0f};
+    return xQueueSend(_cmd_queue, &cmd, 0) == pdTRUE;
+}
+
+bool AppMode::enqueue_target(float val, float yaw) {
+    if (_cmd_queue == nullptr) return false;
+    AppCommand cmd = {APP_CMD_SET_TARGET, 0, val, yaw};
+    return xQueueSend(_cmd_queue, &cmd, 0) == pdTRUE;
+}
+
+void AppMode::process_command_queue() {
+    if (_cmd_queue == nullptr) return;
+
+    AppCommand cmd;
+    while (xQueueReceive(_cmd_queue, &cmd, 0) == pdTRUE) {
+        if (cmd.type == APP_CMD_SET_MODE) {
+            set_mode(static_cast<Mode_t>(cmd.mode));
+        } else if (cmd.type == APP_CMD_SET_TARGET) {
+            set_target(cmd.target_value, cmd.target_yaw_rate);
+        }
+    }
 }
 
 void AppMode::set_mode(Mode_t mode) {
     if (_cmd.mode == mode) return; // 模式相同則不執行
 
     _cmd.mode = mode;
-
-    _pid_velocity.reset();
-    _pid_angle.reset();
-    _pid_yaw.reset();
     
     output_turn = 0;
     loop_counter = 0;
@@ -58,6 +79,11 @@ void AppMode::set_mode(Mode_t mode) {
         _motor->set_enable(false);
     else
         _motor->set_enable(true);
+    
+    _pid_velocity.reset();
+    _pid_angle.reset();
+    _pid_yaw.reset();
+    _motor->reset();
 }
 
 void AppMode::set_target(float val, float yaw) {
@@ -66,6 +92,8 @@ void AppMode::set_target(float val, float yaw) {
 }
 
 void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
+    process_command_queue();
+
     // 先處理MODE_PWM
     if (_cmd.mode == MODE_PWM) {
         _motor->set_pwm(_cmd.target_value, _cmd.target_value);
@@ -77,7 +105,7 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     _motor->get_motor_state(&motor_state);
 
     current_velocity = (motor_state.rpm_L + motor_state.rpm_R) * 0.5f * RPM_TO_MS; // 需定義轉換係數
-    current_velocity = lpf_current_velocity.update(current_velocity); // 50Hz 低通濾波
+    current_velocity = lpf_current_velocity.update(current_velocity); // 10Hz 低通濾波
     float current_pitch = ahrs_state.euler[0]; // Rad
     float current_gyro_x = ahrs_state.imu_data_calibrated.gyro[0]; // Rad/s
     velocity_loop_dt += dt;
@@ -91,15 +119,13 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     float target_velocity = _pid_target.velocity;
     float target_pitch = _pid_target.pitch;
     if (run_outer_loop) {
-        if (_cmd.mode == MODE_VELOCITY || _cmd.mode == MODE_REMOTE) {
+        if (_cmd.mode >= MODE_VELOCITY) {
             target_velocity = constrain(_cmd.target_value, -MAX_VELOCITY, MAX_VELOCITY);
-            target_velocity = lpf_velocity.update(target_velocity); // 速度指令的低通濾波
+            target_velocity = lpf_velocity.update(target_velocity);
             target_pitch = -_pid_velocity.compute(velocity_loop_dt, target_velocity, current_velocity); 
-            target_pitch = constrain(target_pitch, -MAX_PITCH, MAX_PITCH);
         } 
         else if (_cmd.mode == MODE_ANGLE) {
             target_pitch = constrain(_cmd.target_value * DEG_TO_RAD, -MAX_PITCH, MAX_PITCH);
-            target_pitch = lpf_angle.update(target_pitch); // 角度指令的低通濾波
         }
         velocity_loop_dt = 0.0f;
     }
@@ -107,7 +133,7 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     // Level 3: Angle Loop (直立環)
     // 輸入：目標角度，輸出：目標角速度
     float output_balance;
-    if (_cmd.mode >= MODE_ANGLE && _cmd.mode != MODE_FREE) {
+    if (_cmd.mode >= MODE_ANGLE) {
         output_balance = _pid_angle.compute(dt, target_pitch, current_pitch, -current_gyro_x);
     } 
     else if (_cmd.mode == MODE_MOTOR) {
@@ -123,12 +149,12 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
         if (_cmd.mode == MODE_REMOTE) {
             float target_yaw_rate_rads = _cmd.target_yaw_rate * DEG_TO_RAD;
             target_yaw_rate = constrain(target_yaw_rate_rads, -MAX_YAW_RATE, MAX_YAW_RATE);
-            target_yaw_rate = lpf_yaw.update(target_yaw_rate); // 轉向指令的低通濾波
+            // target_yaw_rate = lpf_yaw.update(target_yaw_rate); // 轉向指令的低通濾波
             output_turn = _pid_yaw.compute(yaw_loop_dt, target_yaw_rate, ahrs_state.imu_data_calibrated.gyro[2]);
         } else {
             output_turn = 0;
         }
-        output_turn = constrain(output_turn, -MAX_TURN_RPM , MAX_TURN_RPM);
+        output_turn = lpf_yaw.update(output_turn);
         yaw_loop_dt = 0.0f;
     }
     

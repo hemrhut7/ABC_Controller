@@ -61,13 +61,17 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
     int mode;
     if (sscanf(cmd_line.c_str(), "MODE %d", &mode) == 1) {
       // 安全檢查: Mode 範圍 (0-6)
-      if (mode >= MODE_STOP && mode <= MODE_FREE) {
-        _app_mode->set_mode((Mode_t)mode);
-        snprintf(tx_buffer, sizeof(tx_buffer), "[OK] Mode Set: %d\n", mode);
+      if (mode >= MODE_STOP && mode <= MODE_REMOTE) {
+        if (_app_mode->enqueue_mode((Mode_t)mode)) {
+          snprintf(tx_buffer, sizeof(tx_buffer), "[OK] Mode Queued: %d\n", mode);
+        } else {
+          snprintf(tx_buffer, sizeof(tx_buffer),
+                   "[ERR] Command queue full (MODE)\n");
+        }
         telemetry->queue_string(tx_buffer);
       } else {
         snprintf(tx_buffer, sizeof(tx_buffer), "[ERR] Invalid Mode (0-%d)\n",
-                 MODE_FREE);
+                 MODE_REMOTE);
         telemetry->queue_string(tx_buffer);
       }
     } else {
@@ -78,7 +82,9 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
   else if (cmd_line.startsWith("VAL")) {
     float val, yaw;
     if (sscanf(cmd_line.c_str(), "VAL %f %f", &val, &yaw) == 2) {
-      _app_mode->set_target(val, yaw);
+      if (!_app_mode->enqueue_target(val, yaw)) {
+        telemetry->queue_string("[ERR] Command queue full (VAL)\n");
+      }
     }
   }
   // 4. 讀取 PID 指令

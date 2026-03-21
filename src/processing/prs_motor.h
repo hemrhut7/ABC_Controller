@@ -9,6 +9,7 @@ public:
     ~Processing_Motor();
 
     void init();
+    void reset() { motor_l.resetPID(); motor_r.resetPID(); }
     void set_target_rpms(float left_rpm, float right_rpm);
     void set_enable(bool enable);
     void set_pwm(int left_pwm, int right_pwm);

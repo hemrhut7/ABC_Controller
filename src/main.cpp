@@ -70,10 +70,11 @@ void Control_Task(void *pvParameters) {
       if (failsafe.get_error_state() == FS_ERROR_LOOP_SLOW) {
         ahrs.reset_att();
       }
-    } else if ((current_mode == MODE_STOP || current_mode == MODE_FREE) && failsafe.is_ready_auto_start()){
-      app_mode.set_mode(MODE_REMOTE);
-      current_mode = MODE_REMOTE;
-    }
+    } 
+    // else if ((current_mode <= MODE_FREE) && failsafe.is_ready_auto_start()){
+    //   app_mode.set_mode(MODE_REMOTE);
+    //   current_mode = MODE_REMOTE;
+    // }
 
     // 2. Push fresh data to the telemetry queues (non-blocking)
     current_sys_state.delay_count = failsafe.get_delay_count();
