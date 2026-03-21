@@ -69,7 +69,7 @@ void Telemetry::process_serial_outgoing() {
       data_packet[10] = pkt.abc_state.ahrs_data.imu_data.accl[1];
       data_packet[11] = pkt.abc_state.ahrs_data.imu_data.accl[2];
       data_packet[12] = pkt.target_val;
-      data_packet[13] = (float)pkt.loop_time_ms;
+      data_packet[13] = (float)pkt.delay_count;
       data_packet[14] = (float)pkt.mode;
 
       // Write the data packet and the tail to the serial port.

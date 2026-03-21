@@ -39,6 +39,8 @@ public:
     const SystemConfig& get_pid_config() const;
 
 private:
+    static constexpr uint8_t OUTER_LOOP_DIVIDER = 4;
+
     Processing_Motor* _motor;
     ConfigStore* _config_store;
     
@@ -57,4 +59,9 @@ private:
     // 中間變數 (便於 Telemetry 觀察)
     PID_target_t _pid_target;
     float current_velocity;
+    float output_turn = 0;
+    float velocity_loop_dt = 0.0f;
+    float yaw_loop_dt = 0.0f;
+
+    uint8_t loop_counter = 0;
 };

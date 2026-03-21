@@ -20,7 +20,6 @@ void AppMode::init() {
     
     // Level 4: Velocity Loop (外環) - 輸入 m/s, 輸出 Target Pitch (rad)
     _pid_velocity.setTunings(_config_store->data.velocity.p, _config_store->data.velocity.i, _config_store->data.velocity.d);
-    _pid_velocity.setOutputLimits(-MAX_PITCH, MAX_PITCH);
 
     // Level 3: Angle Loop (直立環) - 輸入 Pitch (rad), 輸出 Target Rate (rad/s)
     _pid_angle.setTunings(_config_store->data.pitch.p, _config_store->data.pitch.i, _config_store->data.pitch.d);
@@ -46,6 +45,14 @@ void AppMode::set_mode(Mode_t mode) {
     _pid_velocity.reset();
     _pid_angle.reset();
     _pid_yaw.reset();
+    
+    output_turn = 0;
+    loop_counter = 0;
+    velocity_loop_dt = 0.0f;
+    yaw_loop_dt = 0.0f;
+    _pid_target = {0};
+    _cmd.target_value = 0.0f;
+    _cmd.target_yaw_rate = 0.0f;
 
     if (_cmd.mode == MODE_FREE)
         _motor->set_enable(false);
@@ -63,7 +70,7 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     if (_cmd.mode == MODE_PWM) {
         _motor->set_pwm(_cmd.target_value, _cmd.target_value);
         return;
-    }    
+    }
 
     // 1. 獲取狀態 (State Estimation)
     motor_state_t motor_state;
@@ -73,22 +80,28 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     current_velocity = lpf_current_velocity.update(current_velocity); // 50Hz 低通濾波
     float current_pitch = ahrs_state.euler[0]; // Rad
     float current_gyro_x = ahrs_state.imu_data_calibrated.gyro[0]; // Rad/s
+    velocity_loop_dt += dt;
+    yaw_loop_dt += dt;
+    const bool run_outer_loop = (loop_counter % OUTER_LOOP_DIVIDER) == 0;
 
     // --- 串級控制邏輯 (The Cascade) ---
     
     // Level 4: Velocity Loop (速度環)
     // 輸入：目標速度 (m/s)，輸出：目標角度 (rad)
-    float target_velocity = 0;
-    float target_pitch = 0;
-    if (_cmd.mode == MODE_VELOCITY || _cmd.mode == MODE_REMOTE) {
-        target_velocity = constrain(_cmd.target_value, -MAX_VELOCITY, MAX_VELOCITY);
-        target_velocity = lpf_velocity.update(target_velocity); // 速度指令的低通濾波
-        target_pitch = -_pid_velocity.compute(dt, target_velocity, current_velocity); 
-        target_pitch = constrain(target_pitch, -MAX_PITCH, MAX_PITCH);
-    } 
-    else if (_cmd.mode == MODE_ANGLE) {
-        target_pitch = constrain(_cmd.target_value * DEG_TO_RAD, -MAX_PITCH, MAX_PITCH);
-        target_pitch = lpf_angle.update(target_pitch); // 角度指令的低通濾波
+    float target_velocity = _pid_target.velocity;
+    float target_pitch = _pid_target.pitch;
+    if (run_outer_loop) {
+        if (_cmd.mode == MODE_VELOCITY || _cmd.mode == MODE_REMOTE) {
+            target_velocity = constrain(_cmd.target_value, -MAX_VELOCITY, MAX_VELOCITY);
+            target_velocity = lpf_velocity.update(target_velocity); // 速度指令的低通濾波
+            target_pitch = -_pid_velocity.compute(velocity_loop_dt, target_velocity, current_velocity); 
+            target_pitch = constrain(target_pitch, -MAX_PITCH, MAX_PITCH);
+        } 
+        else if (_cmd.mode == MODE_ANGLE) {
+            target_pitch = constrain(_cmd.target_value * DEG_TO_RAD, -MAX_PITCH, MAX_PITCH);
+            target_pitch = lpf_angle.update(target_pitch); // 角度指令的低通濾波
+        }
+        velocity_loop_dt = 0.0f;
     }
 
     // Level 3: Angle Loop (直立環)
@@ -105,17 +118,20 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     }
 
     // Yaw Loop (獨立的轉向環)
-    float output_turn;
-    float target_yaw_rate = 0;
-    if (_cmd.mode == MODE_REMOTE) {
-        float target_yaw_rate_rads = _cmd.target_yaw_rate * DEG_TO_RAD;
-        target_yaw_rate = constrain(target_yaw_rate_rads, -MAX_YAW_RATE, MAX_YAW_RATE);
-        target_yaw_rate = lpf_yaw.update(target_yaw_rate); // 轉向指令的低通濾波
-        output_turn = _pid_yaw.compute(dt, target_yaw_rate, ahrs_state.imu_data.gyro[2]);
-    } else {
-        output_turn = 0;
+    float target_yaw_rate = _pid_target.yaw_rate;
+    if (run_outer_loop) {
+        if (_cmd.mode == MODE_REMOTE) {
+            float target_yaw_rate_rads = _cmd.target_yaw_rate * DEG_TO_RAD;
+            target_yaw_rate = constrain(target_yaw_rate_rads, -MAX_YAW_RATE, MAX_YAW_RATE);
+            target_yaw_rate = lpf_yaw.update(target_yaw_rate); // 轉向指令的低通濾波
+            output_turn = _pid_yaw.compute(yaw_loop_dt, target_yaw_rate, ahrs_state.imu_data_calibrated.gyro[2]);
+        } else {
+            output_turn = 0;
+        }
+        output_turn = constrain(output_turn, -MAX_TURN_RPM , MAX_TURN_RPM);
+        yaw_loop_dt = 0.0f;
     }
-    output_turn = constrain(output_turn, -MAX_TURN_RPM , MAX_TURN_RPM);
+    
 
     // --- Mixer (混合器) ---
     // 平衡輸出加在兩輪同向，轉向輸出加在兩輪反向
@@ -126,9 +142,15 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     if (target_rpm_R > MAX_RPM) {
         target_rpm_R = MAX_RPM;
         target_rpm_L = MAX_RPM - 2 * output_turn;
+    } else if (target_rpm_L > MAX_RPM) {
+        target_rpm_L = MAX_RPM;
+        target_rpm_R = MAX_RPM + 2 * output_turn;
     } else if (target_rpm_L < -MAX_RPM) {
         target_rpm_L = -MAX_RPM;
         target_rpm_R = -MAX_RPM + 2 * output_turn;
+    } else if (target_rpm_R < -MAX_RPM) {
+        target_rpm_R = -MAX_RPM;
+        target_rpm_L = -MAX_RPM - 2 * output_turn;
     }
     
 
@@ -144,6 +166,7 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
         _motor->set_target_rpms(0, 0);
     }
     _pid_target = {target_rpm_L, target_rpm_R, target_pitch, target_velocity, target_yaw_rate};
+    loop_counter++;
 }
 
 void AppMode::set_pid_gains(PID_id_t pid_id, float kp, float ki, float kd) {
