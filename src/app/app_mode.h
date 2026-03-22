@@ -14,11 +14,11 @@
 // Factor = 0.0325 * 2 * 3.14159 / 60 ~= 0.003403
 #define MAX_RPM      150
 #define RPM_TO_MS 0.003403f 
-#define MAX_PITCH 10.0f * DEG_TO_RAD
+#define MAX_PITCH 8.0f * DEG_TO_RAD
 #define MAX_PITCH_RATE 15.0f * DEG_TO_RAD
-#define MAX_VELOCITY MAX_RPM * RPM_TO_MS
-#define MAX_YAW_RATE 100.0f * DEG_TO_RAD
-#define MAX_TURN_RPM MAX_RPM * 0.25f
+#define MAX_VELOCITY MAX_RPM * RPM_TO_MS * 0.9
+#define MAX_YAW_RATE 150.0f * DEG_TO_RAD
+#define MAX_TURN_RPM 0.5f * MAX_RPM
 
 class AppMode {
 public:

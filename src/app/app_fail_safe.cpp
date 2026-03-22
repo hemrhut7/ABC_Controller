@@ -16,6 +16,7 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready) {
     motor_state_t motor_state;
     _motor->get_motor_state(&motor_state);
 
+    float roll_rad = ahrs_data.euler[1];
     float pitch_rad = ahrs_data.euler[0];
     float pitch_rate_rad = ahrs_data.imu_data.gyro[0];
     int rpm_l = motor_state.rpm_L;
@@ -38,7 +39,7 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready) {
     }
 
     // 倒地偵測
-    if (abs(pitch_rad) > CRITICAL_ANGLE_RAD) {
+    if (abs(pitch_rad) > CRITICAL_ANGLE_RAD || abs(roll_rad) > CRITICAL_ANGLE_RAD) {
         current_error_state = min(current_error_state, FS_ERROR_CRITICAL_ANGLE);
     } else if (error_state == FS_ERROR_CRITICAL_ANGLE && abs(pitch_rad) > RECOVERY_ANGLE_RAD) {
         current_error_state = min(current_error_state, FS_ERROR_CRITICAL_ANGLE);
