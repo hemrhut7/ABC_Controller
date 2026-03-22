@@ -7,7 +7,8 @@ AppMode::AppMode(Processing_Motor* motor, ConfigStore* config_store, int interva
     lpf_angle(1000 / interval_ms, 10),
     lpf_velocity(1000 / interval_ms, 5), 
     lpf_yaw(1000 / interval_ms, 5),
-    lpf_current_velocity(1000 / interval_ms, 2) {
+    lpf_current_velocity(1000 / interval_ms, 2),
+    lpf_gyro_z(1000 / interval_ms, 20) {
     _cmd.mode = MODE_STOP;
     _cmd.target_value = 0.0f;
     _cmd.target_yaw_rate = 0.0f;
@@ -26,6 +27,7 @@ void AppMode::init() {
     // Level 3: Angle Loop (直立環) - 輸入 Pitch (rad), 輸出 RPM
     _pid_angle.setTunings(_config_store->data.pitch.p, _config_store->data.pitch.i, _config_store->data.pitch.d);
     _pid_angle.setOutputLimits(MAX_RPM);
+    _pid_angle.setRamp(MAX_PITCH_RATE);
 
     // Yaw Loop (轉向環)
     _pid_yaw.setTunings(_config_store->data.yaw.p, _config_store->data.yaw.i, _config_store->data.yaw.d);
@@ -149,8 +151,8 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
         if (_cmd.mode == MODE_REMOTE) {
             float target_yaw_rate_rads = _cmd.target_yaw_rate * DEG_TO_RAD;
             target_yaw_rate = constrain(target_yaw_rate_rads, -MAX_YAW_RATE, MAX_YAW_RATE);
-            // target_yaw_rate = lpf_yaw.update(target_yaw_rate); // 轉向指令的低通濾波
-            output_turn = _pid_yaw.compute(yaw_loop_dt, target_yaw_rate, ahrs_state.imu_data_calibrated.gyro[2]);
+            float filtered_gyro_z = lpf_gyro_z.update(ahrs_state.imu_data_calibrated.gyro[2]);
+            output_turn = _pid_yaw.compute(yaw_loop_dt, target_yaw_rate, filtered_gyro_z);
         } else {
             output_turn = 0;
         }
