@@ -1,39 +1,57 @@
 #include "app/app_fail_safe.h"
 #include "app/app_mode.h"
 #include "app/app_script.h"
+#include "hal/hal_joystick.h"
 #include "hal/hal_led.h"
 #include "hal/hal_storage.h"
 #include "hal/hal_telemetry.h"
 #include "processing/prs_ahrs.h"
 #include "processing/prs_motor.h"
 #include <Arduino.h>
+
+#if defined(CONFIG_BT_ENABLED) && defined(CONFIG_BLUEDROID_ENABLED) && \
+    defined(CONFIG_BT_SPP_ENABLED)
 #include <BluetoothSerial.h>
+#define HAS_BT_SERIAL 1
+#else
+#define HAS_BT_SERIAL 0
+#endif
 
 #define PRIORITY_CONTROL 24
 #define PRIORITY_AHRS 15
 #define PRIORITY_COMM 10
+#define PRIORITY_GAMEPAD 8
 #define PRIORITY_BT 5
 
 #define PERIOD_CONTROLL 5 // 200Hz
 #define PERIOD_COMM 5     // 200Hz
+#define PERIOD_GAMEPAD 10 // 100Hz
 #define PERIOD_BT 5       // 200Hz
 
 TaskHandle_t ControlTaskHandle;
 TaskHandle_t AHRSTaskHandle;
 TaskHandle_t CommTaskHandle;
+TaskHandle_t GamepadTaskHandle;
 TaskHandle_t BTTaskHandle;
 
+#if HAS_BT_SERIAL
 BluetoothSerial SerialBT;
+#endif
 Processing_Motor motor(PERIOD_CONTROLL);
 Processing_AHRS ahrs(PERIOD_CONTROLL);
 Telemetry uart_telemetry(Serial, PORT_USB);
+#if HAS_BT_SERIAL
 Telemetry bt_telemetry(SerialBT, PORT_BT);
+#else
+Telemetry bt_telemetry(Serial, PORT_BT);
+#endif
 HAL_LED system_led(LED_BUILTIN);
 ConfigStore config_store;
 
 AppMode app_mode(&motor, &config_store, PERIOD_CONTROLL);
 AppScript app_script(&app_mode);
 Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led);
+HAL_Joystick joystick(&app_mode, PERIOD_GAMEPAD);
 
 // 1. 控制任務 (Core 1)
 void Control_Task(void *pvParameters) {
@@ -63,7 +81,7 @@ void Control_Task(void *pvParameters) {
 
     if (!failsafe.check(current_sys_state.abc_state.ahrs_data, ahrs.is_ready())) {
       app_mode.set_mode(MODE_FREE);
-      
+
       if (failsafe.get_error_state() == FS_ERROR_LOOP_SLOW) {
         ahrs.reset_att();
       }
@@ -74,15 +92,16 @@ void Control_Task(void *pvParameters) {
 
     // 2. Push fresh data to the telemetry queues (non-blocking)
     current_sys_state.delay_count = failsafe.get_delay_count();
-    current_sys_state.target_val = app_mode.get_target_val();
-    current_sys_state.mode = app_mode.get_mode();
+    current_sys_state.cmd.target_value = app_mode.get_target_val();
+    current_sys_state.cmd.mode = app_mode.get_mode();
+    current_sys_state.cmd.target_yaw_rate = app_mode.get_target_yaw_rate();
     current_sys_state.abc_state.velocity = app_mode.get_velocity();
     current_sys_state.pid_target = app_mode.get_pid_target();
 
     uart_telemetry.push_data(current_sys_state);
     bt_telemetry.push_data(current_sys_state);
 
-    vTaskDelayUntil(&xLastWakeTime, xFrequency); // 確保精確的執行頻率
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
 
@@ -99,6 +118,7 @@ void Comm_Task(void *pvParameters) {
   }
 }
 
+#if HAS_BT_SERIAL
 // 3. 藍牙遙測發送任務 (Core 0)
 void BT_Task(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -110,12 +130,15 @@ void BT_Task(void *pvParameters) {
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
+#endif
 
 void setup() {
   system_led.set_state(INITIALIZING);
 
   Serial.begin(115200);
+#if HAS_BT_SERIAL
   SerialBT.begin("ABC_Controller");
+#endif
   config_store.begin();
   ahrs.init();
   motor.init();
@@ -125,16 +148,20 @@ void setup() {
   app_mode.init();
   app_mode.set_mode(MODE_FREE);
 
-  // 建立任務 參數：函數名, 名稱, 堆棧, 參數, 優先級, Handle, 核心ID
-  // Core 1
   xTaskCreatePinnedToCore(Control_Task, "ControlTask", 8192, NULL,
                           PRIORITY_CONTROL, &ControlTaskHandle, 1);
 
-  // Core 0
   xTaskCreatePinnedToCore(Comm_Task, "CommTask", 4096, NULL, PRIORITY_COMM,
                           &CommTaskHandle, 0);
+
+#if HAS_BT_SERIAL
   xTaskCreatePinnedToCore(BT_Task, "BT_Task", 4096, NULL, PRIORITY_BT,
                           &BTTaskHandle, 0);
+#else
+  xTaskCreatePinnedToCore(HAL_Joystick::task_entry, "Gamepad_Task", 6144,
+                          &joystick,
+                          PRIORITY_GAMEPAD, &GamepadTaskHandle, 0);
+#endif
 }
 
 void loop() { vTaskDelete(NULL); }

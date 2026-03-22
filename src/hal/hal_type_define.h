@@ -65,9 +65,8 @@ typedef struct {
 
 typedef struct {
     ABC_state_t abc_state;
+    UserCommand_t cmd;
     uint32_t delay_count;
-    float target_val;
     PID_target_t pid_target;
-    Mode_t mode;
 } system_state_t;
 

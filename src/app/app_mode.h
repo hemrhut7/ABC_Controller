@@ -12,12 +12,13 @@
 // 假設輪徑 65mm => 半徑 0.0325m
 // 速度 (m/s) = (RPM / 60) * 2 * PI * R
 // Factor = 0.0325 * 2 * 3.14159 / 60 ~= 0.003403
-#define MAX_RPM      140
+#define MAX_RPM      150
 #define RPM_TO_MS 0.003403f 
-#define MAX_PITCH 8.0f * DEG_TO_RAD
+#define MAX_PITCH 4.0f * DEG_TO_RAD
 #define MAX_PITCH_RATE 15.0f * DEG_TO_RAD
-#define MAX_VELOCITY MAX_RPM * RPM_TO_MS * 0.9
-#define MAX_YAW_RATE 150.0f * DEG_TO_RAD
+#define MAX_VELOCITY MAX_RPM * RPM_TO_MS * 0.8
+#define MAX_YAW_RATE_DEG 100.0f
+#define MAX_YAW_RATE_RAD MAX_YAW_RATE_DEG * DEG_TO_RAD
 #define MAX_TURN_RPM 0.5f * MAX_RPM
 
 class AppMode {
@@ -30,7 +31,9 @@ public:
     void set_target(float val, float yaw);
     bool enqueue_mode(Mode_t mode);
     bool enqueue_target(float val, float yaw);
+
     float get_target_val() const { return _cmd.target_value; }
+    float get_target_yaw_rate() const { return _cmd.target_yaw_rate; }    
     Mode_t get_mode() const { return static_cast<Mode_t>(_cmd.mode); }
     float get_velocity() const { return current_velocity; }
     PID_target_t get_pid_target () const { return _pid_target; }

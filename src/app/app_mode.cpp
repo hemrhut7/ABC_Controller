@@ -159,7 +159,7 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     if (run_outer_loop) {
         if (_cmd.mode == MODE_REMOTE) {
             float target_yaw_rate_rads = _cmd.target_yaw_rate * DEG_TO_RAD;
-            target_yaw_rate = constrain(target_yaw_rate_rads, -MAX_YAW_RATE, MAX_YAW_RATE);
+            target_yaw_rate = constrain(target_yaw_rate_rads, -MAX_YAW_RATE_RAD, MAX_YAW_RATE_RAD);
             float filtered_gyro_z = lpf_gyro_z.update(ahrs_state.imu_data_calibrated.gyro[2]);
             output_turn = _pid_yaw.compute(yaw_loop_dt, target_yaw_rate, filtered_gyro_z);
         } else {
