@@ -12,7 +12,7 @@
 // 假設輪徑 65mm => 半徑 0.0325m
 // 速度 (m/s) = (RPM / 60) * 2 * PI * R
 // Factor = 0.0325 * 2 * 3.14159 / 60 ~= 0.003403
-#define MAX_RPM      150
+#define MAX_RPM      140
 #define RPM_TO_MS 0.003403f 
 #define MAX_PITCH 8.0f * DEG_TO_RAD
 #define MAX_PITCH_RATE 15.0f * DEG_TO_RAD
@@ -26,6 +26,7 @@ public:
     void init();
     void update(float dt, const ahrs_data_t &ahrs_state);
     void set_mode(Mode_t mode);
+    void reset_control_state();
     void set_target(float val, float yaw);
     bool enqueue_mode(Mode_t mode);
     bool enqueue_target(float val, float yaw);

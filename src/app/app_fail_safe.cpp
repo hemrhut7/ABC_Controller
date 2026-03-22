@@ -19,8 +19,8 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready) {
     float roll_rad = ahrs_data.euler[1];
     float pitch_rad = ahrs_data.euler[0];
     float pitch_rate_rad = ahrs_data.imu_data.gyro[0];
-    int rpm_l = motor_state.rpm_L;
-    int rpm_r = motor_state.rpm_R;
+    float rpm_l = motor_state.rpm_L;
+    float rpm_r = motor_state.rpm_R;
 
     failsafe_error_t current_error_state = FS_ERROR_NONE;
     // 檢查迴圈性能

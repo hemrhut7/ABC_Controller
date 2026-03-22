@@ -50,7 +50,7 @@ void HAL_Motor::init() {
     digitalWrite(stdy_pin, LOW);
 
     count = 0;
-    pid.reset();
+    resetControllerState();
     pid.setOutputLimits(MAX_PWM_DUTY);
 }
 
@@ -94,6 +94,14 @@ void HAL_Motor::set_target_rpm(float target_rpm) {
     last_rpm = current_rpm;
 }
 
+void HAL_Motor::resetControllerState() {
+    pid.reset();
+    last_target_rpm = 0.0f;
+    last_rpm = current_rpm;
+    last_pwm_out = 0;
+    dither_dir = 1;
+}
+
 void HAL_Motor::drive_moter(int pwm) {
     if (pwm == 0) {
         ledcWrite(pwm_channel, 0);
@@ -132,8 +140,9 @@ void HAL_Motor::set_enable(bool enable) {
     is_enable = enable;
     if (enable) {
         digitalWrite(stdy_pin, HIGH);
-        pid.reset();
+        resetControllerState();
     } else {
+        resetControllerState();
         digitalWrite(stdy_pin, LOW); // 關閉 H-Bridge (高阻抗/滑行)
         ledcWrite(pwm_channel, 0);   // 確保 PWM 為 0
     }

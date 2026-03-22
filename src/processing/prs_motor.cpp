@@ -13,6 +13,11 @@ void Processing_Motor::init() {
     set_target_rpms(0, 0);
 }
 
+void Processing_Motor::reset() {
+    motor_l.resetControllerState();
+    motor_r.resetControllerState();
+}
+
 void Processing_Motor::set_target_rpms(float left_rpm, float right_rpm) {
     motor_l.set_target_rpm(left_rpm);
     motor_r.set_target_rpm(right_rpm);

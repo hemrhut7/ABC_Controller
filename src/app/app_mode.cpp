@@ -69,6 +69,15 @@ void AppMode::set_mode(Mode_t mode) {
 
     _cmd.mode = mode;
     
+    if (_cmd.mode == MODE_FREE)
+        _motor->set_enable(false);
+    else
+        _motor->set_enable(true);
+
+    reset_control_state();
+}
+
+void AppMode::reset_control_state() {
     output_turn = 0;
     loop_counter = 0;
     velocity_loop_dt = 0.0f;
@@ -77,14 +86,14 @@ void AppMode::set_mode(Mode_t mode) {
     _cmd.target_value = 0.0f;
     _cmd.target_yaw_rate = 0.0f;
 
-    if (_cmd.mode == MODE_FREE)
-        _motor->set_enable(false);
-    else
-        _motor->set_enable(true);
-    
     _pid_velocity.reset();
     _pid_angle.reset();
     _pid_yaw.reset();
+    lpf_angle.reset();
+    lpf_velocity.reset();
+    lpf_yaw.reset();
+    lpf_gyro_z.reset();
+    lpf_current_velocity.reset();
     _motor->reset();
 }
 
