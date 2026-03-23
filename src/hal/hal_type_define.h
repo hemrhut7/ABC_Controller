@@ -10,7 +10,8 @@ typedef enum {
     MODE_MOTOR,         // 3. 直接控制馬達轉速 (Open/Close Loop)
     MODE_ANGLE,         // 4. 控制傾角 (最常用的調試模式)
     MODE_VELOCITY,      // 5. 控制前進速度 (加上速度環)
-    MODE_REMOTE,        // 6. 綜合遙控 (速度 + 轉向)
+    MODE_REMOTE,        // 6. 綜合遙控 (速度 + 轉向) 上限的九成
+    MODE_TURBO,         // 6. 綜合遙控 (速度 + 轉向)
 } Mode_t;
 
 typedef enum {
@@ -18,14 +19,14 @@ typedef enum {
     PID_RATE,
     PID_ANGLE,
     PID_VELOCITY,
-    PID_YAW,
+    PID_STEER,
     PID_ID_COUNT
 } PID_id_t;
 
 typedef struct {
     int mode;
     float target_value; // 根據模式不同，單位可能是 RPM, rad/s, rad, m/s
-    float target_yaw_rate; // 轉向指令 (rad/s)
+    float target_steer; // 轉向指令 (rad/s)
 } UserCommand_t;
 
 
@@ -60,7 +61,7 @@ typedef struct {
     float rpm_L, rpm_R;
     float pitch;
     float velocity;
-    float yaw_rate;
+    float steer_rpm;
 } PID_target_t;
 
 typedef struct {

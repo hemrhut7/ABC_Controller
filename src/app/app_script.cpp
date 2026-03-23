@@ -27,7 +27,7 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
   char tx_buffer[256]; // Buffer for formatting response strings
 
   // 1. PID Tuning 指令: "PID <id> <kp> <ki> <kd>"
-  // ID Mapping: 0=MOTOR, 1=RATE, 2=ANGLE, 3=VELOCITY, 4=YAW
+  // ID Mapping: 0=MOTOR, 1=RATE, 2=ANGLE, 3=VELOCITY, 4=STEER
   if (cmd_line.startsWith("PID")) {
     if (cmd_line == "PID SAVE") {
       _app_mode->save_pid_gains();
@@ -78,11 +78,11 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
       telemetry->queue_string("[ERR] Invalid MODE format. Usage: MODE <id>\n");
     }
   }
-  // 3. 控制指令: "VAL <val> <yaw>"
+  // 3. 控制指令: "VAL <val> <steer>"
   else if (cmd_line.startsWith("VAL")) {
-    float val, yaw;
-    if (sscanf(cmd_line.c_str(), "VAL %f %f", &val, &yaw) == 2) {
-      if (!_app_mode->enqueue_target(val, yaw)) {
+    float val, steer;
+    if (sscanf(cmd_line.c_str(), "VAL %f %f", &val, &steer) == 2) {
+      if (!_app_mode->enqueue_target(val, steer)) {
         telemetry->queue_string("[ERR] Command queue full (VAL)\n");
       }
     }
@@ -105,7 +105,7 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
       }
     } else {
       // 獲取所有 PID
-      const char *pid_names[] = {"MOTOR", "RATE", "ANGLE", "VELOCITY", "YAW"};
+      const char *pid_names[] = {"MOTOR", "RATE", "ANGLE", "VELOCITY", "STEER"};
       for (int i = 0; i < PID_ID_COUNT; i++) {
         PID_Params p = _app_mode->get_pid_gains((PID_id_t)i);
         snprintf(tx_buffer, sizeof(tx_buffer),

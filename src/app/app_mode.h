@@ -14,12 +14,10 @@
 // Factor = 0.0325 * 2 * 3.14159 / 60 ~= 0.003403
 #define MAX_RPM      150
 #define RPM_TO_MS 0.003403f 
-#define MAX_PITCH 4.0f * DEG_TO_RAD
+#define MAX_PITCH 6.0f * DEG_TO_RAD
 #define MAX_PITCH_RATE 15.0f * DEG_TO_RAD
-#define MAX_VELOCITY MAX_RPM * RPM_TO_MS * 0.8
-#define MAX_YAW_RATE_DEG 100.0f
-#define MAX_YAW_RATE_RAD MAX_YAW_RATE_DEG * DEG_TO_RAD
-#define MAX_TURN_RPM 0.5f * MAX_RPM
+#define MAX_VELOCITY MAX_RPM * 0.65f * RPM_TO_MS
+#define MAX_STEER_RPM MAX_RPM * 0.65f
 
 class AppMode {
 public:
@@ -28,12 +26,10 @@ public:
     void update(float dt, const ahrs_data_t &ahrs_state);
     void set_mode(Mode_t mode);
     void reset_control_state();
-    void set_target(float val, float yaw);
+    void set_target(float val, float steer);
     bool enqueue_mode(Mode_t mode);
-    bool enqueue_target(float val, float yaw);
+    bool enqueue_target(float val, float steer);
 
-    float get_target_val() const { return _cmd.target_value; }
-    float get_target_yaw_rate() const { return _cmd.target_yaw_rate; }    
     Mode_t get_mode() const { return static_cast<Mode_t>(_cmd.mode); }
     float get_velocity() const { return current_velocity; }
     PID_target_t get_pid_target () const { return _pid_target; }
@@ -54,7 +50,7 @@ private:
         AppCommandType type;
         int mode;
         float target_value;
-        float target_yaw_rate;
+        float target_steer_rate;
     };
 
     static constexpr uint8_t OUTER_LOOP_DIVIDER = 4;
@@ -71,11 +67,11 @@ private:
     // PIDs
     PID _pid_velocity; // 外環
     PID _pid_angle;    // 中環
-    PID _pid_yaw;      // 轉向
+    PID _pid_steer;      // 轉向
 
     LPF_1D lpf_angle; // 傾角的低通濾波器
     LPF_1D lpf_velocity; // 速度的低通濾波器
-    LPF_1D lpf_yaw; // 轉向的低通濾波器
+    LPF_1D lpf_steer; // 轉向的低通濾波器
     LPF_1D lpf_gyro_z;
     LPF_1D lpf_current_velocity; // 當前速度的低通濾波器
 
@@ -84,7 +80,7 @@ private:
     float current_velocity = 0;
     float output_turn = 0;
     float velocity_loop_dt = 0.0f;
-    float yaw_loop_dt = 0.0f;
+    float steer_loop_dt = 0.0f;
 
     uint8_t loop_counter = 0;
 };

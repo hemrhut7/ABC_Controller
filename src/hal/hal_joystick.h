@@ -1,5 +1,8 @@
 #pragma once
 
+#include "config.h"
+
+#if !HAS_BT_SERIAL
 #include "app/app_mode.h"
 #include <Bluepad32.h>
 
@@ -25,8 +28,9 @@ private:
   uint32_t period_ms_;
   float deadzone_;
   float last_val_;
-  float last_yaw_;
+  float last_steer_;
   TickType_t last_push_tick_;
   uint32_t last_buttons_;
   bool was_connected_;
 };
+#endif  // #!HAS_BT_SERIAL

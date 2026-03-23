@@ -55,7 +55,7 @@ void Telemetry::process_serial_outgoing() {
     if (_format == FORMAT_DEFAULT) {
       // A packet was successfully received.
       // Now, manually flatten the nested struct into a float array for VOFA+.
-      float data_packet[16];
+      float data_packet[14];
       data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
       data_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
       data_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
@@ -69,9 +69,7 @@ void Telemetry::process_serial_outgoing() {
       data_packet[10] = pkt.abc_state.ahrs_data.imu_data.accl[1];
       data_packet[11] = pkt.abc_state.ahrs_data.imu_data.accl[2];
       data_packet[12] = (float)pkt.cmd.mode;
-      data_packet[13] = pkt.cmd.target_value;
-      data_packet[14] = pkt.cmd.target_yaw_rate;
-      data_packet[15] = (float)pkt.delay_count;
+      data_packet[13] = (float)pkt.delay_count;
 
       // Write the data packet and the tail to the serial port.
       uint8_t send_buffer[sizeof(data_packet) + sizeof(vofa_tail)];
@@ -87,7 +85,7 @@ void Telemetry::process_serial_outgoing() {
       data_packet[3] = pkt.pid_target.rpm_R;
       data_packet[4] = pkt.pid_target.pitch * RAD_TO_DEG;
       data_packet[5] = pkt.pid_target.velocity;
-      data_packet[6] = pkt.pid_target.yaw_rate * RAD_TO_DEG;
+      data_packet[6] = pkt.pid_target.steer_rpm;
       data_packet[7] = (float)pkt.abc_state.motor_state.pwm_out_L;
       data_packet[8] = (float)pkt.abc_state.motor_state.pwm_out_R;
       data_packet[9] = (float)pkt.abc_state.motor_state.rpm_L;

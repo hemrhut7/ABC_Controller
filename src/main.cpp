@@ -1,7 +1,7 @@
+#include "config.h"
 #include "app/app_fail_safe.h"
 #include "app/app_mode.h"
 #include "app/app_script.h"
-#include "hal/hal_joystick.h"
 #include "hal/hal_led.h"
 #include "hal/hal_storage.h"
 #include "hal/hal_telemetry.h"
@@ -9,12 +9,11 @@
 #include "processing/prs_motor.h"
 #include <Arduino.h>
 
-#if defined(CONFIG_BT_ENABLED) && defined(CONFIG_BLUEDROID_ENABLED) && \
-    defined(CONFIG_BT_SPP_ENABLED)
+
+#if HAS_BT_SERIAL
 #include <BluetoothSerial.h>
-#define HAS_BT_SERIAL 1
 #else
-#define HAS_BT_SERIAL 0
+#include "hal/hal_joystick.h"
 #endif
 
 #define PRIORITY_CONTROL 24
@@ -34,24 +33,24 @@ TaskHandle_t CommTaskHandle;
 TaskHandle_t GamepadTaskHandle;
 TaskHandle_t BTTaskHandle;
 
-#if HAS_BT_SERIAL
-BluetoothSerial SerialBT;
-#endif
+ConfigStore config_store;
 Processing_Motor motor(PERIOD_CONTROLL);
 Processing_AHRS ahrs(PERIOD_CONTROLL);
+AppMode app_mode(&motor, &config_store, PERIOD_CONTROLL);
+
+AppScript app_script(&app_mode);
+HAL_LED system_led(LED_BUILTIN);
+Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led);
+
 Telemetry uart_telemetry(Serial, PORT_USB);
 #if HAS_BT_SERIAL
+BluetoothSerial SerialBT;
 Telemetry bt_telemetry(SerialBT, PORT_BT);
 #else
+HAL_Joystick joystick(&app_mode, PERIOD_GAMEPAD);
 Telemetry bt_telemetry(Serial, PORT_BT);
 #endif
-HAL_LED system_led(LED_BUILTIN);
-ConfigStore config_store;
 
-AppMode app_mode(&motor, &config_store, PERIOD_CONTROLL);
-AppScript app_script(&app_mode);
-Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led);
-HAL_Joystick joystick(&app_mode, PERIOD_GAMEPAD);
 
 // 1. 控制任務 (Core 1)
 void Control_Task(void *pvParameters) {
@@ -92,9 +91,7 @@ void Control_Task(void *pvParameters) {
 
     // 2. Push fresh data to the telemetry queues (non-blocking)
     current_sys_state.delay_count = failsafe.get_delay_count();
-    current_sys_state.cmd.target_value = app_mode.get_target_val();
     current_sys_state.cmd.mode = app_mode.get_mode();
-    current_sys_state.cmd.target_yaw_rate = app_mode.get_target_yaw_rate();
     current_sys_state.abc_state.velocity = app_mode.get_velocity();
     current_sys_state.pid_target = app_mode.get_pid_target();
 

@@ -19,7 +19,7 @@ void ConfigStore::reset_defaults() {
     data.motor = {1.0f, 5.0f, 0.0f};
     data.pitch = {12.0f, 0.0f, 0.5f};
     data.rate  = {1.5f, 8.0f, 0.04f};
-    data.yaw   = {2.0f, 0.0f, 0.0f};
+    data.steer   = {2.0f, 0.0f, 0.0f};
     data.velocity = {0.1f, 0.01f, 0.0f};
 
     save_config(); // 寫入預設值
@@ -37,7 +37,7 @@ void ConfigStore::load_config() {
     } else if (isnan(data.motor.p) || isnan(data.motor.i) || isnan(data.motor.d) ||
                isnan(data.pitch.p) || isnan(data.pitch.i) || isnan(data.pitch.d) ||
                isnan(data.rate.p) || isnan(data.rate.i) || isnan(data.rate.d) ||
-               isnan(data.yaw.p) || isnan(data.yaw.i) || isnan(data.yaw.d) ||
+               isnan(data.steer.p) || isnan(data.steer.i) || isnan(data.steer.d) ||
                isnan(data.velocity.p) || isnan(data.velocity.i) || isnan(data.velocity.d)) {
         // Serial.println("Config invalid (contains NaN), resetting to defaults...");
         needs_reset = true;

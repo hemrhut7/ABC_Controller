@@ -17,7 +17,7 @@ struct SystemConfig {
     PID_Params motor;
     PID_Params pitch;
     PID_Params rate;
-    PID_Params yaw;
+    PID_Params steer;
     PID_Params velocity;
 };
 

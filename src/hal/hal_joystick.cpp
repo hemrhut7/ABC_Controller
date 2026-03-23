@@ -2,6 +2,8 @@
 #include <Arduino.h>
 #include <math.h>
 
+#if !HAS_BT_SERIAL
+
 HAL_Joystick *HAL_Joystick::instance_ = nullptr;
 
 namespace {
@@ -27,7 +29,7 @@ float apply_deadzone(float input, float deadzone) {
 
 HAL_Joystick::HAL_Joystick(AppMode *app_mode, uint32_t period_ms, float deadzone)
     : app_mode_(app_mode), gamepad_(nullptr), period_ms_(period_ms),
-      deadzone_(deadzone), last_val_(0.0f), last_yaw_(0.0f), last_push_tick_(0),
+      deadzone_(deadzone), last_val_(0.0f), last_steer_(0.0f), last_push_tick_(0),
       last_buttons_(0), was_connected_(false) {}
 
 void HAL_Joystick::setup_driver() {
@@ -76,7 +78,7 @@ void HAL_Joystick::update_gamepad() {
       app_mode_->enqueue_target(0.0f, 0.0f);
       app_mode_->enqueue_mode(MODE_STOP);
       last_val_ = 0.0f;
-      last_yaw_ = 0.0f;
+      last_steer_ = 0.0f;
       last_push_tick_ = xTaskGetTickCount();
       last_buttons_ = 0;
     }
@@ -100,16 +102,16 @@ void HAL_Joystick::update_gamepad() {
   }
 
   float val = -apply_deadzone(normalize_axis(gamepad_->axisY()), deadzone_);
-  float yaw = apply_deadzone(normalize_axis(gamepad_->axisX()), deadzone_);
+  float steer = apply_deadzone(normalize_axis(gamepad_->axisX()), deadzone_);
 
   TickType_t now = xTaskGetTickCount();
   bool changed = (fabsf(val - last_val_) >= kChangeThreshold) ||
-                 (fabsf(yaw - last_yaw_) >= kChangeThreshold);
+                 (fabsf(steer - last_steer_) >= kChangeThreshold);
   bool period_reached = (now - last_push_tick_) >= kMinPushInterval;
 
   if (changed || period_reached) {
     float scaled_val = val;
-    float scaled_yaw = yaw;
+    float scaled_steer = steer;
     switch (app_mode_->get_mode())
     {
     case MODE_MOTOR:
@@ -124,14 +126,13 @@ void HAL_Joystick::update_gamepad() {
     case MODE_VELOCITY:
     case MODE_REMOTE:
         scaled_val *= MAX_VELOCITY;
-        scaled_yaw *= -MAX_YAW_RATE_DEG;
         break;
     default:
         break;
     }
-    if (app_mode_->enqueue_target(scaled_val, scaled_yaw)) {
+    if (app_mode_->enqueue_target(scaled_val, scaled_steer)) {
       last_val_ = val;
-      last_yaw_ = yaw;
+      last_steer_ = steer;
       last_push_tick_ = now;
     }
   }
@@ -157,3 +158,4 @@ void HAL_Joystick::task_entry(void *pvParameters) {
   }
   joystick->task_loop();
 }
+#endif  // !HAS_BT_SERIAL
