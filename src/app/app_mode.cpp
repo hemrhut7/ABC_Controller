@@ -174,9 +174,7 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     float target_steer_rpm = _pid_target.steer_rpm;
     if (run_outer_loop) {
         if (_cmd.mode == MODE_REMOTE) {
-            float speed_ratio = constrain(abs(current_velocity) / MAX_VELOCITY, 0.0f, 1.0f);
-            float sensitivity = 1.0f - 0.8f * pow(speed_ratio, 0.333f);
-            target_steer_rpm = cmd_steer * abs(cmd_steer) *  MAX_STEER_RPM * sensitivity;
+            target_steer_rpm = cmd_steer * abs(cmd_steer) *  MAX_STEER_RPM;
             if (_cmd.mode < MODE_TURBO) target_steer_rpm *= 0.9f;
             output_turn = _pid_steer.compute(steer_loop_dt, target_steer_rpm, current_rpm_diff);
         } else {
