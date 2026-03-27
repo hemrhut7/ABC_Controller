@@ -16,6 +16,7 @@ public:
     void update_rpms(float dt);
     void get_motor_state(motor_state_t *state);
     void set_pid_gains(float p, float i, float d);
+    int16_t get_right_wheel_count() const { return motor_r.get_count(); }
 
 private:
     HAL_Motor motor_l;

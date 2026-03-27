@@ -31,6 +31,7 @@ public:
     bool enqueue_target(float val, float steer);
 
     Mode_t get_mode() const { return static_cast<Mode_t>(_cmd.mode); }
+    Mode_t get_pending_mode() const { return pending_mode; }
     float get_velocity() const { return current_velocity; }
     PID_target_t get_pid_target () const { return _pid_target; }
     
@@ -57,6 +58,8 @@ private:
     static constexpr uint8_t COMMAND_QUEUE_LEN = 16;
 
     void process_command_queue();
+    void check_auto_start_stop(float dt, float current_pitch, float current_gyro_x, float current_rpm);
+    void update_mode_selection();
 
     Processing_Motor* _motor;
     ConfigStore* _config_store;
@@ -81,6 +84,12 @@ private:
     float output_turn = 0;
     float velocity_loop_dt = 0.0f;
     float steer_loop_dt = 0.0f;
+
+    uint32_t pickup_timer_ms = 0;
+    uint32_t drop_timer_ms = 0;
+
+    int32_t wheel_accumulator = 0;  // 累積右輪相對轉動量 (PCNT count)
+    Mode_t pending_mode = MODE_FREE;
 
     uint8_t loop_counter = 0;
 };

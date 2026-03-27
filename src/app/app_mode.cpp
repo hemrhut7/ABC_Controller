@@ -65,14 +65,17 @@ void AppMode::process_command_queue() {
 }
 
 void AppMode::set_mode(Mode_t mode) {
-    if (_cmd.mode == mode) return; // 模式相同則不執行
+    if (_cmd.mode == mode) return;
 
     _cmd.mode = mode;
+    pending_mode = mode;
     
-    if (_cmd.mode == MODE_FREE)
+    if (_cmd.mode == MODE_FREE) {
         _motor->set_enable(false);
-    else
+        wheel_accumulator = 0;  // 進入 FREE 時歸零累積器
+    } else {
         _motor->set_enable(true);
+    }
 
     reset_control_state();
 }
@@ -105,6 +108,22 @@ void AppMode::set_target(float val, float steer) {
 void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     process_command_queue();
 
+    // 1. 獲取狀態 (State Estimation)
+    motor_state_t motor_state;
+    _motor->get_motor_state(&motor_state);
+
+    float current_rpm = (motor_state.rpm_L + motor_state.rpm_R) * 0.5f;
+    float current_pitch = ahrs_state.euler[0]; // Rad
+    float current_gyro_x = ahrs_state.imu_data_calibrated.gyro[0]; // Rad/s
+
+    // 檢測自動啟停 (Issue #10)
+    check_auto_start_stop(dt, current_pitch, current_gyro_x, current_rpm);
+
+    // MODE_FREE 下的輪胎切換模式邏輯
+    if (_cmd.mode == MODE_FREE) {
+        update_mode_selection();
+    }
+
     // 先處理MODE_PWM
     if (_cmd.mode == MODE_PWM) {
         _motor->set_pwm(_cmd.target_value, _cmd.target_value);
@@ -112,13 +131,8 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     }
 
     // 1. 獲取狀態 (State Estimation)
-    motor_state_t motor_state;
-    _motor->get_motor_state(&motor_state);
-
-    current_velocity = (motor_state.rpm_L + motor_state.rpm_R) * 0.5f * RPM_TO_MS; // 需定義轉換係數
+    current_velocity = current_rpm * RPM_TO_MS; // 需定義轉換係數
     current_velocity = lpf_current_velocity.update(current_velocity); // 10Hz 低通濾波
-    float current_pitch = ahrs_state.euler[0]; // Rad
-    float current_gyro_x = ahrs_state.imu_data_calibrated.gyro[0]; // Rad/s
     velocity_loop_dt += dt;
     steer_loop_dt += dt;
     const bool run_outer_loop = (loop_counter % OUTER_LOOP_DIVIDER) == 0;
@@ -264,4 +278,77 @@ PID_Params AppMode::get_pid_gains(PID_id_t pid_id) {
 
 const SystemConfig& AppMode::get_pid_config() const {
     return _config_store->data;
+}
+
+void AppMode::check_auto_start_stop(float dt, float current_pitch, float current_gyro_x, float current_rpm) {
+    // PWM / MOTOR 為手動測試模式，跳過自動啟停
+    if (_cmd.mode == MODE_PWM || _cmd.mode == MODE_MOTOR) {
+        pickup_timer_ms = 0;
+        drop_timer_ms = 0;
+        return;
+    }
+
+    // --- 1. 懸空保護 (Pick-up Detection) ---
+    // 條件：平衡中 + 姿態接近直立 + 輪胎高速空轉 → 判定為被撿起
+    if (_cmd.mode >= MODE_ANGLE) {
+        bool is_runaway = (abs(current_pitch) < 15.0f * DEG_TO_RAD)
+                       && (abs(current_rpm) > MAX_RPM * 0.8f);
+
+        pickup_timer_ms = is_runaway ? pickup_timer_ms + (uint32_t)(dt * 1000.0f) : 0;
+
+        if (pickup_timer_ms > 500) {
+            enqueue_mode(MODE_FREE);
+            pickup_timer_ms = 0;
+        }
+    } else {
+        pickup_timer_ms = 0;
+    }
+
+    // --- 2. 落地啟動 (Drop-to-Start) ---
+    // 條件：停止中 + 直立 + 穩定 + 輪胎靜止 → 自動恢復到 pending_mode
+    if (_cmd.mode == MODE_FREE) {
+        bool is_ready = (abs(current_pitch)  < 3.0f  * DEG_TO_RAD)
+                     && (abs(current_gyro_x) < 10.0f * DEG_TO_RAD)
+                     && (abs(current_rpm)    < 10.0f);
+
+        drop_timer_ms = is_ready ? drop_timer_ms + (uint32_t)(dt * 1000.0f) : 0;
+
+        if (drop_timer_ms > 500 && pending_mode >= MODE_ANGLE) {
+            reset_control_state();
+            enqueue_mode(pending_mode);
+            drop_timer_ms = 0;
+        }
+    } else {
+        drop_timer_ms = 0;
+    }
+}
+
+void AppMode::update_mode_selection() {
+    // get_right_wheel_count() 回傳的是自上次讀取以來的「相對轉動量」
+    // (PCNT 在 getPCNTCount() 中會被清零)
+    // 因此需要累積到 wheel_accumulator 來追蹤絕對位置
+    int16_t delta_count = _motor->get_right_wheel_count();
+    wheel_accumulator += delta_count;
+
+    // 每 30 度切換一個模式
+    const int32_t cnt_per_step = (int32_t)(60.0f / DEG_PER_CNT);
+
+    if (abs(wheel_accumulator) >= cnt_per_step) {
+        int steps = wheel_accumulator / cnt_per_step;
+        wheel_accumulator -= steps * cnt_per_step;  // 保留餘量
+
+        // 確保起始 pending_mode 在合法循環範圍內
+        if (pending_mode < MODE_ANGLE || pending_mode > MODE_TURBO) {
+            pending_mode = MODE_ANGLE;
+        }
+
+        int next_mode = (int)pending_mode + steps;
+
+        // 循環限制: MODE_ANGLE(4) ~ MODE_TURBO(7)
+        if (next_mode > MODE_TURBO) next_mode = MODE_ANGLE;
+        if (next_mode < MODE_ANGLE) next_mode = MODE_TURBO;
+
+        pending_mode = (Mode_t)next_mode;
+        Serial.printf("[MODE_SEL] Pending: %d\n", pending_mode);
+    }
 }

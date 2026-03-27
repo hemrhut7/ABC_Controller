@@ -59,6 +59,7 @@ class HAL_Motor {
         float get_pwm_out() { return last_pwm_out; }
         void drive_moter(int pwm);
         void resetControllerState();
+        int16_t get_count() const { return count; }
 
     private:
         uint8_t pwm_pin;

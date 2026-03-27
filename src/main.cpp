@@ -7,6 +7,7 @@
 #include "hal/hal_telemetry.h"
 #include "processing/prs_ahrs.h"
 #include "processing/prs_motor.h"
+#include "hal/hal_display.h"
 #include <Arduino.h>
 
 
@@ -40,6 +41,7 @@ AppMode app_mode(&motor, &config_store, PERIOD_CONTROLL);
 
 AppScript app_script(&app_mode);
 HAL_LED system_led(LED_BUILTIN);
+HAL_Display system_display(128, 32);
 Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led);
 
 Telemetry uart_telemetry(Serial, PORT_USB);
@@ -110,6 +112,7 @@ void Comm_Task(void *pvParameters) {
     uart_telemetry.process_serial_outgoing();
     app_script.check_serial(Serial, &uart_telemetry);
     system_led.update();
+    system_display.update(app_mode.get_mode(), app_mode.get_pending_mode());
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
@@ -143,6 +146,7 @@ void setup() {
   bt_telemetry.init(1000 / PERIOD_BT);
 
   app_mode.init();
+  system_display.init();
   app_mode.set_mode(MODE_FREE);
 
   xTaskCreatePinnedToCore(Control_Task, "ControlTask", 8192, NULL,

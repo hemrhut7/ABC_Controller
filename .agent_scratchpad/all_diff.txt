@@ -1,0 +1,407 @@
+diff --git a/platformio.ini b/platformio.ini
+index 3434b5b..f67cf6b 100644
+--- a/platformio.ini
++++ b/platformio.ini
+@@ -12,8 +12,10 @@
+ platform = espressif32
+ board = nodemcu-32s
+ framework = arduino
+-platform_packages =
+-  framework-arduinoespressif32 @ symlink://C:/PIO_Cores/esp32-bluepad32-4.1.0
++# platform_packages =
++#   framework-arduinoespressif32 @ symlink://C:/PIO_Cores/esp32-bluepad32-4.1.0
+ lib_deps =
+   adafruit/Adafruit MPU6050@^2.2.8
++  adafruit/Adafruit SSD1306@^2.5.7
++  adafruit/Adafruit GFX Library@^1.11.5
+ upload_speed = 921600
+diff --git a/src/app/app_mode.cpp b/src/app/app_mode.cpp
+index 0ad2003..5ebd29c 100644
+--- a/src/app/app_mode.cpp
++++ b/src/app/app_mode.cpp
+@@ -65,14 +65,17 @@ void AppMode::process_command_queue() {
+ }
+ 
+ void AppMode::set_mode(Mode_t mode) {
+-    if (_cmd.mode == mode) return; // 模式相同則不執行
++    if (_cmd.mode == mode) return;
+ 
+     _cmd.mode = mode;
++    pending_mode = mode;
+     
+-    if (_cmd.mode == MODE_FREE)
++    if (_cmd.mode == MODE_FREE) {
+         _motor->set_enable(false);
+-    else
++        wheel_accumulator = 0;  // 進入 FREE 時歸零累積器
++    } else {
+         _motor->set_enable(true);
++    }
+ 
+     reset_control_state();
+ }
+@@ -105,6 +108,22 @@ void AppMode::set_target(float val, float steer) {
+ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
+     process_command_queue();
+ 
++    // 1. 獲取狀態 (State Estimation)
++    motor_state_t motor_state;
++    _motor->get_motor_state(&motor_state);
++
++    float current_rpm = (motor_state.rpm_L + motor_state.rpm_R) * 0.5f;
++    float current_pitch = ahrs_state.euler[0]; // Rad
++    float current_gyro_x = ahrs_state.imu_data_calibrated.gyro[0]; // Rad/s
++
++    // 檢測自動啟停 (Issue #10)
++    check_auto_start_stop(dt, current_pitch, current_gyro_x, current_rpm);
++
++    // MODE_FREE 下的輪胎切換模式邏輯
++    if (_cmd.mode == MODE_FREE) {
++        update_mode_selection();
++    }
++
+     // 先處理MODE_PWM
+     if (_cmd.mode == MODE_PWM) {
+         _motor->set_pwm(_cmd.target_value, _cmd.target_value);
+@@ -112,13 +131,8 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
+     }
+ 
+     // 1. 獲取狀態 (State Estimation)
+-    motor_state_t motor_state;
+-    _motor->get_motor_state(&motor_state);
+-
+-    current_velocity = (motor_state.rpm_L + motor_state.rpm_R) * 0.5f * RPM_TO_MS; // 需定義轉換係數
++    current_velocity = current_rpm * RPM_TO_MS; // 需定義轉換係數
+     current_velocity = lpf_current_velocity.update(current_velocity); // 10Hz 低通濾波
+-    float current_pitch = ahrs_state.euler[0]; // Rad
+-    float current_gyro_x = ahrs_state.imu_data_calibrated.gyro[0]; // Rad/s
+     velocity_loop_dt += dt;
+     steer_loop_dt += dt;
+     const bool run_outer_loop = (loop_counter % OUTER_LOOP_DIVIDER) == 0;
+@@ -265,3 +279,76 @@ PID_Params AppMode::get_pid_gains(PID_id_t pid_id) {
+ const SystemConfig& AppMode::get_pid_config() const {
+     return _config_store->data;
+ }
++
++void AppMode::check_auto_start_stop(float dt, float current_pitch, float current_gyro_x, float current_rpm) {
++    // PWM / MOTOR 為手動測試模式，跳過自動啟停
++    if (_cmd.mode == MODE_PWM || _cmd.mode == MODE_MOTOR) {
++        pickup_timer_ms = 0;
++        drop_timer_ms = 0;
++        return;
++    }
++
++    // --- 1. 懸空保護 (Pick-up Detection) ---
++    // 條件：平衡中 + 姿態接近直立 + 輪胎高速空轉 → 判定為被撿起
++    if (_cmd.mode >= MODE_ANGLE) {
++        bool is_runaway = (abs(current_pitch) < 15.0f * DEG_TO_RAD)
++                       && (abs(current_rpm) > MAX_RPM * 0.8f);
++
++        pickup_timer_ms = is_runaway ? pickup_timer_ms + (uint32_t)(dt * 1000.0f) : 0;
++
++        if (pickup_timer_ms > 500) {
++            enqueue_mode(MODE_FREE);
++            pickup_timer_ms = 0;
++        }
++    } else {
++        pickup_timer_ms = 0;
++    }
++
++    // --- 2. 落地啟動 (Drop-to-Start) ---
++    // 條件：停止中 + 直立 + 穩定 + 輪胎靜止 → 自動恢復到 pending_mode
++    if (_cmd.mode == MODE_FREE) {
++        bool is_ready = (abs(current_pitch)  < 3.0f  * DEG_TO_RAD)
++                     && (abs(current_gyro_x) < 10.0f * DEG_TO_RAD)
++                     && (abs(current_rpm)    < 10.0f);
++
++        drop_timer_ms = is_ready ? drop_timer_ms + (uint32_t)(dt * 1000.0f) : 0;
++
++        if (drop_timer_ms > 500 && pending_mode >= MODE_ANGLE) {
++            reset_control_state();
++            enqueue_mode(pending_mode);
++            drop_timer_ms = 0;
++        }
++    } else {
++        drop_timer_ms = 0;
++    }
++}
++
++void AppMode::update_mode_selection() {
++    // get_right_wheel_count() 回傳的是自上次讀取以來的「相對轉動量」
++    // (PCNT 在 getPCNTCount() 中會被清零)
++    // 因此需要累積到 wheel_accumulator 來追蹤絕對位置
++    int16_t delta_count = _motor->get_right_wheel_count();
++    wheel_accumulator += delta_count;
++
++    // 每 30 度切換一個模式
++    const int32_t cnt_per_step = (int32_t)(60.0f / DEG_PER_CNT);
++
++    if (abs(wheel_accumulator) >= cnt_per_step) {
++        int steps = wheel_accumulator / cnt_per_step;
++        wheel_accumulator -= steps * cnt_per_step;  // 保留餘量
++
++        // 確保起始 pending_mode 在合法循環範圍內
++        if (pending_mode < MODE_ANGLE || pending_mode > MODE_TURBO) {
++            pending_mode = MODE_ANGLE;
++        }
++
++        int next_mode = (int)pending_mode + steps;
++
++        // 循環限制: MODE_ANGLE(4) ~ MODE_TURBO(7)
++        if (next_mode > MODE_TURBO) next_mode = MODE_ANGLE;
++        if (next_mode < MODE_ANGLE) next_mode = MODE_TURBO;
++
++        pending_mode = (Mode_t)next_mode;
++        Serial.printf("[MODE_SEL] Pending: %d\n", pending_mode);
++    }
++}
+diff --git a/src/app/app_mode.h b/src/app/app_mode.h
+index af09490..f50b48b 100644
+--- a/src/app/app_mode.h
++++ b/src/app/app_mode.h
+@@ -31,6 +31,7 @@ public:
+     bool enqueue_target(float val, float steer);
+ 
+     Mode_t get_mode() const { return static_cast<Mode_t>(_cmd.mode); }
++    Mode_t get_pending_mode() const { return pending_mode; }
+     float get_velocity() const { return current_velocity; }
+     PID_target_t get_pid_target () const { return _pid_target; }
+     
+@@ -57,6 +58,8 @@ private:
+     static constexpr uint8_t COMMAND_QUEUE_LEN = 16;
+ 
+     void process_command_queue();
++    void check_auto_start_stop(float dt, float current_pitch, float current_gyro_x, float current_rpm);
++    void update_mode_selection();
+ 
+     Processing_Motor* _motor;
+     ConfigStore* _config_store;
+@@ -82,5 +85,11 @@ private:
+     float velocity_loop_dt = 0.0f;
+     float steer_loop_dt = 0.0f;
+ 
++    uint32_t pickup_timer_ms = 0;
++    uint32_t drop_timer_ms = 0;
++
++    int32_t wheel_accumulator = 0;  // 累積右輪相對轉動量 (PCNT count)
++    Mode_t pending_mode = MODE_FREE;
++
+     uint8_t loop_counter = 0;
+ };
+diff --git a/src/config.h b/src/config.h
+index 9a07c3b..d4450a4 100644
+--- a/src/config.h
++++ b/src/config.h
+@@ -1,4 +1,4 @@
+ #pragma once
+ 
+ // if enable BT_SERIAL, framework-arduinoespressif32 @ symlink://C:/PIO_Cores/esp32-bluepad32-4.1.0 in the platformio.ini should be commented
+-#define HAS_BT_SERIAL 0
++#define HAS_BT_SERIAL 1
+diff --git a/src/hal/hal_display.cpp b/src/hal/hal_display.cpp
+new file mode 100644
+index 0000000..3c162ef
+--- /dev/null
++++ b/src/hal/hal_display.cpp
+@@ -0,0 +1,99 @@
++#include "hal_display.h"
++
++HAL_Display::HAL_Display(uint8_t w, uint8_t h) 
++    : _display(w, h, OLED_MOSI_PIN, OLED_SCLK_PIN, OLED_DC_PIN, OLED_RST_PIN, OLED_CS_PIN), 
++      _w(w), _h(h) {
++}
++
++void HAL_Display::init() {
++    // 使用 Software SPI，不依賴全局 Wire 總線
++    // 因為是 SPI，通常無法像 I2C 那樣簡單偵測，所以假定連線成功
++    if (!_display.begin(SSD1306_SWITCHCAPVCC)) { 
++        Serial.println(F("[DISPLAY] SSD1306 SPI failed"));
++        _connected = false;
++        return;
++    }
++    _connected = true;
++    Serial.println(F("[DISPLAY] SSD1306 SPI OK"));
++
++    _display.clearDisplay();
++    _display.setTextColor(SSD1306_WHITE);
++    _display.setCursor(0, 0);
++    _display.setTextSize(2);
++    _display.println(F("ABC Ctrl"));
++    _display.setTextSize(1);
++    _display.println(F("SPI Mode Init..."));
++    _display.display();
++}
++
++void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery_v) {
++    if (!_connected) return;
++
++    // Dirty check: 只在狀態改變時重繪
++    if (current_mode == _last_current_mode 
++     && pending_mode == _last_pending_mode
++     && abs(battery_v - _last_battery_v) < 0.05f) {
++        return;
++    }
++    _last_current_mode = current_mode;
++    _last_pending_mode = pending_mode;
++    _last_battery_v = battery_v;
++
++    _display.clearDisplay();
++
++    // 第一行：當前模式 (大字)
++    _display.setCursor(0, 0);
++    _display.setTextSize(2);
++    _display.print(mode_to_str(current_mode));
++
++    // 第二行：待選模式 (小字，僅 FREE 時顯示)
++    _display.setCursor(0, 18);
++    _display.setTextSize(1);
++    if (current_mode == MODE_FREE) {
++        _display.print(F("Next: "));
++        _display.print(mode_to_str(pending_mode));
++    } else {
++        // 非 FREE 模式顯示電壓
++        _display.print(F("Batt: "));
++        _display.print(battery_v, 1);
++        _display.print(F("V"));
++    }
++
++    // 右下角：簡易狀態指示
++    _display.setCursor(100, 24);
++    if (current_mode >= MODE_ANGLE) {
++        _display.print(F("[BAL]"));
++    } else if (current_mode == MODE_FREE) {
++        _display.print(F("[SEL]"));
++    }
++
++    _display.display();
++}
++
++void HAL_Display::show_message(const char* line1, const char* line2) {
++    if (!_connected) return;
++
++    _display.clearDisplay();
++    _display.setCursor(0, 0);
++    _display.setTextSize(2);
++    _display.println(line1);
++    if (line2) {
++        _display.setTextSize(1);
++        _display.println(line2);
++    }
++    _display.display();
++}
++
++const char* HAL_Display::mode_to_str(Mode_t mode) {
++    switch (mode) {
++        case MODE_STOP:     return "STOP";
++        case MODE_FREE:     return "FREE";
++        case MODE_PWM:      return "PWM";
++        case MODE_MOTOR:    return "MOTOR";
++        case MODE_ANGLE:    return "ANGLE";
++        case MODE_VELOCITY: return "VELOCITY";
++        case MODE_REMOTE:   return "REMOTE";
++        case MODE_TURBO:    return "TURBO";
++        default:            return "???";
++    }
++}
+diff --git a/src/hal/hal_display.h b/src/hal/hal_display.h
+new file mode 100644
+index 0000000..87f66a0
+--- /dev/null
++++ b/src/hal/hal_display.h
+@@ -0,0 +1,36 @@
++#pragma once
++
++#include <Arduino.h>
++#include <Adafruit_GFX.h>
++#include <Adafruit_SSD1306.h>
++#include "hal/hal_type_define.h"
++
++// OLED SPI Pins (Software SPI)
++#define OLED_MOSI_PIN   13
++#define OLED_SCLK_PIN   14
++#define OLED_DC_PIN     27
++#define OLED_RST_PIN    12
++#define OLED_CS_PIN     -1 // Not used or grounded
++
++class HAL_Display {
++public:
++    HAL_Display(uint8_t w = 128, uint8_t h = 32);
++    void init();
++    bool is_connected() const { return _connected; }
++
++    // 主要更新介面：傳入當前模式與待選模式
++    void update(Mode_t current_mode, Mode_t pending_mode, float battery_v = 0.0f);
++    void show_message(const char* line1, const char* line2 = nullptr);
++
++private:
++    static const char* mode_to_str(Mode_t mode);
++
++    Adafruit_SSD1306 _display;
++    uint8_t _w, _h;
++    bool _connected = false;
++
++    // Dirty flag: 只在狀態改變時刷新
++    Mode_t _last_current_mode = MODE_STOP;
++    Mode_t _last_pending_mode = MODE_STOP;
++    float  _last_battery_v = -1.0f;
++};
+diff --git a/src/hal/hal_motor.h b/src/hal/hal_motor.h
+index 80e7222..a297c1f 100644
+--- a/src/hal/hal_motor.h
++++ b/src/hal/hal_motor.h
+@@ -59,6 +59,7 @@ class HAL_Motor {
+         float get_pwm_out() { return last_pwm_out; }
+         void drive_moter(int pwm);
+         void resetControllerState();
++        int16_t get_count() const { return count; }
+ 
+     private:
+         uint8_t pwm_pin;
+diff --git a/src/main.cpp b/src/main.cpp
+index c480e92..7b91430 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -7,6 +7,7 @@
+ #include "hal/hal_telemetry.h"
+ #include "processing/prs_ahrs.h"
+ #include "processing/prs_motor.h"
++#include "hal/hal_display.h"
+ #include <Arduino.h>
+ 
+ 
+@@ -40,6 +41,7 @@ AppMode app_mode(&motor, &config_store, PERIOD_CONTROLL);
+ 
+ AppScript app_script(&app_mode);
+ HAL_LED system_led(LED_BUILTIN);
++HAL_Display system_display(128, 32);
+ Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led);
+ 
+ Telemetry uart_telemetry(Serial, PORT_USB);
+@@ -110,6 +112,7 @@ void Comm_Task(void *pvParameters) {
+     uart_telemetry.process_serial_outgoing();
+     app_script.check_serial(Serial, &uart_telemetry);
+     system_led.update();
++    system_display.update(app_mode.get_mode(), app_mode.get_pending_mode());
+ 
+     vTaskDelayUntil(&xLastWakeTime, xFrequency);
+   }
+@@ -143,6 +146,7 @@ void setup() {
+   bt_telemetry.init(1000 / PERIOD_BT);
+ 
+   app_mode.init();
++  system_display.init();
+   app_mode.set_mode(MODE_FREE);
+ 
+   xTaskCreatePinnedToCore(Control_Task, "ControlTask", 8192, NULL,
+diff --git a/src/processing/prs_motor.h b/src/processing/prs_motor.h
+index 425d3fd..4b81925 100644
+--- a/src/processing/prs_motor.h
++++ b/src/processing/prs_motor.h
+@@ -16,6 +16,7 @@ public:
+     void update_rpms(float dt);
+     void get_motor_state(motor_state_t *state);
+     void set_pid_gains(float p, float i, float d);
++    int16_t get_right_wheel_count() const { return motor_r.get_count(); }
+ 
+ private:
+     HAL_Motor motor_l;
