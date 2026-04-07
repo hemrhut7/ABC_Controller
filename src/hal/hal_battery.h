@@ -2,6 +2,9 @@
 
 #include <Arduino.h>
 
+#define BAT_ADC_PIN   35
+#define BAT_V_FACTOR  0.010466f
+
 class HAL_Battery {
 public:
     /**
@@ -9,7 +12,7 @@ public:
      * @param pin ADC pin to read from
      * @param factor Calibration factor (V = raw * factor)
      */
-    HAL_Battery(uint8_t pin, float factor = 0.05371f);
+    HAL_Battery(uint8_t pin = BAT_ADC_PIN, float factor = BAT_V_FACTOR);
 
     /**
      * @brief Initialize the ADC pin

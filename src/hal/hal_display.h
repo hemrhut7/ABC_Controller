@@ -12,9 +12,12 @@
 #define OLED_RST_PIN    12
 #define OLED_CS_PIN     -1 // Not used or grounded
 
+#define OLED_WIDTH      128
+#define OLED_HEIGHT     32
+
 class HAL_Display {
 public:
-    HAL_Display(uint8_t w = 128, uint8_t h = 32);
+    HAL_Display(uint8_t w = OLED_WIDTH, uint8_t h = OLED_HEIGHT);
     void init();
     bool is_connected() const { return _connected; }
 

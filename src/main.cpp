@@ -47,8 +47,8 @@ void set_app_pending_mode(Mode_t mode) {
 }
 
 HAL_LED system_led(LED_BUILTIN);
-HAL_Display system_display(128, 32);
-HAL_Battery system_battery(35, 0.010466f);
+HAL_Display system_display;
+HAL_Battery system_battery;
 Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led, set_app_pending_mode);
 
 Telemetry uart_telemetry(Serial, PORT_USB);
