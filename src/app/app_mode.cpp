@@ -120,8 +120,13 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     check_auto_start_stop(dt, current_pitch, current_gyro_x, current_rpm);
 
     // MODE_FREE 下的輪胎切換模式邏輯
+    uint32_t now_ms = ahrs_state.imu_data.timestamp * 1e-3f;
     if (_cmd.mode == MODE_FREE) {
-        update_mode_selection();
+        if ((now_ms - last_disarm_time_ms) > 3000) {
+            update_mode_selection();
+        }
+    } else {
+        last_disarm_time_ms = now_ms;
     }
 
     // 先處理MODE_PWM
@@ -349,6 +354,5 @@ void AppMode::update_mode_selection() {
         if (next_mode < MODE_ANGLE) next_mode = MODE_TURBO;
 
         pending_mode = (Mode_t)next_mode;
-        Serial.printf("[MODE_SEL] Pending: %d\n", pending_mode);
     }
 }

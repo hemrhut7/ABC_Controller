@@ -8,6 +8,7 @@
 #include "processing/prs_ahrs.h"
 #include "processing/prs_motor.h"
 #include "hal/hal_display.h"
+#include "hal/hal_battery.h"
 #include <Arduino.h>
 
 
@@ -40,9 +41,15 @@ Processing_AHRS ahrs(PERIOD_CONTROLL);
 AppMode app_mode(&motor, &config_store, PERIOD_CONTROLL);
 
 AppScript app_script(&app_mode);
+
+void set_app_pending_mode(Mode_t mode) {
+  app_mode.set_pending_mode(mode);
+}
+
 HAL_LED system_led(LED_BUILTIN);
 HAL_Display system_display(128, 32);
-Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led);
+HAL_Battery system_battery(35, 0.010466f);
+Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led, set_app_pending_mode);
 
 Telemetry uart_telemetry(Serial, PORT_USB);
 #if HAS_BT_SERIAL
@@ -92,6 +99,8 @@ void Control_Task(void *pvParameters) {
     // }
 
     // 2. Push fresh data to the telemetry queues (non-blocking)
+    system_battery.update(dt);
+    current_sys_state.battery_v = system_battery.get_voltage();
     current_sys_state.delay_count = failsafe.get_delay_count();
     current_sys_state.cmd.mode = app_mode.get_mode();
     current_sys_state.abc_state.velocity = app_mode.get_velocity();
@@ -112,7 +121,7 @@ void Comm_Task(void *pvParameters) {
     uart_telemetry.process_serial_outgoing();
     app_script.check_serial(Serial, &uart_telemetry);
     system_led.update();
-    system_display.update(app_mode.get_mode(), app_mode.get_pending_mode());
+    system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_delay_count());
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
@@ -147,6 +156,7 @@ void setup() {
 
   app_mode.init();
   system_display.init();
+  system_battery.init();
   app_mode.set_mode(MODE_FREE);
 
   xTaskCreatePinnedToCore(Control_Task, "ControlTask", 8192, NULL,

@@ -26,18 +26,20 @@ void HAL_Display::init() {
     _display.display();
 }
 
-void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery_v) {
+void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery_v, int delay_count) {
     if (!_connected) return;
 
     // Dirty check: 只在狀態改變時重繪
     if (current_mode == _last_current_mode 
      && pending_mode == _last_pending_mode
-     && abs(battery_v - _last_battery_v) < 0.05f) {
+     && abs(battery_v - _last_battery_v) < 0.05f
+     && delay_count == _last_delay_count) {
         return;
     }
     _last_current_mode = current_mode;
     _last_pending_mode = pending_mode;
     _last_battery_v = battery_v;
+    _last_delay_count = delay_count;
 
     _display.clearDisplay();
 
@@ -46,26 +48,25 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
     _display.setTextSize(2);
     _display.print(mode_to_str(current_mode));
 
-    // 第二行：待選模式 (小字，僅 FREE 時顯示)
+    // 待選模式移到當前模式模式右邊 (小字)
+    if (current_mode == MODE_FREE) {
+        _display.setTextSize(1);
+        _display.setCursor(70, 6); 
+        _display.print(F("> "));
+        _display.print(mode_to_str(pending_mode));
+    }
+
+    // 第二行：電池電壓 (小字，始終顯示)
     _display.setCursor(0, 18);
     _display.setTextSize(1);
-    if (current_mode == MODE_FREE) {
-        _display.print(F("Next: "));
-        _display.print(mode_to_str(pending_mode));
-    } else {
-        // 非 FREE 模式顯示電壓
-        _display.print(F("Batt: "));
-        _display.print(battery_v, 1);
-        _display.print(F("V"));
-    }
+    _display.print(F("V:"));
+    _display.print(battery_v, 1);
+    _display.print(F("V"));
 
     // 右下角：簡易狀態指示
     _display.setCursor(100, 24);
-    if (current_mode >= MODE_ANGLE) {
-        _display.print(F("[BAL]"));
-    } else if (current_mode == MODE_FREE) {
-        _display.print(F("[SEL]"));
-    }
+    _display.print(F("D:"));
+    _display.print(delay_count);
 
     _display.display();
 }

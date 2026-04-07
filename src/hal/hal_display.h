@@ -19,7 +19,7 @@ public:
     bool is_connected() const { return _connected; }
 
     // 主要更新介面：傳入當前模式與待選模式
-    void update(Mode_t current_mode, Mode_t pending_mode, float battery_v = 0.0f);
+    void update(Mode_t current_mode, Mode_t pending_mode, float battery_v = 0.0f, int delay_count = 0);
     void show_message(const char* line1, const char* line2 = nullptr);
 
 private:
@@ -33,4 +33,5 @@ private:
     Mode_t _last_current_mode = MODE_STOP;
     Mode_t _last_pending_mode = MODE_STOP;
     float  _last_battery_v = -1.0f;
+    int    _last_delay_count = -1;
 };

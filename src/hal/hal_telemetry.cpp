@@ -55,7 +55,7 @@ void Telemetry::process_serial_outgoing() {
     if (_format == FORMAT_DEFAULT) {
       // A packet was successfully received.
       // Now, manually flatten the nested struct into a float array for VOFA+.
-      float data_packet[14];
+      float data_packet[15];
       data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
       data_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
       data_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
@@ -70,6 +70,7 @@ void Telemetry::process_serial_outgoing() {
       data_packet[11] = pkt.abc_state.ahrs_data.imu_data.accl[2];
       data_packet[12] = (float)pkt.cmd.mode;
       data_packet[13] = (float)pkt.delay_count;
+      data_packet[14] = pkt.battery_v;
 
       // Write the data packet and the tail to the serial port.
       uint8_t send_buffer[sizeof(data_packet) + sizeof(vofa_tail)];
@@ -78,7 +79,7 @@ void Telemetry::process_serial_outgoing() {
       port.write(send_buffer, sizeof(send_buffer));
     } 
     else if (FORMAT_PID == 1) {
-      float data_packet[14];
+      float data_packet[15];
       data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
       data_packet[1] = pkt.cmd.target_value;
       data_packet[2] = pkt.pid_target.rpm_L;
@@ -93,6 +94,7 @@ void Telemetry::process_serial_outgoing() {
       data_packet[11] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
       data_packet[12] = pkt.abc_state.velocity;
       data_packet[13] = pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[2] * RAD_TO_DEG;
+      data_packet[14] = pkt.battery_v;
 
       // Write the data packet and the tail to the serial port.
       uint8_t send_buffer[sizeof(data_packet) + sizeof(vofa_tail)];

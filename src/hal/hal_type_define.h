@@ -69,5 +69,6 @@ typedef struct {
     UserCommand_t cmd;
     uint32_t delay_count;
     PID_target_t pid_target;
+    float battery_v;
 } system_state_t;
 

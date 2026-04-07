@@ -1,7 +1,7 @@
 #include "app_fail_safe.h"
 
-Failsafe::Failsafe(uint16_t period_ms, Processing_Motor* motor, HAL_LED* led) 
-    : _motor(motor), _led(led) {
+Failsafe::Failsafe(uint16_t period_ms, Processing_Motor* motor, HAL_LED* led, set_pending_mode_fn set_pending_mode_cb) 
+    : _motor(motor), _led(led), _set_pending_mode_cb(set_pending_mode_cb) {
     last_check_time = 0;
     pickup_start_time = 0;
     MAX_LOOP_TIME_MS = period_ms * 2; // 增加容錯空間，避免因系統抖動誤觸發
@@ -28,6 +28,7 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready) {
     uint32_t dt = current_time_ms - last_check_time;
     if (last_check_time != 0 && dt > MAX_LOOP_TIME_MS) {
         current_error_state = min(current_error_state, FS_ERROR_LOOP_SLOW);
+        if (_set_pending_mode_cb) _set_pending_mode_cb(MODE_FREE);
         delay_counter++;
     }
     last_check_time = current_time_ms;
@@ -39,9 +40,10 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready) {
     }
 
     // 倒地偵測
-    if (abs(pitch_rad) > CRITICAL_ANGLE_RAD || abs(roll_rad) > CRITICAL_ANGLE_RAD) {
+    if (fabsf(pitch_rad) > CRITICAL_ANGLE_RAD || fabsf(roll_rad) > CRITICAL_ANGLE_RAD) {
         current_error_state = min(current_error_state, FS_ERROR_CRITICAL_ANGLE);
-    } else if (error_state == FS_ERROR_CRITICAL_ANGLE && abs(pitch_rad) > RECOVERY_ANGLE_RAD) {
+        if (_set_pending_mode_cb) _set_pending_mode_cb(MODE_FREE);
+    } else if (error_state == FS_ERROR_CRITICAL_ANGLE && fabsf(pitch_rad) > RECOVERY_ANGLE_RAD) {
         current_error_state = min(current_error_state, FS_ERROR_CRITICAL_ANGLE);
     }
 

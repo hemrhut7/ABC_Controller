@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "hal/hal_type_define.h"
 #include "processing/prs_ahrs.h"
 #include "processing/prs_motor.h"
 #include "hal/hal_led.h"
@@ -13,9 +14,11 @@ typedef enum {
     FS_ERROR_NONE,  // should always be last
 } failsafe_error_t;
 
+typedef void (*set_pending_mode_fn)(Mode_t);
+
 class Failsafe {
 public:
-    Failsafe(uint16_t period_ms, Processing_Motor* motor, HAL_LED* led);
+    Failsafe(uint16_t period_ms, Processing_Motor* motor, HAL_LED* led, set_pending_mode_fn set_pending_mode_cb);
 
     void init();
     bool check(const ahrs_data_t &ahrs_data, bool ahrs_ready);
@@ -48,4 +51,6 @@ private:
     uint16_t delay_counter = 0;
     uint32_t last_disarm_time_ms = 0;
     bool ready_auto_start = false;
+
+    set_pending_mode_fn _set_pending_mode_cb;
 };
