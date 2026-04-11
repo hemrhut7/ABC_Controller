@@ -14,6 +14,7 @@ enum TelemetryFormat {
 typedef enum TelemetryPort {
   PORT_USB = 0,
   PORT_BT = 1,
+  PORT_WIFI = 2,
 } TelemetryPort_t;
 
 

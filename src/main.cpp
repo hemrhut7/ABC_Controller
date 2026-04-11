@@ -9,7 +9,11 @@
 #include "processing/prs_motor.h"
 #include "hal/hal_display.h"
 #include "hal/hal_battery.h"
-#include <Arduino.h>
+
+#if HAS_WIFI_SERIAL
+#include <WiFi.h>
+#include "hal/hal_udp_stream.h"
+#endif
 
 
 #if HAS_BT_SERIAL
@@ -34,6 +38,9 @@ TaskHandle_t AHRSTaskHandle;
 TaskHandle_t CommTaskHandle;
 TaskHandle_t GamepadTaskHandle;
 TaskHandle_t BTTaskHandle;
+#if HAS_WIFI_SERIAL
+TaskHandle_t WiFiTaskHandle;
+#endif
 
 ConfigStore config_store;
 Processing_Motor motor(PERIOD_CONTROLL);
@@ -58,6 +65,11 @@ Telemetry bt_telemetry(SerialBT, PORT_BT);
 #else
 HAL_Joystick joystick(&app_mode, PERIOD_GAMEPAD);
 Telemetry bt_telemetry(Serial, PORT_BT);
+#endif
+
+#if HAS_WIFI_SERIAL
+UDPStream udp_stream(UDP_PORT);
+Telemetry udp_telemetry(udp_stream, PORT_WIFI);
 #endif
 
 
@@ -94,9 +106,6 @@ void Control_Task(void *pvParameters) {
         ahrs.reset_att();
       }
     } 
-    // else if ((app_mode.get_mode() == MODE_FREE) && failsafe.is_ready_auto_start()){
-    //   app_mode.set_mode(MODE_REMOTE);
-    // }
 
     // 2. Push fresh data to the telemetry queues (non-blocking)
     system_battery.update(dt);
@@ -108,6 +117,9 @@ void Control_Task(void *pvParameters) {
 
     uart_telemetry.push_data(current_sys_state);
     bt_telemetry.push_data(current_sys_state);
+#if HAS_WIFI_SERIAL
+    udp_telemetry.push_data(current_sys_state);
+#endif
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
@@ -118,7 +130,7 @@ void Comm_Task(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
   for (;;) {
-    uart_telemetry.process_serial_outgoing();
+    // uart_telemetry.process_serial_outgoing();
     app_script.check_serial(Serial, &uart_telemetry);
     system_led.update();
     system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_delay_count());
@@ -141,6 +153,27 @@ void BT_Task(void *pvParameters) {
 }
 #endif
 
+#if HAS_WIFI_SERIAL
+// 4. WiFi 遙測發送任務 (Core 0)
+void WiFi_Task(void *pvParameters) {
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
+  for (;;) {
+    // 偵測是否收到第一個 UDP 封包以鎖定目標 IP
+    int len = udp_stream.available();
+
+    if (udp_stream.connected()) {
+      udp_telemetry.process_serial_outgoing();
+      if (len > 0) {
+        app_script.check_serial(udp_stream, &udp_telemetry);
+      }
+    }
+
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+  }
+}
+#endif
+
 void setup() {
   system_led.set_state(INITIALIZING);
 
@@ -153,6 +186,32 @@ void setup() {
   motor.init();
   uart_telemetry.init(1000 / PERIOD_COMM);
   bt_telemetry.init(1000 / PERIOD_BT);
+#if HAS_WIFI_SERIAL
+  udp_telemetry.init(1000 / PERIOD_COMM);
+
+  // WiFi Initialization
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("Connecting to WiFi");
+  uint8_t timeout = 0;
+  while (WiFi.status() != WL_CONNECTED && timeout < 20) { // 10 seconds (20 * 500ms)
+    delay(500);
+    Serial.print(".");
+    timeout++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi Connected!");
+    Serial.print("IP: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\nWiFi connection failed. Starting AP mode...");
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(AP_SSID, AP_PASS);
+    Serial.print("AP IP: ");
+    Serial.println(WiFi.softAPIP());
+  }
+  udp_stream.begin();
+#endif
 
   app_mode.init();
   system_display.init();
@@ -172,6 +231,11 @@ void setup() {
   xTaskCreatePinnedToCore(HAL_Joystick::task_entry, "Gamepad_Task", 6144,
                           &joystick,
                           PRIORITY_GAMEPAD, &GamepadTaskHandle, 0);
+#endif
+
+#if HAS_WIFI_SERIAL
+  xTaskCreatePinnedToCore(WiFi_Task, "WiFi_Task", 4096, NULL, PRIORITY_COMM,
+                          &WiFiTaskHandle, 0);
 #endif
 }
 
