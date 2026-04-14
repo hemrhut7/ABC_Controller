@@ -201,28 +201,11 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
         output_turn = lpf_steer.update(output_turn);
         steer_loop_dt = 0.0f;
     }
-    
 
     // --- Mixer (混合器) ---
     // 平衡輸出加在兩輪同向，轉向輸出加在兩輪反向
-    // 注意：這裡假設 output 直接對應 RPM，如果 Processing_Motor 吃的是 PWM，這裡單位要注意
-    float target_rpm_L = output_balance + output_turn;
-    float target_rpm_R = output_balance - output_turn;
-        
-    if (target_rpm_L > MAX_RPM) {
-        target_rpm_L = MAX_RPM;
-        target_rpm_R = MAX_RPM - 2 * output_turn;
-    } else if (target_rpm_R > MAX_RPM) {
-        target_rpm_R = MAX_RPM;
-        target_rpm_L = MAX_RPM + 2 * output_turn;
-    } else if (target_rpm_L < -MAX_RPM) {
-        target_rpm_L = -MAX_RPM;
-        target_rpm_R = -MAX_RPM - 2 * output_turn;
-    } else if (target_rpm_R < -MAX_RPM) {
-        target_rpm_R = -MAX_RPM;
-        target_rpm_L = -MAX_RPM + 2 * output_turn;
-    }
-    
+    float target_rpm_L = constrain(output_balance + output_turn, -MAX_RPM, MAX_RPM);
+    float target_rpm_R = constrain(output_balance - output_turn, -MAX_RPM, MAX_RPM);
 
     // --- Actuation (執行) ---
     if (_cmd.mode != MODE_STOP) {
@@ -235,7 +218,12 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
         target_steer_rpm = 0;
         _motor->set_target_rpms(0, 0);
     }
-    _pid_target = {target_rpm_L, target_rpm_R, target_pitch, target_velocity, target_steer_rpm};
+    
+    _pid_target.rpm_L = target_rpm_L;
+    _pid_target.rpm_R = target_rpm_R;
+    _pid_target.pitch = target_pitch;
+    _pid_target.velocity = target_velocity;
+    _pid_target.steer_rpm = target_steer_rpm;
     loop_counter++;
 }
 
