@@ -132,4 +132,109 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
                               "<enabled> <divider> <format>\n");
     }
   }
+  // 6. LPF 設定指令: "LPF <id> <freq>"
+  else if (cmd_line.startsWith("LPF")) {
+    int id;
+    float freq;
+    if (sscanf(cmd_line.c_str(), "LPF %d %f", &id, &freq) == 2) {
+      if (id >= 0 && id < LPF_ID_COUNT) {
+        _app_mode->set_cut_off_freq((LPF_id_t)id, freq);
+        snprintf(tx_buffer, sizeof(tx_buffer),
+                 "[OK] LPF %d Updated: Freq=%.2f Hz\n", id, freq);
+        telemetry->queue_string(tx_buffer);
+      } else {
+        snprintf(tx_buffer, sizeof(tx_buffer),
+                 "[ERR] LPF ID out of range (0-%d)\n", LPF_ID_COUNT - 1);
+        telemetry->queue_string(tx_buffer);
+      }
+    } else {
+      telemetry->queue_string(
+          "[ERR] Invalid LPF format. Usage: LPF <id> <freq>\n");
+    }
+  }
+  // 7. 讀取 LPF 指令: "GET LPF [<id>]"
+  else if (cmd_line.startsWith("GET LPF")) {
+    int id;
+    if (sscanf(cmd_line.c_str(), "GET LPF %d", &id) == 1) {
+      if (id >= 0 && id < LPF_ID_COUNT) {
+        float f = _app_mode->get_lpf_freq((LPF_id_t)id);
+        snprintf(tx_buffer, sizeof(tx_buffer),
+                 "[OK] LPF %d: Freq=%.2f Hz\n", id, f);
+        telemetry->queue_string(tx_buffer);
+      } else {
+        snprintf(tx_buffer, sizeof(tx_buffer),
+                 "[ERR] LPF ID out of range (0-%d)\n", LPF_ID_COUNT - 1);
+        telemetry->queue_string(tx_buffer);
+      }
+    } else {
+        const char *lpf_names[] = {"VELOCITY", "STEER", "GYRO_Z", "CURR_VEL"};
+        for (int i = 0; i < LPF_ID_COUNT; i++) {
+            float f = _app_mode->get_lpf_freq((LPF_id_t)i);
+            snprintf(tx_buffer, sizeof(tx_buffer),
+                     "[OK] LPF %d (%s): Freq=%.2f Hz\n", i, lpf_names[i], f);
+            telemetry->queue_string(tx_buffer);
+        }
+    }
+  }
+
+  // 8. 斜率設定指令: "RAMP <id> <val>"
+  else if (cmd_line.startsWith("RAMP")) {
+    int id;
+    float val;
+    if (sscanf(cmd_line.c_str(), "RAMP %d %f", &id, &val) == 2) {
+      if (id >= 0 && id < PARAM_RAMP_ID_COUNT) {
+        float internal_val = val;
+        const char *unit = "";
+        if (id == PARAM_RAMP_PITCH) {
+          internal_val = val * DEG_TO_RAD;
+          unit = " deg/s";
+        }
+        _app_mode->set_ramp((PARAM_RAMP_id_t)id, internal_val);
+        snprintf(tx_buffer, sizeof(tx_buffer), "[OK] Ramp %d Updated: %.3f%s\n",
+                 id, val, unit);
+        telemetry->queue_string(tx_buffer);
+      } else {
+        snprintf(tx_buffer, sizeof(tx_buffer),
+                 "[ERR] Ramp ID out of range (0-%d)\n", PARAM_RAMP_ID_COUNT - 1);
+        telemetry->queue_string(tx_buffer);
+      }
+    } else {
+      telemetry->queue_string(
+          "[ERR] Invalid RAMP format. Usage: RAMP <id> <val>\n");
+    }
+  }
+  // 9. 讀取斜率指令: "GET RAMP [<id>]"
+  else if (cmd_line.startsWith("GET RAMP")) {
+    int id;
+    if (sscanf(cmd_line.c_str(), "GET RAMP %d", &id) == 1) {
+      if (id >= 0 && id < PARAM_RAMP_ID_COUNT) {
+        float val = _app_mode->get_ramp((PARAM_RAMP_id_t)id);
+        const char *unit = "";
+        if (id == PARAM_RAMP_PITCH) {
+          val *= RAD_TO_DEG;
+          unit = " deg/s";
+        }
+        snprintf(tx_buffer, sizeof(tx_buffer), "[OK] Ramp %d: %.3f%s\n", id, val,
+                 unit);
+        telemetry->queue_string(tx_buffer);
+      } else {
+        snprintf(tx_buffer, sizeof(tx_buffer),
+                 "[ERR] Ramp ID out of range (0-%d)\n", PARAM_RAMP_ID_COUNT - 1);
+        telemetry->queue_string(tx_buffer);
+      }
+    } else {
+      const char *ramp_names[] = {"PITCH", "VELOCITY"};
+      for (int i = 0; i < PARAM_RAMP_ID_COUNT; i++) {
+        float val = _app_mode->get_ramp((PARAM_RAMP_id_t)i);
+        const char *unit = "";
+        if (i == PARAM_RAMP_PITCH) {
+          val *= RAD_TO_DEG;
+          unit = " deg/s";
+        }
+        snprintf(tx_buffer, sizeof(tx_buffer), "[OK] Ramp %d (%s): %.3f%s\n", i,
+                 ramp_names[i], val, unit);
+        telemetry->queue_string(tx_buffer);
+      }
+    }
+  }
 }

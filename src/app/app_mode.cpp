@@ -4,11 +4,10 @@
 
 AppMode::AppMode(Processing_Motor* motor, ConfigStore* config_store, int interval_ms) 
     : _motor(motor), _config_store(config_store), _cmd_queue(nullptr),
-    lpf_angle(1000 / interval_ms, 10),
-    lpf_velocity(1000 / interval_ms, 5), 
-    lpf_steer(1000 / interval_ms, 5),
-    lpf_current_velocity(1000 / interval_ms, 2),
-    lpf_gyro_z(1000 / interval_ms, 20) {
+    lpf_velocity(1000 / interval_ms, cut_off_freq_velocity), 
+    lpf_steer(1000 / interval_ms, cut_off_freq_steer),
+    lpf_current_velocity(1000 / interval_ms, cut_off_freq_current_velocity),
+    lpf_gyro_z(1000 / interval_ms, cut_off_freq_gyro_z) {
     _cmd.mode = MODE_STOP;
     _cmd.target_value = 0.0f;
     _cmd.target_steer = 0.0f;
@@ -23,11 +22,12 @@ void AppMode::init() {
     // Level 4: Velocity Loop (外環) - 輸入 m/s, 輸出 Target Pitch (rad)
     _pid_velocity.setTunings(_config_store->data.velocity.p, _config_store->data.velocity.i, _config_store->data.velocity.d);
     _pid_velocity.setOutputLimits(MAX_PITCH);
+    _pid_velocity.setRamp(_velocity_ramp);
 
     // Level 3: Angle Loop (直立環) - 輸入 Pitch (rad), 輸出 RPM
     _pid_angle.setTunings(_config_store->data.pitch.p, _config_store->data.pitch.i, _config_store->data.pitch.d);
     _pid_angle.setOutputLimits(MAX_RPM);
-    _pid_angle.setRamp(MAX_PITCH_RATE);
+    _pid_angle.setRamp(_pitch_ramp);
 
     // Steer Loop (轉向環)
     _pid_steer.setTunings(_config_store->data.steer.p, _config_store->data.steer.i, _config_store->data.steer.d);
@@ -92,7 +92,6 @@ void AppMode::reset_control_state() {
     _pid_velocity.reset();
     _pid_angle.reset();
     _pid_steer.reset();
-    lpf_angle.reset();
     lpf_velocity.reset();
     lpf_steer.reset();
     lpf_gyro_z.reset();
@@ -192,7 +191,7 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     // Yaw Loop (獨立的轉向環)
     float target_steer_rpm = _pid_target.steer_rpm;
     if (run_outer_loop) {
-        if (_cmd.mode == MODE_REMOTE) {
+        if (_cmd.mode >= MODE_REMOTE) {
             target_steer_rpm = cmd_steer * abs(cmd_steer) *  MAX_STEER_RPM;
             if (_cmd.mode < MODE_TURBO) target_steer_rpm *= 0.9f;
             output_turn = _pid_steer.compute(steer_loop_dt, target_steer_rpm, current_rpm_diff);
@@ -283,6 +282,65 @@ PID_Params AppMode::get_pid_gains(PID_id_t pid_id) {
 
 const SystemConfig& AppMode::get_pid_config() const {
     return _config_store->data;
+}
+
+void AppMode::set_cut_off_freq(LPF_id_t lpf_id, float cut_off_freq) {
+    switch (lpf_id) {
+        case LPF_VELOCITY:
+            cut_off_freq_velocity = cut_off_freq;
+            lpf_velocity.set_cut_off_freq(cut_off_freq);
+            break;
+        case LPF_STEER: 
+            cut_off_freq_steer = cut_off_freq;
+            lpf_steer.set_cut_off_freq(cut_off_freq); 
+            break;
+        case LPF_GYRO_Z: 
+            cut_off_freq_gyro_z = cut_off_freq;
+            lpf_gyro_z.set_cut_off_freq(cut_off_freq); 
+            break;
+        case LPF_CURRENT_VELOCITY: 
+            cut_off_freq_current_velocity = cut_off_freq;
+            lpf_current_velocity.set_cut_off_freq(cut_off_freq); 
+            break;
+        default:
+            break;
+    }
+}
+
+float AppMode::get_lpf_freq(LPF_id_t lpf_id) {
+    switch (lpf_id) {
+        case LPF_VELOCITY: return cut_off_freq_velocity;
+        case LPF_STEER: return cut_off_freq_steer;
+        case LPF_GYRO_Z: return cut_off_freq_gyro_z;
+        case LPF_CURRENT_VELOCITY: return cut_off_freq_current_velocity;
+        default: return 0.0f;
+    }
+}
+
+void AppMode::set_ramp(PARAM_RAMP_id_t id, float ramp) {
+    switch (id) {
+    case PARAM_RAMP_PITCH:
+        _pitch_ramp = ramp;
+        _pid_angle.setRamp(ramp);
+        break;
+    case PARAM_RAMP_VELOCITY:
+        _velocity_ramp = ramp;
+        _pid_velocity.setRamp(ramp);
+        break;
+    default:
+        break;
+    }
+}
+
+float AppMode::get_ramp(PARAM_RAMP_id_t id) const {
+    switch (id) {
+    case PARAM_RAMP_PITCH:
+        return _pitch_ramp;
+    case PARAM_RAMP_VELOCITY:
+        return _velocity_ramp;
+    default:
+        return 0.0f;
+    }
 }
 
 void AppMode::check_auto_start_stop(float dt, float current_pitch, float current_gyro_x, float current_rpm) {

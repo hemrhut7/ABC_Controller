@@ -23,6 +23,21 @@ typedef enum {
     PID_ID_COUNT
 } PID_id_t;
 
+typedef enum {
+    LPF_VELOCITY = 0,
+    LPF_STEER,
+    LPF_GYRO_Z,
+    LPF_CURRENT_VELOCITY,
+    LPF_ID_COUNT
+} LPF_id_t;
+
+typedef enum {
+    PARAM_RAMP_PITCH = 0,
+    PARAM_RAMP_VELOCITY,
+    PARAM_RAMP_ID_COUNT
+} PARAM_RAMP_id_t;
+
+
 typedef struct {
     int mode;
     float target_value; // 根據模式不同，單位可能是 RPM, rad/s, rad, m/s

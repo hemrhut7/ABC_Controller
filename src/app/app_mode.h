@@ -15,7 +15,8 @@
 #define MAX_RPM      150
 #define RPM_TO_MS 0.003403f 
 #define MAX_PITCH 6.0f * DEG_TO_RAD
-#define MAX_PITCH_RATE 15.0f * DEG_TO_RAD
+#define MAX_PITCH_RAMP 15.0f * DEG_TO_RAD
+#define MAX_VELOCITY_RAMP 0.1f
 #define MAX_VELOCITY MAX_RPM * 0.65f * RPM_TO_MS
 #define MAX_STEER_RPM MAX_RPM * 0.65f
 
@@ -42,6 +43,12 @@ public:
     PID_Params get_pid_gains(PID_id_t pid_id);
     const SystemConfig& get_pid_config() const;
 
+    void set_cut_off_freq(LPF_id_t lpf_id, float cut_off_freq);
+    float get_lpf_freq(LPF_id_t lpf_id);
+
+    void set_ramp(PARAM_RAMP_id_t id, float ramp);
+    float get_ramp(PARAM_RAMP_id_t id) const;
+
 private:
     enum AppCommandType : uint8_t {
         APP_CMD_SET_MODE = 0,
@@ -67,13 +74,22 @@ private:
     QueueHandle_t _cmd_queue;
     
     UserCommand_t _cmd;
+
+    // Parameters (MUST be declared before LPF/PID objects for correct C++ initialization order)
+    uint8_t loop_rate_hz = 200;
+    float cut_off_freq_velocity = 5.0f;
+    float cut_off_freq_steer = 5.0f;
+    float cut_off_freq_gyro_z = 10.0f;
+    float cut_off_freq_current_velocity = 2.0f;
+    float _pitch_ramp = MAX_PITCH_RAMP;
+    float _velocity_ramp = MAX_VELOCITY_RAMP;
     
     // PIDs
     PID _pid_velocity; // 外環
     PID _pid_angle;    // 中環
     PID _pid_steer;      // 轉向
 
-    LPF_1D lpf_angle; // 傾角的低通濾波器
+    // LPFs
     LPF_1D lpf_velocity; // 速度的低通濾波器
     LPF_1D lpf_steer; // 轉向的低通濾波器
     LPF_1D lpf_gyro_z;

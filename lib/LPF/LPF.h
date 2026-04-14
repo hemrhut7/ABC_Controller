@@ -1,30 +1,36 @@
 #ifndef LPF_H
 #define LPF_H
 
+#include <Arduino.h>
+
+
 struct LPF_1D {
     LPF_1D(int fs, float f_cut);
+    void set_cut_off_freq(float f_cut);
     float update(float in);
-    void reset() {
-        for (int i = 0; i < 3; ++i) {
-            x[i] = 0;
-            y[i] = 0;
-        }
-    }
+    void reset();
 private:
+    int fs;
+    float f_cut;
     float a[2];
     float b[3];
     float x[3]; // [n, n-1, n-2]
     float y[3]; // [n, n-1, n-2]
+    bool is_initialized = false;
 };
 
 struct LPF_3D {
     LPF_3D(int fs, float f_cut);
     void update(const float in[3], float out[3]);
+    void set_cut_off_freq(float f_cut);
+    void reset();
 private:
+    int fs;
     float a[2];
     float b[3];
     float x[3][3]; // [axis][n, n-1, n-2]
     float y[3][3]; // [axis][n, n-1, n-2]
+    bool is_initialized = false;
 };
 
 struct AlphaBetaFilter {
