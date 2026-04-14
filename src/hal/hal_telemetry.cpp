@@ -1,4 +1,5 @@
 #include "hal_telemetry.h"
+#include "hal_motor.h"
 #include <cstring>
 #include <math.h>
 
@@ -55,22 +56,24 @@ void Telemetry::process_serial_outgoing() {
     if (_format == FORMAT_DEFAULT) {
       // A packet was successfully received.
       // Now, manually flatten the nested struct into a float array for VOFA+.
-      float data_packet[15];
+      float data_packet[17];
       data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
       data_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
       data_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
       data_packet[3] = pkt.abc_state.ahrs_data.euler[2] * RAD_TO_DEG;
       data_packet[4] = (float)pkt.abc_state.motor_state.rpm_L;
       data_packet[5] = (float)pkt.abc_state.motor_state.rpm_R;
-      data_packet[6] = pkt.abc_state.ahrs_data.imu_data.gyro[0] * RAD_TO_DEG;
-      data_packet[7] = pkt.abc_state.ahrs_data.imu_data.gyro[1] * RAD_TO_DEG;
-      data_packet[8] = pkt.abc_state.ahrs_data.imu_data.gyro[2] * RAD_TO_DEG;
-      data_packet[9] = pkt.abc_state.ahrs_data.imu_data.accl[0];
-      data_packet[10] = pkt.abc_state.ahrs_data.imu_data.accl[1];
-      data_packet[11] = pkt.abc_state.ahrs_data.imu_data.accl[2];
-      data_packet[12] = (float)pkt.cmd.mode;
-      data_packet[13] = (float)pkt.delay_count;
-      data_packet[14] = pkt.battery_v;
+      data_packet[6] = (float)pkt.abc_state.motor_state.pwm_out_L / (float)MAX_PWM_DUTY;
+      data_packet[7] = (float)pkt.abc_state.motor_state.pwm_out_R / (float)MAX_PWM_DUTY;
+      data_packet[8] = pkt.abc_state.ahrs_data.imu_data.gyro[0] * RAD_TO_DEG;
+      data_packet[9] = pkt.abc_state.ahrs_data.imu_data.gyro[1] * RAD_TO_DEG;
+      data_packet[10] = pkt.abc_state.ahrs_data.imu_data.gyro[2] * RAD_TO_DEG;
+      data_packet[11] = pkt.abc_state.ahrs_data.imu_data.accl[0];
+      data_packet[12] = pkt.abc_state.ahrs_data.imu_data.accl[1];
+      data_packet[13] = pkt.abc_state.ahrs_data.imu_data.accl[2];
+      data_packet[14] = (float)pkt.cmd.mode;
+      data_packet[15] = (float)pkt.delay_count;
+      data_packet[16] = pkt.battery_v;
 
       // Write the data packet and the tail to the serial port.
       uint8_t send_buffer[sizeof(data_packet) + sizeof(vofa_tail)];
@@ -78,7 +81,7 @@ void Telemetry::process_serial_outgoing() {
       memcpy(send_buffer + sizeof(data_packet), vofa_tail, sizeof(vofa_tail));
       port.write(send_buffer, sizeof(send_buffer));
     } 
-    else if (FORMAT_PID == 1) {
+    else if (_format == FORMAT_PID) {
       float data_packet[15];
       data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
       data_packet[1] = pkt.cmd.target_value;

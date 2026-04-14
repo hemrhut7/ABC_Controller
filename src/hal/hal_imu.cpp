@@ -42,12 +42,12 @@ constexpr float GYRO_CAL_B2  = -0.01655f;
 
 void hal_imu_init() {
   if (!Wire.begin(SDA_PIN_MPU6050, SCL_PIN_MPU6050, 400000)) {
-    // Serial.println("Failed to initialize I2C bus");
+    Serial.println("Failed to initialize I2C bus");
     return;
   }
   Wire.setTimeOut(5);
   if (!mpu.begin()) {
-    // Serial.println("Failed to find MPU6050 chip");
+    Serial.println("Failed to find MPU6050 chip");
     return;
   }
 
@@ -56,6 +56,7 @@ void hal_imu_init() {
   mpu.setFilterBandwidth(MPU6050_BAND_94_HZ);
   mpu.setSampleRateDivisor(0);
   is_initialized = true;
+  Serial.println("MPU6050 initialized");
 }
 
 bool hal_imu_healthy() {

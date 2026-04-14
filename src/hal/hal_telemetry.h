@@ -15,6 +15,8 @@ typedef enum TelemetryPort {
   PORT_USB = 0,
   PORT_BT = 1,
   PORT_WIFI = 2,
+  PORT_UART1 = 3,
+  PORT_UART2 = 4,
 } TelemetryPort_t;
 
 

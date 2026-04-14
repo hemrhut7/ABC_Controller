@@ -32,21 +32,21 @@ void ConfigStore::load_config() {
 
     // 檢查 Magic Number，如果不符合代表是新晶片或資料損毀
     if (data.magic_number != CONFIG_MAGIC) {
-        // Serial.println("Config invalid (magic number mismatch), resetting to defaults...");
+        Serial.println("Config invalid (magic number mismatch), resetting to defaults...");
         needs_reset = true;
     } else if (isnan(data.motor.p) || isnan(data.motor.i) || isnan(data.motor.d) ||
                isnan(data.pitch.p) || isnan(data.pitch.i) || isnan(data.pitch.d) ||
                isnan(data.rate.p) || isnan(data.rate.i) || isnan(data.rate.d) ||
                isnan(data.steer.p) || isnan(data.steer.i) || isnan(data.steer.d) ||
                isnan(data.velocity.p) || isnan(data.velocity.i) || isnan(data.velocity.d)) {
-        // Serial.println("Config invalid (contains NaN), resetting to defaults...");
+        Serial.println("Config invalid (contains NaN), resetting to defaults...");
         needs_reset = true;
     }
 
     if (needs_reset) {
         reset_defaults();
     } else {
-        // Serial.println("Config loaded from EEPROM.");
+        Serial.println("Config loaded from EEPROM.");
     }
 }
 
