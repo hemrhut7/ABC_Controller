@@ -184,7 +184,7 @@ void setup() {
   system_led.set_state(INITIALIZING);
 
   Serial.begin(115200);
-  Serial2.begin(230400, SERIAL_8N1, 16, 17);
+  Serial2.begin(460800, SERIAL_8N1, 16, 17);
   Serial2.setRxBufferSize(1024);
 #if HAS_BT_SERIAL
   SerialBT.begin("ABC_Controller");
