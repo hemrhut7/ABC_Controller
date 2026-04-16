@@ -1,24 +1,14 @@
 #pragma once
 
 #include <Arduino.h>
+#include <freertos/queue.h>
 #include "processing/prs_ahrs.h"
 #include "processing/prs_motor.h"
 #include "pid.h"
 #include "LPF.h"
 #include "hal/hal_storage.h"
-#include <freertos/queue.h>
+#include "config.h"
 
-// 物理參數定義
-// 假設輪徑 65mm => 半徑 0.0325m
-// 速度 (m/s) = (RPM / 60) * 2 * PI * R
-// Factor = 0.0325 * 2 * 3.14159 / 60 ~= 0.003403
-#define MAX_RPM      150
-#define RPM_TO_MS 0.003403f 
-#define MAX_PITCH 6.0f * DEG_TO_RAD
-#define MAX_PITCH_RAMP 15.0f * DEG_TO_RAD
-#define MAX_VELOCITY_RAMP 100.0f
-#define MAX_VELOCITY MAX_RPM * 0.65f * RPM_TO_MS
-#define MAX_STEER_RPM MAX_RPM * 0.65f
 
 class AppMode {
 public:
@@ -77,10 +67,10 @@ private:
 
     // Parameters (MUST be declared before LPF/PID objects for correct C++ initialization order)
     uint8_t loop_rate_hz = 200;
-    float cut_off_freq_velocity = 5.0f;
-    float cut_off_freq_steer = 5.0f;
-    float cut_off_freq_gyro_z = 10.0f;
-    float cut_off_freq_current_velocity = 2.0f;
+    float cut_off_freq_velocity = PARM_LPF_CUTOFF_FREQ_VELOCITY;
+    float cut_off_freq_steer = PARM_LPF_CUTOFF_FREQ_STEER;
+    float cut_off_freq_gyro_z = PARM_LPF_CUTOFF_FREQ_GYRO_Z;
+    float cut_off_freq_current_velocity = PARM_LPF_CUTOFF_FREQ_CURRENT_VELOCITY;
     float _pitch_ramp = MAX_PITCH_RAMP;
     float _velocity_ramp = MAX_VELOCITY_RAMP;
     
