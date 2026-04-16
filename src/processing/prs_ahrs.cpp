@@ -1,5 +1,5 @@
 #include "prs_ahrs.h"
-#include "hal/hal_imu.h"
+#include "hal/hal_external_sensor.h"
 #include <Arduino.h>
 
 Processing_AHRS::Processing_AHRS(uint32_t period_ms) : cpf(period_ms){
@@ -12,15 +12,15 @@ Processing_AHRS::~Processing_AHRS() {
 
 void Processing_AHRS::init()
 {
-    hal_imu_init();
+    hal_external_sensor_init();
     last_time = micros();
     is_stable = false;
 }
 
 void Processing_AHRS::update()
 {
-    if (!hal_imu_healthy()) return;
-    hal_imu_read(&ahrs_data.imu_data);
+    if (!hal_external_sensor_healthy()) return;
+    hal_external_sensor_read(&ahrs_data.imu_data);
     const uint64_t now = ahrs_data.imu_data.timestamp;
 
     if (!is_stable) { 
