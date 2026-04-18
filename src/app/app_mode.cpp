@@ -136,7 +136,7 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
 
     // 1. 獲取狀態 (State Estimation)
     current_velocity = current_rpm * RPM_TO_MS; // 需定義轉換係數
-    current_velocity = lpf_current_velocity.update(current_velocity); // 10Hz 低通濾波
+    float current_velocity_lpf = lpf_current_velocity.update(current_velocity); // 10Hz 低通濾波
     velocity_loop_dt += dt;
     steer_loop_dt += dt;
     const bool run_outer_loop = (loop_counter % OUTER_LOOP_DIVIDER) == 0;
@@ -167,7 +167,7 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
             if (_cmd.mode < MODE_TURBO) cmd_val *= 0.9f;
 
             target_velocity = lpf_velocity.update(cmd_val);
-            target_pitch = -_pid_velocity.compute(velocity_loop_dt, target_velocity, current_velocity); 
+            target_pitch = -_pid_velocity.compute(velocity_loop_dt, target_velocity, current_velocity_lpf); 
         } 
         else if (_cmd.mode == MODE_ANGLE) {
             target_pitch = constrain(cmd_val * DEG_TO_RAD, -MAX_PITCH, MAX_PITCH);

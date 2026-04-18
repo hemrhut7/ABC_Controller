@@ -23,22 +23,26 @@
 #include "hal/hal_joystick.h"
 #endif
 
+// Core 1
 #define PRIORITY_CONTROL 24
-#define PRIORITY_AHRS 15
-#define PRIORITY_UART2_SENSOR 12
+#define PRIORITY_UART2_SENSOR 15
+// Core 0
 #define PRIORITY_COMM 10
 #define PRIORITY_GAMEPAD 8
 #define PRIORITY_BT 5
+#define PRIORITY_WIFI 5
+#define PRIORITY_JETSON_COMM 15
 
 #define PERIOD_CONTROLL 5 // 200Hz
 #define PERIOD_COMM 5     // 200Hz
 #define PERIOD_GAMEPAD 10 // 100Hz
 #define PERIOD_BT 5       // 200Hz
+#define PERIOD_JETSON_COMM 10 // 100Hz
 
 TaskHandle_t ControlTaskHandle;
-TaskHandle_t AHRSTaskHandle;
 TaskHandle_t UART2SensorTaskHandle;
 TaskHandle_t CommTaskHandle;
+TaskHandle_t Jetson_CommTaskHandle;
 TaskHandle_t GamepadTaskHandle;
 TaskHandle_t BTTaskHandle;
 #if HAS_WIFI_SERIAL
@@ -62,6 +66,8 @@ HAL_Battery system_battery;
 Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led, set_app_pending_mode);
 
 Telemetry uart_telemetry(Serial, PORT_USB);
+Telemetry jetson_telemetry(Serial1, PORT_UART1);
+
 #if HAS_BT_SERIAL
 BluetoothSerial SerialBT;
 Telemetry bt_telemetry(SerialBT, PORT_BT);
@@ -76,7 +82,7 @@ Telemetry udp_telemetry(udp_stream, PORT_WIFI);
 #endif
 
 
-// 1. 控制任務 (Core 1)
+// 控制任務 (Core 1)
 void Control_Task(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_CONTROLL);
@@ -123,13 +129,14 @@ void Control_Task(void *pvParameters) {
 #if HAS_WIFI_SERIAL
     udp_telemetry.push_data(current_sys_state);
 #endif
+    jetson_telemetry.push_data(current_sys_state);
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
 
 
-// 3. 通訊與管理任務 (Core 0)
+// 通訊與管理任務 (Core 0)
 void Comm_Task(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
@@ -145,8 +152,20 @@ void Comm_Task(void *pvParameters) {
   }
 }
 
+// Jetson Orin Nano Super 通訊與管理任務 (Core 0)
+void Jetson_Comm_Task(void *pvParameters) {
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_JETSON_COMM);
+  for (;;) {
+    jetson_telemetry.process_serial_outgoing();
+    app_script.check_serial(Serial1, &jetson_telemetry);
+
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+  }
+}
+
 #if HAS_BT_SERIAL
-// 4. 藍牙遙測發送任務 (Core 0)
+// 藍牙遙測發送任務 (Core 0)
 void BT_Task(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_BT);
@@ -160,7 +179,7 @@ void BT_Task(void *pvParameters) {
 #endif
 
 #if HAS_WIFI_SERIAL
-// 5. WiFi 遙測發送任務 (Core 0)
+// WiFi 遙測發送任務 (Core 0)
 void WiFi_Task(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
@@ -184,6 +203,7 @@ void setup() {
   system_led.set_state(INITIALIZING);
 
   Serial.begin(115200);
+  Serial1.begin(460800, SERIAL_8N1, 22, 23);
 #if HAS_BT_SERIAL
   SerialBT.begin("ABC_Controller");
 #endif
@@ -192,6 +212,7 @@ void setup() {
   ahrs.init();
   motor.init();
   uart_telemetry.init(1000 / PERIOD_COMM);
+  jetson_telemetry.init(1000 / PERIOD_COMM);
   bt_telemetry.init(1000 / PERIOD_BT);
 #if HAS_WIFI_SERIAL
   udp_telemetry.init(1000 / PERIOD_COMM);
@@ -233,6 +254,9 @@ void setup() {
 
   xTaskCreatePinnedToCore(Comm_Task, "CommTask", 4096, NULL, PRIORITY_COMM,
                           &CommTaskHandle, 0);
+  
+  xTaskCreatePinnedToCore(Jetson_Comm_Task, "Jetson_Comm_Task", 4096, NULL, PRIORITY_JETSON_COMM,
+                          &Jetson_CommTaskHandle, 0);
 
 #if HAS_BT_SERIAL
   xTaskCreatePinnedToCore(BT_Task, "BT_Task", 4096, NULL, PRIORITY_BT,
@@ -244,7 +268,7 @@ void setup() {
 #endif
 
 #if HAS_WIFI_SERIAL
-  xTaskCreatePinnedToCore(WiFi_Task, "WiFi_Task", 4096, NULL, PRIORITY_COMM,
+  xTaskCreatePinnedToCore(WiFi_Task, "WiFi_Task", 4096, NULL, PRIORITY_WIFI,
                           &WiFiTaskHandle, 0);
 #endif
 }

@@ -9,6 +9,7 @@
 enum TelemetryFormat {
   FORMAT_DEFAULT = 0,
   FORMAT_PID = 1,
+  FORMAT_IMU = 2,
 };
 
 typedef enum TelemetryPort {
