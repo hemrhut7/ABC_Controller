@@ -62,7 +62,7 @@ void HAL_Joystick::on_disconnected(GamepadPtr gamepad) {
     gamepad_ = nullptr;
     last_buttons_ = 0;
   }
-  app_mode_->enqueue_mode(MODE_VELOCITY);
+  app_mode_->enqueue_mode(MODE_REMOTE);
   app_mode_->enqueue_target(0.0f, 0.0f);
 }
 
@@ -76,7 +76,7 @@ void HAL_Joystick::update_gamepad() {
   if (!connected) {
     if (was_connected_) {
       app_mode_->enqueue_target(0.0f, 0.0f);
-      app_mode_->enqueue_mode(MODE_STOP);
+      app_mode_->enqueue_mode(MODE_REMOTE);
       last_val_ = 0.0f;
       last_steer_ = 0.0f;
       last_push_tick_ = xTaskGetTickCount();
