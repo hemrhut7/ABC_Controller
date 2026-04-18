@@ -184,12 +184,11 @@ void setup() {
   system_led.set_state(INITIALIZING);
 
   Serial.begin(115200);
-  Serial2.begin(460800, SERIAL_8N1, 16, 17);
-  Serial2.setRxBufferSize(1024);
 #if HAS_BT_SERIAL
   SerialBT.begin("ABC_Controller");
 #endif
   config_store.begin();
+  hal_external_sensor_init();
   ahrs.init();
   motor.init();
   uart_telemetry.init(1000 / PERIOD_COMM);
@@ -229,7 +228,7 @@ void setup() {
   xTaskCreatePinnedToCore(Control_Task, "ControlTask", 8192, NULL,
                           PRIORITY_CONTROL, &ControlTaskHandle, 1);
 
-  xTaskCreatePinnedToCore(hal_external_sensor_task, "UART2_Sensor", 4096, &Serial2, 
+  xTaskCreatePinnedToCore(hal_external_sensor_task, "UART2_Sensor", 4096, NULL, 
                           PRIORITY_UART2_SENSOR, &UART2SensorTaskHandle, 1);
 
   xTaskCreatePinnedToCore(Comm_Task, "CommTask", 4096, NULL, PRIORITY_COMM,

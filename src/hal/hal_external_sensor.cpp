@@ -1,6 +1,14 @@
 #include "hal_external_sensor.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
+#include "driver/uart.h"
+#include <string.h>
+
+#define EX_UART_NUM UART_NUM_2
+#define EX_UART_TX_PIN 17
+#define EX_UART_RX_PIN 16
+#define EX_UART_BAUD 460800
+#define EX_UART_BUF_SIZE 2048
 
 static QueueHandle_t imu_queue = NULL;
 static bool is_healthy = false;
@@ -17,6 +25,20 @@ void hal_external_sensor_init() {
     if (imu_queue == NULL) {
         imu_queue = xQueueCreate(1, sizeof(imu_data_t));
     }
+
+    const uart_config_t uart_config = {
+        .baud_rate = EX_UART_BAUD,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_APB,
+    };
+
+    // Install driver and configure UART
+    uart_driver_install(EX_UART_NUM, EX_UART_BUF_SIZE, 0, 0, NULL, 0);
+    uart_param_config(EX_UART_NUM, &uart_config);
+    uart_set_pin(EX_UART_NUM, EX_UART_TX_PIN, EX_UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 }
 
 bool hal_external_sensor_healthy() {
@@ -32,7 +54,7 @@ void hal_external_sensor_read(imu_data_t *data) {
 }
 
 void hal_external_sensor_task(void *pvParameters) {
-    HardwareSerial* serial = (HardwareSerial*)pvParameters;
+    (void)pvParameters; // Unused
     
     // Buffer for reading
     uint8_t buffer[sizeof(IMUPacket)];
@@ -40,8 +62,12 @@ void hal_external_sensor_task(void *pvParameters) {
     imu_data_t imu_to_push;
 
     for (;;) {
-        while (serial->available()) {
-            buffer[index++] = serial->read();
+        // Read from UART Ring Buffer
+        // If we have some bytes already, we only need to read the remainder
+        int len = uart_read_bytes(EX_UART_NUM, buffer + index, sizeof(IMUPacket) - index, pdMS_TO_TICKS(10));
+        
+        if (len > 0) {
+            index += len;
 
             if (index == sizeof(IMUPacket)) {
                 IMUPacket* packet = (IMUPacket*)buffer;
@@ -73,6 +99,5 @@ void hal_external_sensor_task(void *pvParameters) {
                 }
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(2)); // Avoid tight loop
     }
 }
