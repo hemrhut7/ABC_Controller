@@ -21,6 +21,8 @@ void Processing_AHRS::update()
 {
     if (!hal_external_sensor_healthy()) return;
     hal_external_sensor_read(&ahrs_data.imu_data);
+    hal_external_sensor_read_mag(ahrs_data.mag);
+    hal_external_sensor_read_baro(&ahrs_data.baro);
     const uint64_t now = ahrs_data.imu_data.timestamp;
 
     if (!is_stable) { 

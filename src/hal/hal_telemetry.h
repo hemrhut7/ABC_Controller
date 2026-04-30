@@ -4,12 +4,14 @@
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
+#include <freertos/stream_buffer.h>
 
 
 enum TelemetryFormat {
   FORMAT_DEFAULT = 0,
   FORMAT_PID = 1,
-  FORMAT_IMU = 2,
+  FORMAT_SENSOR = 2,
+  FORMAT_JETSON = 3,
 };
 
 typedef enum TelemetryPort {
@@ -40,9 +42,13 @@ public:
   void queue_string(const char *str);
   void queue_string(const String &str);
 
+  // Set stream buffer for raw sensor bypass
+  void set_sensor_stream(StreamBufferHandle_t sb) { _sensor_stream = sb; }
+
   TelemetryPort_t get_port_id() const { return port_id; };
 
 private:
+  void send_vofa_packet(const float *data, size_t num_floats);
   QueueHandle_t data_queue;
   Stream &port;
   TelemetryPort_t port_id = PORT_USB;
@@ -53,4 +59,6 @@ private:
   uint8_t _divider = 1;
   uint8_t _format = 0;
   uint32_t _packet_counter = 0;
+
+  StreamBufferHandle_t _sensor_stream = NULL;
 };

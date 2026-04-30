@@ -213,6 +213,7 @@ void setup() {
   motor.init();
   uart_telemetry.init(1000 / PERIOD_COMM);
   jetson_telemetry.init(1000 / PERIOD_COMM);
+  jetson_telemetry.set_sensor_stream(hal_external_sensor_get_streambuffer());
   bt_telemetry.init(1000 / PERIOD_BT);
 #if HAS_WIFI_SERIAL
   udp_telemetry.init(1000 / PERIOD_COMM);

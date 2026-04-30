@@ -56,6 +56,8 @@ typedef struct {
     imu_data_t imu_data;
     imu_data_t imu_data_calibrated;
     float euler[3];
+    float mag[3];
+    float baro;
 } ahrs_data_t;
 
 
@@ -86,4 +88,25 @@ typedef struct {
     PID_target_t pid_target;
     float battery_v;
 } system_state_t;
+
+
+// VOFA+ JustFloat Protocol Structs (Type-based)
+struct __attribute__((packed)) IMUPacket {
+    float type = 1.0f;   // Type: 1 = IMU
+    float accel[3];       // ax, ay, az (m/s^2)
+    float gyro[3];        // gx, gy, gz (rad/s)
+    uint32_t tail = 0x7f800000; 
+};
+
+struct __attribute__((packed)) MagPacket {
+    float type = 2.0f;   // Type: 2 = Magnetometer
+    float mag[3];        // mx, my, mz (uT)
+    uint32_t tail = 0x7f800000;
+};
+
+struct __attribute__((packed)) BaroPacket {
+    float type = 3.0f;   // Type: 3 = Barometer
+    float press;         // Pressure (hPa/mbar)
+    uint32_t tail = 0x7f800000;
+};
 
