@@ -234,3 +234,49 @@
     -   **資產說明**：由 OLED 顯示器（`HAL_Display`，SPI 驅動，分髒標記刷新）、LED 狀態指示燈（`HAL_LED`，三態閃爍模式）、藍牙遊戲手把（`HAL_Joystick`，Bluepad32 驅動）和輪胎物理選模式（`update_mode_selection`，PCNT 旋鈕）共同組成的多層次人機交互體系。
     -   **解決問題**：早期系統缺乏直觀的狀態回饋和便捷的操控方式，使用者必須依賴 USB 串口才能了解系統狀態和發送指令。
     -   **技術價值**：OLED 顯示器即時顯示當前模式、待選模式和電池電壓，讓使用者「一眼就知道系統在幹什麼」。藍牙手把提供了無線的類比控制，搭配按鍵模式切換，實現了專業級的遙控體驗。而輪胎選模式機制則讓系統在完全脫離外部設備的情況下，僅靠轉動輪胎就能切換工作模式，實現了真正的「獨立運作」。
+
+---
+
+## 5. 硬體腳位分配 (Hardware Pin Mapping)
+
+本專案基於 NodeMCU-32S (ESP32-WROOM-32) 開發板，下表詳細列出了目前已分配的腳位及其功能。
+
+### 腳位對照表
+
+| 功能群組 | 腳位 (GPIO) | 類型 | 說明 | 程式碼定義 |
+| :--- | :--- | :--- | :--- | :--- |
+| **系統核心** | | | | |
+| 內建 LED | GPIO 2 | Output | 系統狀態指示燈 (INITIALIZING/ARMED/DISARMED) | `LED_BUILTIN` |
+| 電池電壓監測 | GPIO 35 | ADC | 經分壓電路 (Factor 0.010466) 讀取電池電壓 | `BAT_ADC_PIN` |
+| USB 串口 (Serial0) | TX:1, RX:3 | UART | 預設遙測、指令接收與韌體燒錄 | - |
+| 擴充串口 (Serial1) | TX:10, RX:9 | UART | 預設通訊腳位 (注意部分開發板此腳位供內部 Flash 使用) | - |
+| **左輪動力 (Left Motor)** | | | | |
+| 馬達 PWM | GPIO 19 | PWM | 控制左側馬達速度 (20kHz, 10-bit) | `MOTOR_L_PWM_PIN` |
+| 方向控制 1 | GPIO 5 | Output | 左馬達轉向控制 (與 DIR2 配合) | `MOTOR_L_DIR1_PIN` |
+| 方向控制 2 | GPIO 18 | Output | 左馬達轉向控制 (與 DIR1 配合) | `MOTOR_L_DIR2_PIN` |
+| 編碼器 A 相 | GPIO 32 | PCNT | 左馬達正交編碼器 A 相 | `MOTOR_L_E1A_PIN` |
+| 編碼器 B 相 | GPIO 33 | PCNT | 左馬達正交編碼器 B 相 | `MOTOR_L_E1B_PIN` |
+| **右輪動力 (Right Motor)** | | | | |
+| 馬達 PWM | GPIO 15 | PWM | 控制右側馬達速度 (20kHz, 10-bit) | `MOTOR_R_PWM_PIN` |
+| 方向控制 1 | GPIO 4 | Output | 右馬達轉向控制 (與 DIR2 配合) | `MOTOR_R_DIR1_PIN` |
+| 方向控制 2 | GPIO 0 | Output | 右馬達轉向控制 (兼具 Boot 按鍵) | `MOTOR_R_DIR2_PIN` |
+| 編碼器 A 相 | GPIO 25 | PCNT | 右馬達正交編碼器 A 相 | `MOTOR_R_E2A_PIN` |
+| 編碼器 B 相 | GPIO 26 | PCNT | 右馬達正交編碼器 B 相 | `MOTOR_R_E2B_PIN` |
+| 馬達致能 (STBY) | GPIO 21 | Output | H 橋驅動晶片待機控制 (左右輪共用) | `MOTOR_L_DTBY_PIN` |
+| **感知與顯示** | | | | |
+| I2C SDA (IMU) | GPIO 23 | I2C | MPU6050 數據線 | `SDA_PIN_MPU6050` |
+| I2C SCL (IMU) | GPIO 22 | I2C | MPU6050 時鐘線 | `SCL_PIN_MPU6050` |
+| OLED MOSI | GPIO 13 | SW SPI | SSD1306 顯示器數據線 | `OLED_MOSI_PIN` |
+| OLED SCLK | GPIO 14 | SW SPI | SSD1306 顯示器時鐘線 | `OLED_SCLK_PIN` |
+| OLED DC | GPIO 27 | SW SPI | SSD1306 資料/命令選擇 | `OLED_DC_PIN` |
+| OLED RST | GPIO 12 | SW SPI | SSD1306 重置線 | `OLED_RST_PIN` |
+
+### 未使用腳位 (Unused / Available)
+
+以下腳位目前未分配功能，可供未來硬體擴充（如超音波、雷射雷達或感測器）使用：
+
+-   **通用輸出入 (GPIO)**: 16, 17 (預設 UART2)
+-   **僅限輸入 (Input Only)**: 34, 36 (VP), 39 (VN)
+
+> [!IMPORTANT]
+> 在擴充使用 GPIO 0, 2, 5, 12, 15 時需注意其 Strapping Pins 特性，可能會影響 ESP32 的開機模式。目前配置已避開衝突或已適當處理。
