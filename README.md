@@ -249,7 +249,8 @@
 | 內建 LED | GPIO 2 | Output | 系統狀態指示燈 (INITIALIZING/ARMED/DISARMED) | `LED_BUILTIN` |
 | 電池電壓監測 | GPIO 35 | ADC | 經分壓電路 (Factor 0.010466) 讀取電池電壓 | `BAT_ADC_PIN` |
 | USB 串口 (Serial0) | TX:1, RX:3 | UART | 預設遙測、指令接收與韌體燒錄 | - |
-| 擴充串口 (Serial1) | TX:10, RX:9 | UART | 預設通訊腳位 (注意部分開發板此腳位供內部 Flash 使用) | - |
+| Lidar 串口 (Serial1) | RX:34 (僅輸入) | UART | 連接 N10 Lidar (230400 bps) | - |
+| 擴充串口 (Serial2) | TX:17, RX:16 | UART | 原 UART1 任務，支援雙向遙測與腳本 | - |
 | **左輪動力 (Left Motor)** | | | | |
 | 馬達 PWM | GPIO 19 | PWM | 控制左側馬達速度 (20kHz, 10-bit) | `MOTOR_L_PWM_PIN` |
 | 方向控制 1 | GPIO 5 | Output | 左馬達轉向控制 (與 DIR2 配合) | `MOTOR_L_DIR1_PIN` |
@@ -275,8 +276,9 @@
 
 以下腳位目前未分配功能，可供未來硬體擴充（如超音波、雷射雷達或感測器）使用：
 
--   **通用輸出入 (GPIO)**: 16, 17 (預設 UART2)
--   **僅限輸入 (Input Only)**: 34, 36 (VP), 39 (VN)
+-   **通用輸出入 (GPIO)**: 無 (常用腳位已全數分配)
+-   **僅限輸入 (Input Only)**: 36 (VP), 39 (VN)
+-   **不可使用 (Internal Flash)**: GPIO 6, 7, 8, 9, 10, 11 (系統內部 Flash 佔用，嚴禁使用)
 
 > [!IMPORTANT]
 > 在擴充使用 GPIO 0, 2, 5, 12, 15 時需注意其 Strapping Pins 特性，可能會影響 ESP32 的開機模式。目前配置已避開衝突或已適當處理。

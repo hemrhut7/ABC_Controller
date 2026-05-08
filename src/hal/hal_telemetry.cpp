@@ -9,10 +9,25 @@ const uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7f};
 #define TELEMETRY_QUEUE_LENGTH 5
 
 Telemetry::Telemetry(Stream &stream, TelemetryPort_t port_id) : port(stream), port_id(port_id) {}
-
-void Telemetry::init(uint16_t base_freq) {
+ 
+Telemetry::~Telemetry() {
+  if (_lidar_scan) {
+    free(_lidar_scan);
+    _lidar_scan = nullptr;
+  }
+  if (data_queue) {
+    vQueueDelete(data_queue);
+    data_queue = nullptr;
+  }
+  if (_lidar_mutex) {
+    vSemaphoreDelete(_lidar_mutex);
+    _lidar_mutex = nullptr;
+  }
+}
+ void Telemetry::init(uint16_t base_freq) {
   _base_freq = base_freq;
   data_queue = xQueueCreate(TELEMETRY_QUEUE_LENGTH, sizeof(system_state_t));
+  _lidar_mutex = xSemaphoreCreateMutex();
 }
 
 void Telemetry::push_data(const system_state_t &packet) {
@@ -34,6 +49,18 @@ void Telemetry::set_config(bool enabled, uint8_t format, uint16_t freq_hz) {
     _divider = _base_freq / freq_hz;
     if (_divider == 0)
       _divider = 1;
+  }
+  
+  // Manage lidar buffer memory
+  if (_format == FORMAT_LIDAR) {
+    if (!_lidar_scan) {
+      _lidar_scan = (lidar_scan_t *)malloc(sizeof(lidar_scan_t));
+    }
+  } else {
+    if (_lidar_scan) {
+      free(_lidar_scan);
+      _lidar_scan = nullptr;
+    }
   }
 }
 
@@ -105,6 +132,64 @@ void Telemetry::process_serial_outgoing() {
       memcpy(send_buffer, data_packet, sizeof(data_packet));
       memcpy(send_buffer + sizeof(data_packet), vofa_tail, sizeof(vofa_tail));
       port.write(send_buffer, sizeof(send_buffer));
+    }
+    else if (_format == FORMAT_LIDAR) {
+      // 1. Standard 18 floats
+      float data_packet[18];
+      data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
+      data_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
+      data_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
+      data_packet[3] = pkt.abc_state.ahrs_data.euler[2] * RAD_TO_DEG;
+      data_packet[4] = (float)pkt.abc_state.motor_state.rpm_L;
+      data_packet[5] = (float)pkt.abc_state.motor_state.rpm_R;
+      data_packet[6] = (float)pkt.abc_state.motor_state.pwm_out_L / (float)MAX_PWM_DUTY;
+      data_packet[7] = (float)pkt.abc_state.motor_state.pwm_out_R / (float)MAX_PWM_DUTY;
+      data_packet[8] = pkt.abc_state.velocity;
+      data_packet[9] = pkt.abc_state.ahrs_data.imu_data.gyro[0] * RAD_TO_DEG;
+      data_packet[10] = pkt.abc_state.ahrs_data.imu_data.gyro[1] * RAD_TO_DEG;
+      data_packet[11] = pkt.abc_state.ahrs_data.imu_data.gyro[2] * RAD_TO_DEG;
+      data_packet[12] = pkt.abc_state.ahrs_data.imu_data.accl[0];
+      data_packet[13] = pkt.abc_state.ahrs_data.imu_data.accl[1];
+      data_packet[14] = pkt.abc_state.ahrs_data.imu_data.accl[2];
+      data_packet[15] = (float)pkt.cmd.mode;
+      data_packet[16] = (float)pkt.delay_count;
+      data_packet[17] = pkt.battery_v;
+      
+      port.write((uint8_t*)data_packet, sizeof(data_packet));
+
+      // 2. Lidar point count
+      if (!_lidar_updated || !_lidar_mutex) return;
+      
+      if (xSemaphoreTake(_lidar_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+        _lidar_updated = false;
+        float count_f = (float)_lidar_scan->count;
+        port.write((uint8_t*)&count_f, sizeof(float));
+
+        // 3. Lidar points (x, y, dist, angle, intensity)
+        float pt[5];
+        for (int i = 0; i < _lidar_scan->count; i++) {
+          pt[0] = _lidar_scan->points[i].x;
+          pt[1] = _lidar_scan->points[i].y;
+          pt[2] = _lidar_scan->points[i].distance;
+          pt[3] = _lidar_scan->points[i].angle;
+          pt[4] = (float)_lidar_scan->points[i].intensity;
+          port.write((uint8_t*)pt, sizeof(pt));
+        }
+        xSemaphoreGive(_lidar_mutex);
+      }
+
+      // 4. Tail
+      port.write(vofa_tail, sizeof(vofa_tail));
+    }
+  }
+}
+
+void Telemetry::update_lidar_data(const lidar_scan_t &scan) {
+  if (_lidar_scan && _lidar_mutex) {
+    if (xSemaphoreTake(_lidar_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+      *_lidar_scan = scan;
+      _lidar_updated = true;
+      xSemaphoreGive(_lidar_mutex);
     }
   }
 }

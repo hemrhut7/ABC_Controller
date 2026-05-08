@@ -9,6 +9,7 @@
 enum TelemetryFormat {
   FORMAT_DEFAULT = 0,
   FORMAT_PID = 1,
+  FORMAT_LIDAR = 2,
 };
 
 typedef enum TelemetryPort {
@@ -23,6 +24,7 @@ typedef enum TelemetryPort {
 class Telemetry {
 public:
   Telemetry(Stream &stream, TelemetryPort_t port_id);
+  ~Telemetry();
   void init(uint16_t base_freq = 200);
 
   // Called by Control_Task to push data into the queue (non-blocking).
@@ -39,6 +41,9 @@ public:
   void queue_string(const char *str);
   void queue_string(const String &str);
 
+  // Update lidar data for FORMAT_LIDAR
+  void update_lidar_data(const lidar_scan_t &scan);
+
   TelemetryPort_t get_port_id() const { return port_id; };
 
 private:
@@ -52,4 +57,10 @@ private:
   uint8_t _divider = 1;
   uint8_t _format = 0;
   uint32_t _packet_counter = 0;
+
+  // Lidar data (dynamically allocated to save RAM when not in use)
+  lidar_scan_t *_lidar_scan = nullptr;
+  uint64_t _last_sent_lidar_ts = 0;
+  bool _lidar_updated = false;
+  SemaphoreHandle_t _lidar_mutex = nullptr;
 };

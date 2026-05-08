@@ -14,6 +14,7 @@
 #include <WiFi.h>
 #include "hal/hal_udp_stream.h"
 #endif
+#include "app/app_lidar.h"
 
 
 #if HAS_BT_SERIAL
@@ -28,6 +29,7 @@
 #define PRIORITY_COMM 10
 #define PRIORITY_GAMEPAD 8
 #define PRIORITY_BT 5
+#define PRIORITY_LIDAR 10
 
 #define PERIOD_CONTROLL 5 // 200Hz
 #define PERIOD_COMM 5     // 200Hz
@@ -43,6 +45,7 @@ TaskHandle_t BTTaskHandle;
 #if HAS_WIFI_SERIAL
 TaskHandle_t WiFiTaskHandle;
 #endif
+TaskHandle_t LidarTaskHandle;
 
 ConfigStore config_store;
 Processing_Motor motor(PERIOD_CONTROLL);
@@ -61,7 +64,7 @@ HAL_Battery system_battery;
 Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led, set_app_pending_mode);
 
 Telemetry uart_telemetry(Serial, PORT_USB);
-Telemetry uart1_telemetry(Serial1, PORT_UART1);
+Telemetry uart1_telemetry(Serial2, PORT_UART1);
 #if HAS_BT_SERIAL
 BluetoothSerial SerialBT;
 Telemetry bt_telemetry(SerialBT, PORT_BT);
@@ -74,6 +77,8 @@ Telemetry bt_telemetry(Serial, PORT_BT);
 UDPStream udp_stream(UDP_PORT);
 Telemetry udp_telemetry(udp_stream, PORT_WIFI);
 #endif
+
+AppLidar app_lidar(Serial1);
 
 
 // 1. 控制任務 (Core 1)
@@ -134,7 +139,7 @@ void UART1_Task(void *pvParameters) {
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
   for (;;) {
     uart1_telemetry.process_serial_outgoing();
-    app_script.check_serial(Serial1, &uart1_telemetry);
+    app_script.check_serial(Serial2, &uart1_telemetry);
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
@@ -195,10 +200,11 @@ void setup() {
   system_led.set_state(INITIALIZING);
 
   Serial.begin(115200);
-  Serial1.begin(230400);
+  Serial1.begin(230400, SERIAL_8N1, 34, -1);
 #if HAS_BT_SERIAL
   SerialBT.begin("ABC_Controller");
 #endif
+  Serial2.begin(230400, SERIAL_8N1, 17, 16);
   config_store.begin();
   ahrs.init();
   motor.init();
@@ -231,6 +237,13 @@ void setup() {
   }
   udp_stream.begin();
 #endif
+  
+  app_lidar.register_telemetry(&uart_telemetry);
+  app_lidar.register_telemetry(&bt_telemetry);
+  app_lidar.register_telemetry(&uart1_telemetry);
+#if HAS_WIFI_SERIAL
+  app_lidar.register_telemetry(&udp_telemetry);
+#endif
 
   app_mode.init();
   system_display.init();
@@ -259,6 +272,9 @@ void setup() {
   xTaskCreatePinnedToCore(WiFi_Task, "WiFi_Task", 4096, NULL, PRIORITY_COMM,
                           &WiFiTaskHandle, 0);
 #endif
+
+  xTaskCreatePinnedToCore(AppLidar::task_entry, "Lidar_Task", 8192, &app_lidar, 
+                          PRIORITY_LIDAR, &LidarTaskHandle, 0);
 }
 
 void loop() { vTaskDelete(NULL); }
