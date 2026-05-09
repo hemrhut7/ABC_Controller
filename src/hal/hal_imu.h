@@ -1,9 +1,9 @@
 #ifndef HAL_IMU_H
 #define HAL_IMU_H
 
-#include "Adafruit_MPU6050.h"
-#include <Adafruit_Sensor.h>
+#include <Wire.h>
 #include "hal_type_define.h"
+#include "config.h"
 
 
 void hal_imu_init();

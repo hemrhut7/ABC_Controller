@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <math.h>
 
-#if !HAS_BT_SERIAL
+#if HAS_BLUEPAD32
 
 HAL_Joystick *HAL_Joystick::instance_ = nullptr;
 
@@ -158,4 +158,4 @@ void HAL_Joystick::task_entry(void *pvParameters) {
   }
   joystick->task_loop();
 }
-#endif  // !HAS_BT_SERIAL
+#endif  // HAS_BLUEPAD32

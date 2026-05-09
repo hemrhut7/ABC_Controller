@@ -15,10 +15,7 @@
 #include "hal/hal_udp_stream.h"
 #endif
 
-
-#if HAS_BT_SERIAL
-#include <BluetoothSerial.h>
-#else
+#if HAS_BLUEPAD32
 #include "hal/hal_joystick.h"
 #endif
 
@@ -27,19 +24,16 @@
 #define PRIORITY_UART1 12
 #define PRIORITY_COMM 10
 #define PRIORITY_GAMEPAD 8
-#define PRIORITY_BT 5
 
 #define PERIOD_CONTROLL 5 // 200Hz
 #define PERIOD_COMM 5     // 200Hz
 #define PERIOD_GAMEPAD 10 // 100Hz
-#define PERIOD_BT 5       // 200Hz
 
 TaskHandle_t ControlTaskHandle;
 TaskHandle_t AHRSTaskHandle;
 TaskHandle_t UART1TaskHandle;
 TaskHandle_t CommTaskHandle;
 TaskHandle_t GamepadTaskHandle;
-TaskHandle_t BTTaskHandle;
 #if HAS_WIFI_SERIAL
 TaskHandle_t WiFiTaskHandle;
 #endif
@@ -55,19 +49,16 @@ void set_app_pending_mode(Mode_t mode) {
   app_mode.set_pending_mode(mode);
 }
 
-HAL_LED system_led(LED_BUILTIN);
+HAL_LED system_led; // Virtual LED
 HAL_Display system_display;
 HAL_Battery system_battery;
 Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led, set_app_pending_mode);
 
 Telemetry uart_telemetry(Serial, PORT_USB);
 Telemetry uart1_telemetry(Serial1, PORT_UART1);
-#if HAS_BT_SERIAL
-BluetoothSerial SerialBT;
-Telemetry bt_telemetry(SerialBT, PORT_BT);
-#else
+
+#if HAS_BLUEPAD32
 HAL_Joystick joystick(&app_mode, PERIOD_GAMEPAD);
-Telemetry bt_telemetry(Serial, PORT_BT);
 #endif
 
 #if HAS_WIFI_SERIAL
@@ -88,7 +79,6 @@ void Control_Task(void *pvParameters) {
     last_micros = current_micros;
     system_state_t current_sys_state;
 
-    // 簡單的濾波/保護，避免 dt 異常 (例如第一次執行或溢位)
     if (dt <= 0.0f || dt > 0.1f)
       dt = PERIOD_CONTROLL * 0.001f;
 
@@ -110,7 +100,7 @@ void Control_Task(void *pvParameters) {
       }
     } 
 
-    // 2. Push fresh data to the telemetry queues (non-blocking)
+    // 2. Push fresh data to the telemetry queues
     system_battery.update(dt);
     current_sys_state.battery_v = system_battery.get_voltage();
     current_sys_state.delay_count = failsafe.get_delay_count();
@@ -119,7 +109,8 @@ void Control_Task(void *pvParameters) {
     current_sys_state.pid_target = app_mode.get_pid_target();
 
     uart_telemetry.push_data(current_sys_state);
-    bt_telemetry.push_data(current_sys_state);
+    uart1_telemetry.push_data(current_sys_state); // Push to UART1 too
+
 #if HAS_WIFI_SERIAL
     udp_telemetry.push_data(current_sys_state);
 #endif
@@ -156,22 +147,8 @@ void Comm_Task(void *pvParameters) {
   }
 }
 
-#if HAS_BT_SERIAL
-// 4. 藍牙遙測發送任務 (Core 0)
-void BT_Task(void *pvParameters) {
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_BT);
-  for (;;) {
-    bt_telemetry.process_serial_outgoing();
-    app_script.check_serial(SerialBT, &bt_telemetry);
-
-    vTaskDelayUntil(&xLastWakeTime, xFrequency);
-  }
-}
-#endif
-
 #if HAS_WIFI_SERIAL
-// 5. WiFi 遙測發送任務 (Core 0)
+// 4. WiFi 遙測發送任務 (Core 0)
 void WiFi_Task(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
@@ -195,15 +172,15 @@ void setup() {
   system_led.set_state(INITIALIZING);
 
   Serial.begin(115200);
-  Serial1.begin(230400);
-#if HAS_BT_SERIAL
-  SerialBT.begin("ABC_Controller");
-#endif
+  // Serial1 (Telemetry/Script)
+  Serial1.begin(230400, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
+  // Serial2 (Sensor RX only)
+  Serial2.begin(115200, SERIAL_8N1, UART2_RX_PIN, -1);
+
   config_store.begin();
   ahrs.init();
   motor.init();
   uart_telemetry.init(1000 / PERIOD_COMM);
-  bt_telemetry.init(1000 / PERIOD_BT);
   uart1_telemetry.init(1000 / PERIOD_COMM);
 #if HAS_WIFI_SERIAL
   udp_telemetry.init(1000 / PERIOD_COMM);
@@ -212,7 +189,7 @@ void setup() {
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print("Connecting to WiFi");
   uint8_t timeout = 0;
-  while (WiFi.status() != WL_CONNECTED && timeout < 20) { // 10 seconds (20 * 500ms)
+  while (WiFi.status() != WL_CONNECTED && timeout < 20) {
     delay(500);
     Serial.print(".");
     timeout++;
@@ -246,10 +223,7 @@ void setup() {
   xTaskCreatePinnedToCore(Comm_Task, "CommTask", 4096, NULL, PRIORITY_COMM,
                           &CommTaskHandle, 0);
 
-#if HAS_BT_SERIAL
-  xTaskCreatePinnedToCore(BT_Task, "BT_Task", 4096, NULL, PRIORITY_BT,
-                          &BTTaskHandle, 0);
-#else
+#if HAS_BLUEPAD32
   xTaskCreatePinnedToCore(HAL_Joystick::task_entry, "Gamepad_Task", 6144,
                           &joystick,
                           PRIORITY_GAMEPAD, &GamepadTaskHandle, 0);

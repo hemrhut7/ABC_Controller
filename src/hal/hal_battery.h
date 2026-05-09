@@ -2,8 +2,9 @@
 
 #include <Arduino.h>
 
-#define BAT_ADC_PIN   35
-#define BAT_V_FACTOR  0.010466f
+#include "config.h"
+
+#define BAT_V_FACTOR  0.002417f
 
 class HAL_Battery {
 public:

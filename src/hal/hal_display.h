@@ -1,23 +1,16 @@
 #pragma once
 
 #include <Arduino.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Arduino_GFX_Library.h>
 #include "hal/hal_type_define.h"
+#include "config.h"
 
-// OLED SPI Pins (Software SPI)
-#define OLED_MOSI_PIN   13
-#define OLED_SCLK_PIN   14
-#define OLED_DC_PIN     27
-#define OLED_RST_PIN    12
-#define OLED_CS_PIN     -1 // Not used or grounded
-
-#define OLED_WIDTH      128
-#define OLED_HEIGHT     32
+#define LCD_WIDTH      240
+#define LCD_HEIGHT     320
 
 class HAL_Display {
 public:
-    HAL_Display(uint8_t w = OLED_WIDTH, uint8_t h = OLED_HEIGHT);
+    HAL_Display(uint16_t w = LCD_WIDTH, uint16_t h = LCD_HEIGHT);
     void init();
     bool is_connected() const { return _connected; }
 
@@ -28,11 +21,12 @@ public:
 private:
     static const char* mode_to_str(Mode_t mode);
 
-    Adafruit_SSD1306 _display;
-    uint8_t _w, _h;
+    Arduino_GFX* _gfx = nullptr;
+    uint16_t _w, _h;
     bool _connected = false;
 
     // Dirty flag: 只在狀態改變時刷新
+    bool   _layout_drawn = false;
     Mode_t _last_current_mode = MODE_STOP;
     Mode_t _last_pending_mode = MODE_STOP;
     float  _last_battery_v = -1.0f;

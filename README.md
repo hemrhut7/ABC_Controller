@@ -238,48 +238,67 @@
 
 ---
 
-## 5. 硬體腳位分配 (Hardware Pin Mapping)
+## 5. 硬體架構遷移：ESP32-S3-LCD-2 (Hardware Migration)
 
-本專案基於 NodeMCU-32S (ESP32-WROOM-32) 開發板，下表詳細列出了目前已分配的腳位及其功能。
+本專案已從 NodeMCU-32S 遷移至 **Waveshare ESP32-S3-LCD-2** 平台。此變更不僅提升了運算效能 (S3 核心)，更整合了板載 1.28" 彩色 LCD 與高效能 IMU，並針對實體佈線進行了腳位優化。
 
-### 腳位對照表
+### 關鍵硬體變更
+- **主控板**：ESP32-S3-WROOM-1 (16MB Flash, 8MB PSRAM)。
+- **感知器**：由 MPU6050 升級為板載 **QMI8658** 六軸 IMU (I2C 介面)。
+- **顯示器**：由 SSD1306 (128x32) 升級為板載 **ST7789** (240x320) IPS 彩色 LCD (硬體 SPI)。
+- **電池監測**：板載 GPIO 5 內建 1/3 分壓電路，支援高精度電壓讀取。
+- **佈線優化**：馬達與編碼器訊號依據「左/右」物理位置重新分配至排針兩側，簡化內部走線。
 
-| 功能群組 | 腳位 (GPIO) | 類型 | 說明 | 程式碼定義 |
-| :--- | :--- | :--- | :--- | :--- |
-| **系統核心** | | | | |
-| 內建 LED | GPIO 2 | Output | 系統狀態指示燈 (INITIALIZING/ARMED/DISARMED) | `LED_BUILTIN` |
-| 電池電壓監測 | GPIO 35 | ADC | 經分壓電路 (Factor 0.010466) 讀取電池電壓 | `BAT_ADC_PIN` |
-| USB 串口 (Serial0) | TX:1, RX:3 | UART | 預設遙測、指令接收與韌體燒錄 | - |
-| Lidar 串口 (Serial1) | RX:34 (僅輸入) | UART | 連接 N10 Lidar (230400 bps) | - |
-| 擴充串口 (Serial2) | TX:17, RX:16 | UART | 原 UART1 任務，支援雙向遙測與腳本 | - |
-| **左輪動力 (Left Motor)** | | | | |
-| 馬達 PWM | GPIO 19 | PWM | 控制左側馬達速度 (20kHz, 10-bit) | `MOTOR_L_PWM_PIN` |
-| 方向控制 1 | GPIO 5 | Output | 左馬達轉向控制 (與 DIR2 配合) | `MOTOR_L_DIR1_PIN` |
-| 方向控制 2 | GPIO 18 | Output | 左馬達轉向控制 (與 DIR1 配合) | `MOTOR_L_DIR2_PIN` |
-| 編碼器 A 相 | GPIO 32 | PCNT | 左馬達正交編碼器 A 相 | `MOTOR_L_E1A_PIN` |
-| 編碼器 B 相 | GPIO 33 | PCNT | 左馬達正交編碼器 B 相 | `MOTOR_L_E1B_PIN` |
-| **右輪動力 (Right Motor)** | | | | |
-| 馬達 PWM | GPIO 15 | PWM | 控制右側馬達速度 (20kHz, 10-bit) | `MOTOR_R_PWM_PIN` |
-| 方向控制 1 | GPIO 4 | Output | 右馬達轉向控制 (與 DIR2 配合) | `MOTOR_R_DIR1_PIN` |
-| 方向控制 2 | GPIO 0 | Output | 右馬達轉向控制 (兼具 Boot 按鍵) | `MOTOR_R_DIR2_PIN` |
-| 編碼器 A 相 | GPIO 25 | PCNT | 右馬達正交編碼器 A 相 | `MOTOR_R_E2A_PIN` |
-| 編碼器 B 相 | GPIO 26 | PCNT | 右馬達正交編碼器 B 相 | `MOTOR_R_E2B_PIN` |
-| 馬達致能 (STBY) | GPIO 21 | Output | H 橋驅動晶片待機控制 (左右輪共用) | `MOTOR_L_DTBY_PIN` |
-| **感知與顯示** | | | | |
-| I2C SDA (IMU) | GPIO 23 | I2C | MPU6050 數據線 | `SDA_PIN_MPU6050` |
-| I2C SCL (IMU) | GPIO 22 | I2C | MPU6050 時鐘線 | `SCL_PIN_MPU6050` |
-| OLED MOSI | GPIO 13 | SW SPI | SSD1306 顯示器數據線 | `OLED_MOSI_PIN` |
-| OLED SCLK | GPIO 14 | SW SPI | SSD1306 顯示器時鐘線 | `OLED_SCLK_PIN` |
-| OLED DC | GPIO 27 | SW SPI | SSD1306 資料/命令選擇 | `OLED_DC_PIN` |
-| OLED RST | GPIO 12 | SW SPI | SSD1306 重置線 | `OLED_RST_PIN` |
+### 腳位對照表 (ESP32-S3-LCD-2 — 依實體排針佈局)
 
-### 未使用腳位 (Unused / Available)
+| 功能群組 | 腳位 (GPIO) | 說明 | 程式碼定義 |
+| :--- | :--- | :--- | :--- |
+| **板載硬體** | | | |
+| 螢幕背光 | GPIO 1 | LCD 背光控制 (High = On) | `LCD_BL_PIN` |
+| LCD 介面 | 38,39,40,42,45 | 硬體 SPI (MOSI/SCLK/MISO/DC/CS) | `LCD_..._PIN` |
+| IMU 介面 | SCL:47, SDA:48 | 板載 QMI8658 I2C 總線 (與觸控共用) | `IMU_..._PIN` |
+| 電池電壓 | GPIO 5 | 板載 1/3 分壓 ADC (Factor 0.002417) | `BAT_ADC_PIN` |
+| **左輪 (P1 排針)** | | | |
+| 馬達 PWM | GPIO 2 (P1-1) | 控制左側馬達速度 | `MOTOR_L_PWM_PIN` |
+| 方向控制 1 | GPIO 4 (P1-2) | 左馬達轉向控制 | `MOTOR_L_DIR1_PIN` |
+| 方向控制 2 | GPIO 6 (P1-3) | 左馬達轉向控制 | `MOTOR_L_DIR2_PIN` |
+| 編碼器 A 相 | GPIO 16 (P1-4) | 左馬達正交編碼器 A 相 | `MOTOR_L_E1A_PIN` |
+| 編碼器 B 相 | GPIO 17 (P1-5) | 左馬達正交編碼器 B 相 | `MOTOR_L_E1B_PIN` |
+| 馬達致能 | GPIO 18 (P1-6) | 左右輪共用 STBY 控制 | `MOTOR_STBY_PIN` |
+| **右輪 (P2 排針)** | | | |
+| 馬達 PWM | GPIO 15 (P2-7) | 控制右側馬達速度 | `MOTOR_R_PWM_PIN` |
+| 方向控制 1 | GPIO 13 (P2-8) | 右馬達轉向控制 | `MOTOR_R_DIR1_PIN` |
+| 方向控制 2 | GPIO 11 (P2-9) | 右馬達轉向控制 | `MOTOR_R_DIR2_PIN` |
+| 編碼器 A 相 | GPIO 12 (P2-10) | 右馬達正交編碼器 A 相 | `MOTOR_R_E2A_PIN` |
+| 編碼器 B 相 | GPIO 14 (P2-11) | 右馬達正交編碼器 B 相 | `MOTOR_R_E2B_PIN` |
+| **通訊介面** | | | |
+| USB 串口 | Native USB | 系統燒錄、監控與原生 CDC 遙測 | `Serial` |
+| 遙測串口 1 | TX:43 (P2-3), RX:44 (P2-4) | 雙向 UART (Telemetry/Script) | `Serial1` |
+| 感測器串口 2 | RX:21 (P1-7) | 僅接收 (適用於 Lidar 等單向感測器) | `Serial2` |
 
-以下腳位目前未分配功能，可供未來硬體擴充（如超音波、雷射雷達或感測器）使用：
-
-- **通用輸出入 (GPIO)**: 無 (常用腳位已全數分配)
-- **僅限輸入 (Input Only)**: 36 (VP), 39 (VN)
-- **不可使用 (Internal Flash)**: GPIO 6, 7, 8, 9, 10, 11 (系統內部 Flash 佔用，嚴禁使用)
+```
+┌───────────────────────────────────────────────────┐
+│  P1 (Left Row)           P2 (Right Row)           │
+│  Pin 1:  IO2  ← L_PWM       3V3                  │
+│  Pin 2:  IO4  ← L_DIR1      GND                  │
+│  Pin 3:  IO6  ← L_DIR2      IO43 ← UART1 TX      │
+│  Pin 4:  IO16 ← L_ENC_A     IO44 ← UART1 RX      │
+│  Pin 5:  IO17 ← L_ENC_B     IO47   (IMU_SCL)      │
+│  Pin 6:  IO18 ← STBY        IO48   (IMU_SDA)      │
+│  Pin 7:  IO21 ← UART2 RX    IO15 ← R_PWM          │
+│  Pin 8:  IO7  (free)        IO13 ← R_DIR1          │
+│  Pin 9:  IO8  (free)        IO11 ← R_DIR2          │
+│  Pin 10: IO10 (free)        IO12 ← R_ENC_A         │
+│  Pin 11: IO20 (USB_P ⚠)     IO14 ← R_ENC_B         │
+│  Pin 12: IO19 (USB_N ⚠)     IO9  (free)            │
+│  Pin 13: GND                GND                    │
+│  Pin 14: 5V                 VBAT                   │
+└───────────────────────────────────────────────────┘
+⚠ IO19/IO20 = USB D-/D+, 啟用 USB CDC 時不可使用
+Free: IO7, IO8, IO10 (P1) / IO9 (P2) 可供未來擴充
+```
 
 > [!IMPORTANT]
-> 在擴充使用 GPIO 0, 2, 5, 12, 15 時需注意其 Strapping Pins 特性，可能會影響 ESP32 的開機模式。目前配置已避開衝突或已適當處理。
+> 由於 ESP32-S3 不支援經典藍牙 (Classic BT)，`BluetoothSerial` 已被完全移除。相關調試功能已遷移至 USB CDC 或 WiFi UDP。
+
+---
