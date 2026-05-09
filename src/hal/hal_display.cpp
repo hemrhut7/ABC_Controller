@@ -94,7 +94,6 @@ const char* HAL_Display::mode_to_str(Mode_t mode) {
         case MODE_ANGLE:    return "ANGLE";
         case MODE_VELOCITY: return "VELOCITY";
         case MODE_REMOTE:   return "REMOTE";
-        case MODE_TURBO:    return "TURBO";
         default:            return "???";
     }
 }

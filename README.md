@@ -8,7 +8,7 @@
 
 ### 核心控制架構：三層串級 PID
 
-我們的架構從單環 PID 演進而來，最終沉澱為一個由「速度環」、「直立環」與「馬達環」組成的三層串級 PID 系統，並輔以一個獨立的「轉向環」。系統支援多層級的運作模式（`MODE_STOP` → `MODE_FREE` → `MODE_PWM` → `MODE_MOTOR` → `MODE_ANGLE` → `MODE_VELOCITY` → `MODE_REMOTE` → `MODE_TURBO`），各環路依據當前模式選擇性啟動。
+我們的架構從單環 PID 演進而來，最終沉澱為一個由「速度環」、「直立環」與「馬達環」組成的三層串級 PID 系統，並輔以一個獨立的「轉向環」。系統支援多層級的運作模式（`MODE_STOP` → `MODE_FREE` → `MODE_PWM` → `MODE_MOTOR` → `MODE_ANGLE` → `MODE_VELOCITY` → `MODE_REMOTE`），各環路依據當前模式選擇性啟動。
 
 - **外環 - 速度環 (Velocity Loop)**
 - **目標**：控制車體前後移動的速度。
@@ -212,7 +212,7 @@
     此提交是應用層架構上的一次重要精煉。Failsafe 類別原本直接依賴 `AppMode` 來切換模式，造成了模組間的緊耦合。現在，Failsafe 改為接受一個**函式指標回調** (`set_pending_mode_fn`)，透過回調間接通知 `AppMode` 設定待選模式。這使得 `Failsafe` 完全不需要知道 `AppMode` 的存在，實現了真正的模組解耦。同時，此提交也整合了 `HAL_Battery` 電池電壓監控模組，透過 ADC 讀取 GPIO 35 的分壓值並以低通濾波穩定化，將電池狀態納入遙測數據和 OLED 顯示中，為低電量保護等未來功能奠定了基礎。
 
 - **輪胎選模式 (`update_mode_selection`)：物理世界的 UI**
-    在 `MODE_FREE` 狀態下，系統會監測右輪的 PCNT（脈衝計數器）累積值。當使用者用手轉動右輪超過每 60 度一個檔位時，`pending_mode` 會在 `MODE_ANGLE` ~ `MODE_TURBO` 之間循環切換，並即時反映在 OLED 螢幕上。這是一個將「馬達編碼器」重新利用為「物理旋鈕」的巧妙設計，讓使用者在沒有手把或電腦的情況下，僅靠車體本身就能選擇運行模式。
+    在 `MODE_FREE` 狀態下，系統會監測右輪的 PCNT（脈衝計數器）累積值。當使用者用手轉動右輪超過每 60 度一個檔位時，`pending_mode` 會在 `MODE_ANGLE` ~ `MODE_REMOTE` 之間循環切換，並即時反映在 OLED 螢幕上。這是一個將「馬達編碼器」重新利用為「物理旋鈕」的巧妙設計，讓使用者在沒有手把或電腦的情況下，僅靠車體本身就能選擇運行模式。
 
 ### 重要設計資產
 

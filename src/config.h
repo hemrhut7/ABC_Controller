@@ -15,13 +15,13 @@
 // 假設輪徑 65mm => 半徑 0.0325m
 // 速度 (m/s) = (RPM / 60) * 2 * PI * R
 // Factor = 0.0325 * 2 * 3.14159 / 60 ~= 0.003403
-#define MAX_RPM      150
+#define MAX_RPM      300
 #define RPM_TO_MS 0.003403f 
 #define MAX_PITCH 6.0f * DEG_TO_RAD
 #define MAX_PITCH_RAMP 15.0f * DEG_TO_RAD
 #define MAX_VELOCITY_RAMP 100.0f
-#define MAX_VELOCITY MAX_RPM * 0.65f * RPM_TO_MS
-#define MAX_STEER_RPM MAX_RPM * 0.65f
+#define MAX_VELOCITY MAX_RPM * 0.5f * 0.7f * RPM_TO_MS
+#define MAX_STEER_RPM MAX_RPM * 0.5f * 0.65f
 
 #define PARM_LPF_CUTOFF_FREQ_VELOCITY 5.0f
 #define PARM_LPF_CUTOFF_FREQ_STEER 5.0f

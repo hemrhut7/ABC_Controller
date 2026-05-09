@@ -77,7 +77,7 @@ void HAL_Motor::update_rpm(float dt) {
 }
 
 void HAL_Motor::set_target_rpm(float target_rpm) {
-    target_rpm = constrain(target_rpm, -MAX_MOTOR_RPM, MAX_MOTOR_RPM);
+    target_rpm = constrain(target_rpm, -MAX_RPM, MAX_RPM);
     if (last_target_rpm - target_rpm > MAX_MOTOR_DELTA_RPM) {
         target_rpm = last_target_rpm - MAX_MOTOR_DELTA_RPM;
     } else if (target_rpm - last_target_rpm > MAX_MOTOR_DELTA_RPM) {

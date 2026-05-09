@@ -4,6 +4,7 @@
 #include <driver/pcnt.h>
 #include "pid.h"
 #include "LPF.h"
+#include "config.h"
 
 
 constexpr int PPR = 500;           // 每轉脈衝數 (300線)
@@ -20,7 +21,6 @@ constexpr int MAX_PWM_DUTY = (1 << PWM_RES) - 1; // 1023
 #define MOTOR_DEADZONE 55
 #define MOTOR_DITHER 40
 #define MOTOR_KV       0.3525f
-#define MAX_MOTOR_RPM 160
 #define MAX_MOTOR_RPM_RATE 2500
 
 #define MOTOR_L_DIR1_PIN    5
