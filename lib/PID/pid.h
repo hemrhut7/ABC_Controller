@@ -12,13 +12,13 @@ class PID {
         void setTunings(float kp, float ki, float kd);
         void setOutputLimits(float max_output) { this->max_output = max_output; }
         void setRamp(float ramp) { this->ramp = ramp; }
-        void reset() { lastError = 0; integral = 0; lastTime = 0; lastInput = 0; lastTarget = 0; hasPrevSample = false; }
+        void reset() { lastError = 0; integral = 0; lastTime = 0; lastInput = 0; lastTarget = 0; max_i = 0; hasPrevSample = false; }
         float compute(float target, float current);
         float compute(float dt, float target, float current);
         float compute(float dt, float target, float current, float derivative);
 
     private:
-        float kp = 1, ki = 1/200, kd = 0.1;
+        float kp = 1, ki = 1.0f/200.0f, kd = 0.1;
         float lastError = 0;
         float lastInput = 0;
         float lastTarget = 0;

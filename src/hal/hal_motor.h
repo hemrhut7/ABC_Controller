@@ -20,7 +20,7 @@ constexpr int MAX_PWM_DUTY = (1 << PWM_RES) - 1; // 1023
 
 #define MOTOR_DEADZONE 55
 #define MOTOR_DITHER 40
-#define MOTOR_KV       0.3525f
+#define MOTOR_KV       0.37605f
 #define MAX_MOTOR_RPM_RATE 2500
 
 enum MotorPosition {

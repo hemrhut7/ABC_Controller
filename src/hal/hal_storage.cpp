@@ -1,5 +1,7 @@
 #include "hal_storage.h"
+#include "config.h"
 #include <math.h>
+
 
 ConfigStore::ConfigStore() {
     // 建構子不執行硬體操作
@@ -15,12 +17,12 @@ void ConfigStore::begin() {
 void ConfigStore::reset_defaults() {
     data.magic_number = CONFIG_MAGIC;
 
-    // 設定預設 PID 參數
-    data.motor = {1.0f, 5.0f, 0.0f};
-    data.pitch = {12.0f, 0.0f, 0.5f};
-    data.rate  = {1.5f, 8.0f, 0.04f};
-    data.steer   = {2.0f, 0.0f, 0.0f};
-    data.velocity = {0.1f, 0.01f, 0.0f};
+    // 設定預設 PID 參數 (從 config.h 讀取)
+    data.motor = {PARM_PID_KP_MOTOR, PARM_PID_KI_MOTOR, PARM_PID_KD_MOTOR};
+    data.pitch = {PARM_PID_KP_ANGLE, PARM_PID_KI_ANGLE, PARM_PID_KD_ANGLE};
+    data.rate  = {1.5f, 8.0f, 0.04f}; // Note: config.h didn't have RATE defaults visible, but others are critical
+    data.steer   = {PARM_PID_KP_STEER, PARM_PID_KI_STEER, PARM_PID_KD_STEER};
+    data.velocity = {PARM_PID_KP_VELOCITY, PARM_PID_KI_VELOCITY, PARM_PID_KD_VELOCITY};
 
     save_config(); // 寫入預設值
 }
