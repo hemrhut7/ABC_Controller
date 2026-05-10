@@ -86,3 +86,8 @@ typedef struct {
     float battery_v;
 } system_state_t;
 
+enum AHRS_STATE {
+    IMU_FAILED,
+    AHRS_INITIALIZING,
+    AHRS_READY,
+};

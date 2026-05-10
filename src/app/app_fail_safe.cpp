@@ -12,7 +12,7 @@ void Failsafe::init() {
     last_check_time = 0;
 }
 
-bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready, Mode_t current_mode) {
+bool Failsafe::check(const ahrs_data_t &ahrs_data, AHRS_STATE ahrs_state, Mode_t current_mode) {
     motor_state_t motor_state;
     _motor->get_motor_state(&motor_state);
 
@@ -37,7 +37,9 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready, Mode_t curre
     loop_time_ms = dt;
 
     // 檢查 AHRS
-    if (!ahrs_ready) {
+    if (ahrs_state == IMU_FAILED) {
+        current_error_state = min(current_error_state, FS_ERROR_IMU_FAILED);
+    } else if (ahrs_state == AHRS_INITIALIZING) {
         current_error_state = min(current_error_state, FS_ERROR_AHRS_UNREADY);
     }
 

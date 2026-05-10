@@ -168,6 +168,7 @@ const char* HAL_Display::mode_to_str(Mode_t mode) {
 const char* HAL_Display::error_to_str(failsafe_error_t error) {
     switch (error) {
         case FS_ERROR_LOOP_SLOW:     return "LOOP SLOW";
+        case FS_ERROR_IMU_FAILED:    return "IMU FAILED";
         case FS_ERROR_AHRS_UNREADY:  return "AHRS CALIB";
         case FS_ERROR_CRITICAL_ANGLE:return "TILT ERROR";
         case FS_ERROR_PICKUP_DETECTED:return "PICKUP";

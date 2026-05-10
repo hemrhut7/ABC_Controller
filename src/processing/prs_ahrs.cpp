@@ -15,12 +15,17 @@ bool Processing_AHRS::init()
     hal_imu_init();
     last_time = micros();
     is_stable = false;
-    return hal_imu_healthy();
+    bool imu_healthy = hal_imu_healthy();
+    ahrs_state = imu_healthy ? AHRS_INITIALIZING : IMU_FAILED;
+    return imu_healthy;
 }
 
 void Processing_AHRS::update()
 {
-    if (!hal_imu_healthy()) return;
+    if (!hal_imu_healthy()) {
+        ahrs_state = IMU_FAILED;
+        return;
+    }
     hal_imu_read(&ahrs_data.imu_data);
     const uint64_t now = ahrs_data.imu_data.timestamp;
 
@@ -44,6 +49,7 @@ void Processing_AHRS::update()
 
     cpf.update(ahrs_data.imu_data.gyro, ahrs_data.imu_data.accl, dt);
     cpf.getEuler(ahrs_data.euler);
+    if (cpf.is_ready()) ahrs_state = AHRS_READY;
 
     float bias[3];
     cpf.getBias(bias);

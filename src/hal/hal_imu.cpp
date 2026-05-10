@@ -24,6 +24,8 @@ namespace {
     constexpr float kAccelScale = (8.0f / 32768.0f) * 9.80665f; // to m/s^2
     constexpr float kGyroScale = (512.0f / 32768.0f) * DEG_TO_RAD; // to rad/s
 
+    static bool is_initialized = false;
+
     bool writeReg(uint8_t reg, uint8_t val) {
         Wire.beginTransmission(kImuAddress);
         Wire.write(reg);
@@ -53,7 +55,6 @@ namespace {
         return Wire.read();
     }
 }
-static bool is_initialized = false;
 
 // Accelerometer Calibration Parameters
 // Matrix R
@@ -150,13 +151,24 @@ void hal_imu_read(imu_data_t *data) {
     // Use readReg directly to avoid overhead, but ensure it doesn't block
     bool success = false;
     uint8_t status = readReg(kQmiStatus0Reg, &success);
-    if (!success || !(status & 0x03)) return; // No new data or error
+    if (!success) {
+        is_initialized = false; // Mark IMU unhealthy on bus/read failure.
+        return;
+    }
+    if (!(status & 0x03)) return; // No new data
 
     // Read 14 bytes: temp(2) + accel(6) + gyro(6)
     Wire.beginTransmission(kImuAddress);
     Wire.write(kQmiTempLowReg);
-    Wire.endTransmission(false);
-    Wire.requestFrom(kImuAddress, (uint8_t)14);
+    if (Wire.endTransmission(false) != 0) {
+        is_initialized = false;
+        return;
+    }
+    uint8_t count = Wire.requestFrom(kImuAddress, (uint8_t)14);
+    if (count != 14) {
+        is_initialized = false;
+        return;
+    }
 
     uint8_t buf[14];
     for (int i = 0; i < 14; i++) buf[i] = Wire.read();

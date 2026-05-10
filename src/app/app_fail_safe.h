@@ -8,6 +8,7 @@
 
 typedef enum {
     FS_ERROR_LOOP_SLOW,
+    FS_ERROR_IMU_FAILED,
     FS_ERROR_AHRS_UNREADY,
     FS_ERROR_CRITICAL_ANGLE,
     FS_ERROR_PICKUP_DETECTED,
@@ -21,7 +22,7 @@ public:
     Failsafe(uint16_t period_ms, Processing_Motor* motor, HAL_LED* led, set_pending_mode_fn set_pending_mode_cb);
 
     void init();
-    bool check(const ahrs_data_t &ahrs_data, bool ahrs_ready, Mode_t current_mode);
+    bool check(const ahrs_data_t &ahrs_data, AHRS_STATE ahrs_state, Mode_t current_mode);
 
     uint32_t get_loop_time_ms() { return loop_time_ms; }
     uint16_t get_delay_count() { return delay_counter; }
