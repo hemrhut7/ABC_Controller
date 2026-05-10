@@ -133,11 +133,9 @@ void hal_imu_read(imu_data_t *data) {
     data->temp = (float)t_raw / 256.0f;
 
     // Map raw data to m/s^2 and rad/s
-    // Note: We keep the sign flip logic from MPU6050 if axes align similarly
-    // Previous logic: ax=-ax, ay=ay, az=-az
-    float raw_x = -(float)ax_raw * kAccelScale;
-    float raw_y = (float)ay_raw * kAccelScale;
-    float raw_z = -(float)az_raw * kAccelScale;
+    float raw_x = (float)ax_raw * kAccelScale;
+    float raw_y = (float)az_raw * kAccelScale;
+    float raw_z = -(float)ay_raw * kAccelScale;
 
     data->accl[0] = ACC_CAL_R00 * raw_x + ACC_CAL_R01 * raw_y + ACC_CAL_R02 * raw_z + ACC_CAL_B0;
     data->accl[1] = ACC_CAL_R10 * raw_x + ACC_CAL_R11 * raw_y + ACC_CAL_R12 * raw_z + ACC_CAL_B1;

@@ -12,7 +12,7 @@ void Failsafe::init() {
     last_check_time = 0;
 }
 
-bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready) {
+bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready, Mode_t current_mode) {
     motor_state_t motor_state;
     _motor->get_motor_state(&motor_state);
 
@@ -23,12 +23,14 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready) {
     float rpm_r = motor_state.rpm_R;
 
     failsafe_error_t current_error_state = FS_ERROR_NONE;
+    const bool is_manual_mode = (current_mode == MODE_PWM || current_mode == MODE_MOTOR);
+
     // 檢查迴圈性能
     uint32_t current_time_ms = millis();
     uint32_t dt = current_time_ms - last_check_time;
     if (last_check_time != 0 && dt > MAX_LOOP_TIME_MS) {
         current_error_state = min(current_error_state, FS_ERROR_LOOP_SLOW);
-        if (_set_pending_mode_cb) _set_pending_mode_cb(MODE_FREE);
+        if (_set_pending_mode_cb && !is_manual_mode) _set_pending_mode_cb(MODE_FREE);
         delay_counter++;
     }
     last_check_time = current_time_ms;
@@ -42,7 +44,7 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready) {
     // 倒地偵測
     if (fabsf(pitch_rad) > CRITICAL_ANGLE_RAD || fabsf(roll_rad) > CRITICAL_ANGLE_RAD) {
         current_error_state = min(current_error_state, FS_ERROR_CRITICAL_ANGLE);
-        if (_set_pending_mode_cb) _set_pending_mode_cb(MODE_FREE);
+        if (_set_pending_mode_cb && !is_manual_mode) _set_pending_mode_cb(MODE_FREE);
     } else if (error_state == FS_ERROR_CRITICAL_ANGLE && fabsf(pitch_rad) > RECOVERY_ANGLE_RAD) {
         current_error_state = min(current_error_state, FS_ERROR_CRITICAL_ANGLE);
     }
@@ -67,5 +69,6 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data, bool ahrs_ready) {
         break;
     }
 
+    if (is_manual_mode) return true; // Manual modes bypass disarm return value
     return error_state == FS_ERROR_NONE;
 }

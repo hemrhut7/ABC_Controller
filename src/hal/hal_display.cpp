@@ -10,7 +10,7 @@ void HAL_Display::init() {
     
     // Arduino_ST7789(Arduino_DataBus *bus, int8_t rst, uint8_t rotation, bool ips, int16_t w, int16_t h)
     // Rotation = 1 (Landscape, 320x240)
-    _gfx = new Arduino_ST7789(bus, -1 /* RST */, 1 /* rotation */, true /* IPS */, _w, _h);
+    _gfx = new Arduino_ST7789(bus, -1 /* RST */, 3 /* rotation */, true /* IPS */, _w, _h);
 
     if (!_gfx->begin()) {
         Serial.println(F("[DISPLAY] ST7789 GFX failed"));
@@ -35,7 +35,7 @@ void HAL_Display::init() {
     _gfx->println(F("S3-LCD-2 Migration..."));
 }
 
-void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery_v, int delay_count) {
+void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery_v, int delay_count, failsafe_error_t error_state) {
     if (!_connected) return;
 
     // Dirty check
@@ -43,6 +43,7 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
     if (!force_redraw
      && current_mode == _last_current_mode 
      && pending_mode == _last_pending_mode
+     && error_state == _last_error_state
      && abs(battery_v - _last_battery_v) < 0.05f
      && delay_count == _last_delay_count) {
         return;
@@ -92,11 +93,23 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
         }
     }
 
+    // Error Message Area
+    if (force_redraw || error_state != _last_error_state) {
+        _gfx->fillRect(10, 80, 300, 20, BLACK);
+        if (error_state != FS_ERROR_NONE) {
+            _gfx->setTextSize(2);
+            _gfx->setCursor(10, 80);
+            _gfx->setTextColor(RED);
+            _gfx->print(F("ERR: "));
+            _gfx->print(error_to_str(error_state));
+        }
+    }
+
     // Dynamic Battery Info
     if (force_redraw || abs(battery_v - _last_battery_v) >= 0.05f) {
-        _gfx->fillRect(10, 100, 300, 40, BLACK); // Clear battery area
+        _gfx->fillRect(10, 110, 300, 40, BLACK); // Clear battery area (moved down slightly)
         _gfx->setTextSize(4);
-        _gfx->setCursor(10, 100);
+        _gfx->setCursor(10, 110);
         if (battery_v < 11.0f) _gfx->setTextColor(RED);
         else if (battery_v < 11.5f) _gfx->setTextColor(ORANGE);
         else _gfx->setTextColor(GREEN);
@@ -132,6 +145,7 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
 
     _last_current_mode = current_mode;
     _last_pending_mode = pending_mode;
+    _last_error_state = error_state;
     _last_battery_v = battery_v;
     _last_delay_count = delay_count;
 }
@@ -162,5 +176,15 @@ const char* HAL_Display::mode_to_str(Mode_t mode) {
         case MODE_VELOCITY: return "VELOCITY";
         case MODE_REMOTE:   return "REMOTE";
         default:            return "???";
+    }
+}
+
+const char* HAL_Display::error_to_str(failsafe_error_t error) {
+    switch (error) {
+        case FS_ERROR_LOOP_SLOW:     return "LOOP SLOW";
+        case FS_ERROR_AHRS_UNREADY:  return "AHRS CALIB";
+        case FS_ERROR_CRITICAL_ANGLE:return "TILT ERROR";
+        case FS_ERROR_PICKUP_DETECTED:return "PICKUP";
+        default:                     return "NONE";
     }
 }

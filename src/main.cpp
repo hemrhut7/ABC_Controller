@@ -92,7 +92,7 @@ void Control_Task(void *pvParameters) {
 
     app_mode.update(dt, current_sys_state.abc_state.ahrs_data);
 
-    if (!failsafe.check(current_sys_state.abc_state.ahrs_data, ahrs.is_ready())) {
+    if (!failsafe.check(current_sys_state.abc_state.ahrs_data, ahrs.is_ready(), app_mode.get_mode())) {
       app_mode.set_mode(MODE_FREE);
 
       if (failsafe.get_error_state() == FS_ERROR_LOOP_SLOW) {
@@ -141,7 +141,7 @@ void Comm_Task(void *pvParameters) {
 
     // system display: LED, Monitor
     system_led.update();
-    system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_delay_count());
+    system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_delay_count(), failsafe.get_error_state());
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
