@@ -9,7 +9,7 @@ public:
     Processing_AHRS(uint32_t period_ms);
     ~Processing_AHRS();
 
-    void init();
+    bool init();
     void update();
     void reset_att() { should_reset_att = true; }
     void get_ahrs_data(ahrs_data_t *data);

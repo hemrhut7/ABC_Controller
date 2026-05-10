@@ -178,7 +178,9 @@ void setup() {
   Serial2.begin(115200, SERIAL_8N1, UART2_RX_PIN, UART2_TX_PIN);
 
   config_store.begin();
-  ahrs.init();
+  if (!ahrs.init()) {
+    Serial.println("WARNING: AHRS initialization failed! System will run in degraded mode (no attitude control).");
+  }
   motor.init();
   uart_telemetry.init(1000 / PERIOD_COMM);
   uart1_telemetry.init(1000 / PERIOD_COMM);

@@ -10,11 +10,12 @@ Processing_AHRS::~Processing_AHRS() {
     // Destructor
 }
 
-void Processing_AHRS::init()
+bool Processing_AHRS::init()
 {
     hal_imu_init();
     last_time = micros();
     is_stable = false;
+    return hal_imu_healthy();
 }
 
 void Processing_AHRS::update()

@@ -24,18 +24,32 @@ namespace {
     constexpr float kAccelScale = (8.0f / 32768.0f) * 9.80665f; // to m/s^2
     constexpr float kGyroScale = (512.0f / 32768.0f) * DEG_TO_RAD; // to rad/s
 
-    void writeReg(uint8_t reg, uint8_t val) {
+    bool writeReg(uint8_t reg, uint8_t val) {
         Wire.beginTransmission(kImuAddress);
         Wire.write(reg);
         Wire.write(val);
-        Wire.endTransmission();
+        byte error = Wire.endTransmission();
+        if (error != 0 && is_initialized) {
+             // Only print if we were already running, to avoid spam during search
+             // Serial.printf("I2C Write Error: %d at reg 0x%02X\n", error, reg);
+        }
+        return (error == 0);
     }
 
-    uint8_t readReg(uint8_t reg) {
+    uint8_t readReg(uint8_t reg, bool *success = nullptr) {
         Wire.beginTransmission(kImuAddress);
         Wire.write(reg);
-        Wire.endTransmission(false);
-        Wire.requestFrom(kImuAddress, (uint8_t)1);
+        byte error = Wire.endTransmission(false);
+        if (error != 0) {
+            if (success) *success = false;
+            return 0;
+        }
+        uint8_t count = Wire.requestFrom(kImuAddress, (uint8_t)1);
+        if (count == 0) {
+            if (success) *success = false;
+            return 0;
+        }
+        if (success) *success = true;
         return Wire.read();
     }
 }
@@ -78,27 +92,51 @@ void hal_imu_init() {
         Serial.println("Failed to initialize I2C bus");
         return;
     }
+    Wire.setTimeOut(10); // 10ms timeout to prevent hanging
     
-    // Check WHO_AM_I
-    uint8_t whoAmI = readReg(kQmiWhoAmIReg);
-    if (whoAmI != kQmiWhoAmIValue) {
-        Serial.printf("QMI8658 not found! WHO_AM_I=0x%02X\n", whoAmI);
+    Serial.println("IMU: Searching for QMI8658...");
+    
+    // Check WHO_AM_I with retries
+    uint8_t whoAmI = 0;
+    bool found = false;
+    for (int i = 0; i < 5; i++) {
+        bool success = false;
+        whoAmI = readReg(kQmiWhoAmIReg, &success);
+        if (success && whoAmI == kQmiWhoAmIValue) {
+            found = true;
+            break;
+        }
+        Serial.printf("IMU: WHO_AM_I check failed (attempt %d/5), got 0x%02X\n", i+1, whoAmI);
+        delay(50);
+    }
+
+    if (!found) {
+        Serial.printf("QMI8658 not found! Final WHO_AM_I=0x%02X\n", whoAmI);
         return;
     }
 
     // Reset
-    writeReg(kQmiResetReg, 0xB0);
-    delay(20);
+    if (!writeReg(kQmiResetReg, 0xB0)) {
+        Serial.println("IMU: Reset command failed");
+        return;
+    }
+    delay(50); // Give it some time to reset
 
     // Config
-    writeReg(kQmiCtrl1Reg, 0x40); // Address auto-increment
-    writeReg(kQmiCtrl2Reg, kCtrl2Accel8gOdr2000Hz);
-    writeReg(kQmiCtrl3Reg, kCtrl3Gyro512dpsOdr2000Hz);
-    writeReg(kQmiCtrl5Reg, kCtrl5Lpf106Hz);
-    writeReg(kQmiCtrl7Reg, 0x03); // Enable accel and gyro
+    bool ok = true;
+    ok &= writeReg(kQmiCtrl1Reg, 0x40); // Address auto-increment
+    ok &= writeReg(kQmiCtrl2Reg, kCtrl2Accel8gOdr2000Hz);
+    ok &= writeReg(kQmiCtrl3Reg, kCtrl3Gyro512dpsOdr2000Hz);
+    ok &= writeReg(kQmiCtrl5Reg, kCtrl5Lpf106Hz);
+    ok &= writeReg(kQmiCtrl7Reg, 0x03); // Enable accel and gyro
+
+    if (!ok) {
+        Serial.println("IMU: Configuration failed");
+        return;
+    }
 
     is_initialized = true;
-    Serial.println("QMI8658 initialized");
+    Serial.println("QMI8658 initialized successfully");
 }
 
 bool hal_imu_healthy() {
@@ -109,7 +147,10 @@ void hal_imu_read(imu_data_t *data) {
     if (!is_initialized) return;
 
     // Read status
-    if (!(readReg(kQmiStatus0Reg) & 0x03)) return; // No new data, remove status check if it makes system blocked
+    // Use readReg directly to avoid overhead, but ensure it doesn't block
+    bool success = false;
+    uint8_t status = readReg(kQmiStatus0Reg, &success);
+    if (!success || !(status & 0x03)) return; // No new data or error
 
     // Read 14 bytes: temp(2) + accel(6) + gyro(6)
     Wire.beginTransmission(kImuAddress);
