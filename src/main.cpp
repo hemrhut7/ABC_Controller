@@ -175,7 +175,7 @@ void setup() {
   // Serial1 (Telemetry/Script)
   Serial1.begin(230400, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
   // Serial2 (Sensor RX only)
-  Serial2.begin(115200, SERIAL_8N1, UART2_RX_PIN, -1);
+  Serial2.begin(115200, SERIAL_8N1, UART2_RX_PIN, UART2_TX_PIN);
 
   config_store.begin();
   ahrs.init();

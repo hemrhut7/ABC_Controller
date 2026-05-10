@@ -278,24 +278,25 @@
 
 ```
 ┌───────────────────────────────────────────────────┐
-│  P1 (Left Row)           P2 (Right Row)           │
-│  Pin 1:  IO2  ← L_PWM       3V3                  │
-│  Pin 2:  IO4  ← L_DIR1      GND                  │
-│  Pin 3:  IO6  ← L_DIR2      IO43 ← UART1 TX      │
-│  Pin 4:  IO16 ← L_ENC_A     IO44 ← UART1 RX      │
-│  Pin 5:  IO17 ← L_ENC_B     IO47   (IMU_SCL)      │
-│  Pin 6:  IO18 ← STBY        IO48   (IMU_SDA)      │
-│  Pin 7:  IO21 ← UART2 RX    IO15 ← R_PWM          │
-│  Pin 8:  IO7  (free)        IO13 ← R_DIR1          │
-│  Pin 9:  IO8  (free)        IO11 ← R_DIR2          │
-│  Pin 10: IO10 (free)        IO12 ← R_ENC_A         │
-│  Pin 11: IO20 (USB_P ⚠)     IO14 ← R_ENC_B         │
-│  Pin 12: IO19 (USB_N ⚠)     IO9  (free)            │
-│  Pin 13: GND                GND                    │
-│  Pin 14: 5V                 VBAT                   │
+│  P1 (Left Row)              P2 (Right Row)        │
+│  Pin 1:  IO2  ← L_ENC_B     3V3                   │
+│  Pin 2:  IO4  ← L_ENC_A     GND                   │
+│  Pin 3:  IO6  ← ADC_BAT     IO43 ← UART1_TX       │
+│  Pin 4:  IO16 ← R_PWM       IO44 ← UART1_RX       │
+│  Pin 5:  IO17 ← R_DIR2      IO47 ← IMU_SCL        │
+│  Pin 6:  IO18 ← R_DIR1      IO48 ← IMU_SDA        │
+│  Pin 7:  IO21 ← STBY        IO15 ← R_ENC_B        │
+│  Pin 8:  IO8  ← L_DIR1      IO13 ← R_ENC_A        │
+│  Pin 9:  IO7  ← L_DIR2      IO11 ← UART2_TX       │
+│  Pin 10: IO10 ← L_PWM       IO12 ← UART2_RX       │
+│  Pin 11: IO20 (USB_P!)      IO14 ← (free)         │
+│  Pin 12: IO19 (USB_N!)      IO9  ← (free)         │
+│  Pin 13: GND                GND                   │
+│  Pin 14: 5V                 VBAT                  │
 └───────────────────────────────────────────────────┘
+
 ⚠ IO19/IO20 = USB D-/D+, 啟用 USB CDC 時不可使用
-Free: IO7, IO8, IO10 (P1) / IO9 (P2) 可供未來擴充
+Free: IO14, IO9可供未來擴充
 ```
 
 > [!IMPORTANT]
