@@ -4,7 +4,7 @@
 
 #include "config.h"
 
-#define BAT_V_FACTOR  0.002417f
+#define BAT_V_FACTOR  0.010466f
 
 class HAL_Battery {
 public:
