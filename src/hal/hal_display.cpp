@@ -113,7 +113,7 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
         if (battery_v < 11.0f) _gfx->setTextColor(RED);
         else if (battery_v < 11.5f) _gfx->setTextColor(ORANGE);
         else _gfx->setTextColor(GREEN);
-        _gfx->print(battery_v, 2);
+        _gfx->print(battery_v, 1);
         _gfx->print(F(" V"));
     }
 

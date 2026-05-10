@@ -4,7 +4,8 @@
 
 #include "config.h"
 
-#define BAT_V_FACTOR  0.010466f
+#define BAT_V_SLOPE   0.03136f
+#define BAT_V_OFFSET  -28.14f
 
 class HAL_Battery {
 public:
@@ -13,7 +14,7 @@ public:
      * @param pin ADC pin to read from
      * @param factor Calibration factor (V = raw * factor)
      */
-    HAL_Battery(uint8_t pin = BAT_ADC_PIN, float factor = BAT_V_FACTOR);
+    HAL_Battery(uint8_t pin = BAT_ADC_PIN, float slope = BAT_V_SLOPE, float offset = BAT_V_OFFSET);
 
     /**
      * @brief Initialize the ADC pin
@@ -34,7 +35,8 @@ public:
 
 private:
     uint8_t _pin;
-    float _factor;
+    float _slope;
+    float _offset;
     float _voltage = 0.0f;
     float _alpha = 0.01f; // LPF alpha, lower = smoother
 };
