@@ -141,7 +141,7 @@ void Comm_Task(void *pvParameters) {
 
     // system display: LED, Monitor
     system_led.update();
-    system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_delay_count(), failsafe.get_error_state());
+    system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_error_state());
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }

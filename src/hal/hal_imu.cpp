@@ -57,35 +57,35 @@ static bool is_initialized = false;
 
 // Accelerometer Calibration Parameters
 // Matrix R
-constexpr float ACC_CAL_R00 = 1.00219466f;
-constexpr float ACC_CAL_R01 = -0.01182011f;
-constexpr float ACC_CAL_R02 = -0.05202197f;
-constexpr float ACC_CAL_R10 = -0.00749989f;
-constexpr float ACC_CAL_R11 = 0.99577523f;
-constexpr float ACC_CAL_R12 = 0.00332870f;
-constexpr float ACC_CAL_R20 = 0.04590206f;
-constexpr float ACC_CAL_R21 = -0.00101295f;
-constexpr float ACC_CAL_R22 = 0.97995910f;
+constexpr float ACC_CAL_R00 = 0.9996914216f;
+constexpr float ACC_CAL_R01 = -0.0308126859f;
+constexpr float ACC_CAL_R02 = 0.0510088819f;
+constexpr float ACC_CAL_R10 = 0.0164932456f;
+constexpr float ACC_CAL_R11 = 1.0006602403f;
+constexpr float ACC_CAL_R12 = 0.0134431725f;
+constexpr float ACC_CAL_R20 = -0.0312931478f;
+constexpr float ACC_CAL_R21 = -0.0294243653f;
+constexpr float ACC_CAL_R22 = 1.028111305f;
 // Bias Vector
-constexpr float ACC_CAL_B0  = 0.16521701f;
-constexpr float ACC_CAL_B1  = 0.04923417f;
-constexpr float ACC_CAL_B2  = 0.14537917f;
+constexpr float ACC_CAL_B0  = -0.720579444f;
+constexpr float ACC_CAL_B1  = -0.2742577706f;
+constexpr float ACC_CAL_B2  = 0.5614902379f;
 
 // Gyroscope Calibration Parameters
 // Matrix R
-constexpr float GYRO_CAL_R00 = 0.99891562f;
-constexpr float GYRO_CAL_R01 = -0.00027220f;
-constexpr float GYRO_CAL_R02 = -0.04655650f;
-constexpr float GYRO_CAL_R10 = 0.00037159f;
-constexpr float GYRO_CAL_R11 = 0.99999767f;
-constexpr float GYRO_CAL_R12 = 0.00212622f;
-constexpr float GYRO_CAL_R20 = 0.04655582f;
-constexpr float GYRO_CAL_R21 = -0.00214122f;
-constexpr float GYRO_CAL_R22 = 0.99891340f;
+constexpr float GYRO_CAL_R00 = 0.998848f;
+constexpr float GYRO_CAL_R01 = -0.024033f;
+constexpr float GYRO_CAL_R02 = 0.041541f;
+constexpr float GYRO_CAL_R10 = 0.023254f;
+constexpr float GYRO_CAL_R11 = 0.999546f;
+constexpr float GYRO_CAL_R12 = 0.019138f;
+constexpr float GYRO_CAL_R20 = -0.041982f;
+constexpr float GYRO_CAL_R21 = -0.018150f;
+constexpr float GYRO_CAL_R22 = 0.998954f;
 // Bias Vector
-constexpr float GYRO_CAL_B0  = 0.02105;
-constexpr float GYRO_CAL_B1  = 0.01105;
-constexpr float GYRO_CAL_B2  = -0.01655f;
+constexpr float GYRO_CAL_B0  = -0.02208f;
+constexpr float GYRO_CAL_B1  = 0.02572f;
+constexpr float GYRO_CAL_B2  = 0.02238f;
 
 void hal_imu_init() {
     if (!Wire.begin(IMU_SDA_PIN, IMU_SCL_PIN, 400000)) {
@@ -182,9 +182,9 @@ void hal_imu_read(imu_data_t *data) {
     data->accl[1] = ACC_CAL_R10 * raw_x + ACC_CAL_R11 * raw_y + ACC_CAL_R12 * raw_z + ACC_CAL_B1;
     data->accl[2] = ACC_CAL_R20 * raw_x + ACC_CAL_R21 * raw_y + ACC_CAL_R22 * raw_z + ACC_CAL_B2;
 
-    float raw_gx = -(float)gx_raw * kGyroScale;
-    float raw_gy = (float)gy_raw * kGyroScale;
-    float raw_gz = -(float)gz_raw * kGyroScale;
+    float raw_gx = (float)gx_raw * kGyroScale;
+    float raw_gy = (float)gz_raw * kGyroScale;
+    float raw_gz = -(float)gy_raw * kGyroScale;
 
     data->gyro[0] = GYRO_CAL_R00 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R01 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R02 * (raw_gz - GYRO_CAL_B2);
     data->gyro[1] = GYRO_CAL_R10 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R11 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R12 * (raw_gz - GYRO_CAL_B2);

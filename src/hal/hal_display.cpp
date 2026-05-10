@@ -35,7 +35,7 @@ void HAL_Display::init() {
     _gfx->println(F("S3-LCD-2 Migration..."));
 }
 
-void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery_v, int delay_count, failsafe_error_t error_state) {
+void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery_v, failsafe_error_t error_state) {
     if (!_connected) return;
 
     // Dirty check
@@ -44,8 +44,7 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
      && current_mode == _last_current_mode 
      && pending_mode == _last_pending_mode
      && error_state == _last_error_state
-     && abs(battery_v - _last_battery_v) < 0.05f
-     && delay_count == _last_delay_count) {
+     && abs(battery_v - _last_battery_v) < 0.05f) {
         return;
     }
 
@@ -64,11 +63,7 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
         _gfx->setTextColor(DARKGREY);
         _gfx->print(F("Pending: "));
 
-        // Static Delay label
-        _gfx->setTextSize(2);
-        _gfx->setCursor(10, 160);
-        _gfx->setTextColor(WHITE);
-        _gfx->print(F("Loop Delay: "));
+
 
         _layout_drawn = true;
     }
@@ -117,15 +112,7 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
         _gfx->print(F(" V"));
     }
 
-    // Dynamic Delay Info
-    if (force_redraw || delay_count != _last_delay_count) {
-        _gfx->fillRect(160, 160, 100, 20, BLACK); // Clear delay value area
-        _gfx->setTextSize(2);
-        _gfx->setCursor(160, 160);
-        _gfx->setTextColor(WHITE);
-        _gfx->print(delay_count);
-        _gfx->print(F(" ms"));
-    }
+
 
     // Status Indicator (Virtual LED)
     if (force_redraw || current_mode != _last_current_mode) {
@@ -147,7 +134,6 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
     _last_pending_mode = pending_mode;
     _last_error_state = error_state;
     _last_battery_v = battery_v;
-    _last_delay_count = delay_count;
 }
 
 void HAL_Display::show_message(const char* line1, const char* line2) {

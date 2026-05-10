@@ -225,7 +225,7 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
     } else {
       const char *ramp_names[] = {"PITCH", "VELOCITY"};
       for (int i = 0; i < PARAM_RAMP_ID_COUNT; i++) {
-        float val = _app_mode->get_ramp((PARAM_RAMP_id_t)i);
+        float val = _app_mode->get_ramp((PARAM_RAMP_id_t)id);
         const char *unit = "";
         if (i == PARAM_RAMP_PITCH) {
           val *= RAD_TO_DEG;
