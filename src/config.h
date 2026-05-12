@@ -1,10 +1,5 @@
 #pragma once
 
-// if enable BT_SERIAL, framework-arduinoespressif32 @ symlink://C:/PIO_Cores/esp32-bluepad32-4.1.0 in the platformio.ini should be commented
-#define HAS_BT_SERIAL 0
-#define HAS_BLUEPAD32 0
-#define HAS_WIFI_SERIAL 1
-
 // --- ESP32-S3-LCD-2 Pin Mapping ---
 // Based on SchDoc: P1 (Left Row) / P2 (Right Row) physical header layout
 //
@@ -92,7 +87,7 @@
 #define PARM_PID_KD_ANGLE 15.0f
 
 #define PARM_PID_KP_VELOCITY 0.3f
-#define PARM_PID_KI_VELOCITY 0.1f
+#define PARM_PID_KI_VELOCITY 0.2f
 #define PARM_PID_KD_VELOCITY 0.03f
 
 #define PARM_PID_KP_STEER 1.0f
