@@ -50,8 +50,8 @@
 // UART Interfaces
 #define UART1_TX_PIN       43      // P2 Pin 3
 #define UART1_RX_PIN       44      // P2 Pin 4
-#define UART2_TX_PIN       11      // P2 Pin 9
-#define UART2_RX_PIN       12      // P2 Pin 10
+#define UART2_TX_PIN       12      // P2 Pin 9
+#define UART2_RX_PIN       11      // P2 Pin 10
 // ---------------------------------
 
 #define WIFI_SSID "TP-Link_E428"

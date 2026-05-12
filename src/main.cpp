@@ -228,17 +228,17 @@ void setup() {
   system_battery.init();
   app_mode.set_mode(MODE_FREE);
 
-  xTaskCreatePinnedToCore(Control_Task, "ControlTask", 8192, NULL,
+  xTaskCreatePinnedToCore(Control_Task, "ControlTask", 12288, NULL,
                           PRIORITY_CONTROL, &ControlTaskHandle, 1);
 
   xTaskCreatePinnedToCore(UART1_Task, "UART1Task", 4096, NULL, PRIORITY_UART1,
                           &UART1TaskHandle, 0);
 
-  xTaskCreatePinnedToCore(Comm_Task, "CommTask", 4096, NULL, PRIORITY_COMM,
+  xTaskCreatePinnedToCore(Comm_Task, "CommTask", 8192, NULL, PRIORITY_COMM,
                           &CommTaskHandle, 0);
 
 #if HAS_BLUEPAD32
-  xTaskCreatePinnedToCore(HAL_Joystick::task_entry, "Gamepad_Task", 6144,
+  xTaskCreatePinnedToCore(HAL_Joystick::task_entry, "Gamepad_Task", 8192,
                           &joystick,
                           PRIORITY_GAMEPAD, &GamepadTaskHandle, 0);
 #endif
@@ -248,7 +248,7 @@ void setup() {
                           &WiFiTaskHandle, 0);
 #endif
 
-  xTaskCreatePinnedToCore(AppLidar::task_entry, "Lidar_Task", 8192, &app_lidar, 
+  xTaskCreatePinnedToCore(AppLidar::task_entry, "Lidar_Task", 16384, &app_lidar, 
                           PRIORITY_LIDAR, &LidarTaskHandle, 0);
 }
 

@@ -7,9 +7,9 @@ HAL_Display::HAL_Display(uint16_t w, uint16_t h)
 void HAL_Display::init() {
     // Arduino_ESP32SPI(int8_t dc, int8_t cs, int8_t sclk, int8_t mosi, int8_t miso)
     Arduino_DataBus *bus = new Arduino_ESP32SPI(LCD_DC_PIN, LCD_CS_PIN, LCD_SCLK_PIN, LCD_MOSI_PIN, LCD_MISO_PIN);
-    
+
     // Arduino_ST7789(Arduino_DataBus *bus, int8_t rst, uint8_t rotation, bool ips, int16_t w, int16_t h)
-    // Rotation = 1 (Landscape, 320x240)
+    // Rotation = 3 (Landscape, 320x240)
     _gfx = new Arduino_ST7789(bus, -1 /* RST */, 3 /* rotation */, true /* IPS */, _w, _h);
 
     if (!_gfx->begin()) {
