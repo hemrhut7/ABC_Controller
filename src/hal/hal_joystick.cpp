@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <math.h>
 
-#if !HAS_BT_SERIAL
+#if HAS_BLUEPAD32
 
 HAL_Joystick *HAL_Joystick::instance_ = nullptr;
 
@@ -92,13 +92,12 @@ void HAL_Joystick::update_gamepad() {
   uint32_t pressed_buttons = current_buttons & ~last_buttons_;
   last_buttons_ = current_buttons;
 
-  // connect in switch mode: X <-> Y,  A <-> B
-  if (pressed_buttons & BUTTON_Y) {
+  if (pressed_buttons & BUTTON_X) {
     app_mode_->enqueue_mode(MODE_FREE);
   } else if (pressed_buttons & BUTTON_B) {
-    app_mode_->enqueue_mode(MODE_ANGLE);
-  } else if (pressed_buttons & BUTTON_A) {
     app_mode_->enqueue_mode(MODE_REMOTE);
+  } else if (pressed_buttons & BUTTON_A) {
+    app_mode_->enqueue_mode(MODE_ANGLE);
   }
 
   float val = -apply_deadzone(normalize_axis(gamepad_->axisY()), deadzone_);
@@ -158,4 +157,4 @@ void HAL_Joystick::task_entry(void *pvParameters) {
   }
   joystick->task_loop();
 }
-#endif  // !HAS_BT_SERIAL
+#endif  // HAS_BLUEPAD32

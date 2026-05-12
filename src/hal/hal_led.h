@@ -11,13 +11,14 @@ typedef enum {
 
 class HAL_LED {
 public:
-    HAL_LED(uint8_t pin);
+    HAL_LED();
     void init();
     void on();
     void off();
     void toggle();
     void set_state(SYSTEM_STATE state);
     void update();
+    SYSTEM_STATE get_state() const { return current_state; }
 
 private:
     uint8_t pin;

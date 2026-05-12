@@ -134,33 +134,33 @@ void Telemetry::process_serial_outgoing() {
       port.write(send_buffer, sizeof(send_buffer));
     }
     else if (_format == FORMAT_LIDAR) {
-      // 1. Standard 18 floats
-      float data_packet[18];
-      data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
-      data_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
-      data_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
-      data_packet[3] = pkt.abc_state.ahrs_data.euler[2] * RAD_TO_DEG;
-      data_packet[4] = (float)pkt.abc_state.motor_state.rpm_L;
-      data_packet[5] = (float)pkt.abc_state.motor_state.rpm_R;
-      data_packet[6] = (float)pkt.abc_state.motor_state.pwm_out_L / (float)MAX_PWM_DUTY;
-      data_packet[7] = (float)pkt.abc_state.motor_state.pwm_out_R / (float)MAX_PWM_DUTY;
-      data_packet[8] = pkt.abc_state.velocity;
-      data_packet[9] = pkt.abc_state.ahrs_data.imu_data.gyro[0] * RAD_TO_DEG;
-      data_packet[10] = pkt.abc_state.ahrs_data.imu_data.gyro[1] * RAD_TO_DEG;
-      data_packet[11] = pkt.abc_state.ahrs_data.imu_data.gyro[2] * RAD_TO_DEG;
-      data_packet[12] = pkt.abc_state.ahrs_data.imu_data.accl[0];
-      data_packet[13] = pkt.abc_state.ahrs_data.imu_data.accl[1];
-      data_packet[14] = pkt.abc_state.ahrs_data.imu_data.accl[2];
-      data_packet[15] = (float)pkt.cmd.mode;
-      data_packet[16] = (float)pkt.delay_count;
-      data_packet[17] = pkt.battery_v;
-      
-      port.write((uint8_t*)data_packet, sizeof(data_packet));
-
-      // 2. Lidar point count
       if (!_lidar_updated || !_lidar_mutex) return;
-      
+
       if (xSemaphoreTake(_lidar_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+        // 1. Standard 18 floats
+        float data_packet[18];
+        data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
+        data_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
+        data_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
+        data_packet[3] = pkt.abc_state.ahrs_data.euler[2] * RAD_TO_DEG;
+        data_packet[4] = (float)pkt.abc_state.motor_state.rpm_L;
+        data_packet[5] = (float)pkt.abc_state.motor_state.rpm_R;
+        data_packet[6] = (float)pkt.abc_state.motor_state.pwm_out_L / (float)MAX_PWM_DUTY;
+        data_packet[7] = (float)pkt.abc_state.motor_state.pwm_out_R / (float)MAX_PWM_DUTY;
+        data_packet[8] = pkt.abc_state.velocity;
+        data_packet[9] = pkt.abc_state.ahrs_data.imu_data.gyro[0] * RAD_TO_DEG;
+        data_packet[10] = pkt.abc_state.ahrs_data.imu_data.gyro[1] * RAD_TO_DEG;
+        data_packet[11] = pkt.abc_state.ahrs_data.imu_data.gyro[2] * RAD_TO_DEG;
+        data_packet[12] = pkt.abc_state.ahrs_data.imu_data.accl[0];
+        data_packet[13] = pkt.abc_state.ahrs_data.imu_data.accl[1];
+        data_packet[14] = pkt.abc_state.ahrs_data.imu_data.accl[2];
+        data_packet[15] = (float)pkt.cmd.mode;
+        data_packet[16] = (float)pkt.delay_count;
+        data_packet[17] = pkt.battery_v;
+        
+        port.write((uint8_t*)data_packet, sizeof(data_packet));
+
+        // 2. Lidar point count
         _lidar_updated = false;
         float count_f = (float)_lidar_scan->count;
         port.write((uint8_t*)&count_f, sizeof(float));
@@ -176,10 +176,10 @@ void Telemetry::process_serial_outgoing() {
           port.write((uint8_t*)pt, sizeof(pt));
         }
         xSemaphoreGive(_lidar_mutex);
-      }
 
-      // 4. Tail
-      port.write(vofa_tail, sizeof(vofa_tail));
+        // 4. Tail
+        port.write(vofa_tail, sizeof(vofa_tail));
+      }
     }
   }
 }

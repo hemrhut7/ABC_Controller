@@ -164,7 +164,6 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
                 cmd_val /= length;
                 cmd_steer /= length;
             }
-            if (_cmd.mode < MODE_TURBO) cmd_val *= 0.9f;
 
             target_velocity = lpf_velocity.update(cmd_val);
             target_pitch = -_pid_velocity.compute(velocity_loop_dt, target_velocity, current_velocity); 
@@ -193,7 +192,6 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     if (run_outer_loop) {
         if (_cmd.mode >= MODE_REMOTE) {
             target_steer_rpm = cmd_steer * abs(cmd_steer) *  MAX_STEER_RPM;
-            if (_cmd.mode < MODE_TURBO) target_steer_rpm *= 0.9f;
             output_turn = _pid_steer.compute(steer_loop_dt, target_steer_rpm, current_rpm_diff);
         } else {
             output_turn = 0;
@@ -389,15 +387,15 @@ void AppMode::update_mode_selection() {
         wheel_accumulator -= steps * cnt_per_step;  // 保留餘量
 
         // 確保起始 pending_mode 在合法循環範圍內
-        if (pending_mode < MODE_ANGLE || pending_mode > MODE_TURBO) {
+        if (pending_mode < MODE_ANGLE || pending_mode > MODE_REMOTE) {
             pending_mode = MODE_ANGLE;
         }
 
         int next_mode = (int)pending_mode + steps;
 
-        // 循環限制: MODE_ANGLE(4) ~ MODE_TURBO(7)
-        if (next_mode > MODE_TURBO) next_mode = MODE_ANGLE;
-        if (next_mode < MODE_ANGLE) next_mode = MODE_TURBO;
+        // 循環限制: MODE_ANGLE(4) ~ MODE_REMOTE(6)
+        if (next_mode > MODE_REMOTE) next_mode = MODE_ANGLE;
+        if (next_mode < MODE_ANGLE) next_mode = MODE_REMOTE;
 
         pending_mode = (Mode_t)next_mode;
     }

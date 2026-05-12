@@ -4,6 +4,7 @@
 #include <driver/pcnt.h>
 #include "pid.h"
 #include "LPF.h"
+#include "config.h"
 
 
 constexpr int PPR = 500;           // 每轉脈衝數 (300線)
@@ -19,24 +20,8 @@ constexpr int MAX_PWM_DUTY = (1 << PWM_RES) - 1; // 1023
 
 #define MOTOR_DEADZONE 55
 #define MOTOR_DITHER 40
-#define MOTOR_KV       0.3525f
-#define MAX_MOTOR_RPM 160
+#define MOTOR_KV       0.37605f
 #define MAX_MOTOR_RPM_RATE 2500
-
-#define MOTOR_L_DIR1_PIN    5
-#define MOTOR_L_DIR2_PIN    18
-#define MOTOR_L_PWM_PIN     19
-#define MOTOR_L_DTBY_PIN    21
-#define MOTOR_L_E1A_PIN     32
-#define MOTOR_L_E1B_PIN     33
-
-#define MOTOR_R_DIR1_PIN    4
-#define MOTOR_R_DIR2_PIN    0
-#define MOTOR_R_PWM_PIN     15
-#define MOTOR_R_DTBY_PIN    MOTOR_L_DTBY_PIN
-#define MOTOR_R_E2A_PIN     25
-#define MOTOR_R_E2B_PIN     26
-
 
 enum MotorPosition {
     LEFT_MOTOR,
@@ -46,7 +31,7 @@ enum MotorPosition {
 
 class HAL_Motor {
     public:
-        // HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stdy_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin);
+        // HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stby_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin);
         HAL_Motor(MotorPosition position, uint32_t period_ms);
         ~HAL_Motor();
         void set_target_rpm(float target_rpm);
@@ -65,7 +50,7 @@ class HAL_Motor {
         uint8_t pwm_pin;
         uint8_t dir_pin1;
         uint8_t dir_pin2;
-        uint8_t stdy_pin;
+        uint8_t stby_pin;
         uint8_t enc_a_pin;
         uint8_t enc_b_pin;
         uint16_t update_rate_hz = 100;

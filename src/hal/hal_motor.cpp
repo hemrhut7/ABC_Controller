@@ -1,17 +1,12 @@
 #include "hal_motor.h"
 
 
-// HAL_Motor::HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stdy_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin): 
-// pwm_pin(pwm_pin), dir_pin1(dir_pin1), dir_pin2(dir_pin2), stdy_pin(stdy_pin), enc_a_pin(enc_a_pin), enc_b_pin(enc_b_pin) {
-//     init();
-// }
-
 HAL_Motor::HAL_Motor(MotorPosition position, uint32_t period_ms) {
     if (position == LEFT_MOTOR) {
         pwm_pin = MOTOR_L_PWM_PIN;
         dir_pin1 = MOTOR_L_DIR1_PIN;
         dir_pin2 = MOTOR_L_DIR2_PIN;
-        stdy_pin = MOTOR_L_DTBY_PIN;
+        stby_pin = MOTOR_STBY_PIN;
         enc_a_pin = MOTOR_L_E1A_PIN;
         enc_b_pin = MOTOR_L_E1B_PIN;
         pcnt_uint = PCNT_UNIT_0;
@@ -21,7 +16,7 @@ HAL_Motor::HAL_Motor(MotorPosition position, uint32_t period_ms) {
         pwm_pin = MOTOR_R_PWM_PIN;
         dir_pin1 = MOTOR_R_DIR1_PIN;
         dir_pin2 = MOTOR_R_DIR2_PIN;
-        stdy_pin = MOTOR_R_DTBY_PIN;
+        stby_pin = MOTOR_STBY_PIN;
         enc_a_pin = MOTOR_R_E2A_PIN;
         enc_b_pin = MOTOR_R_E2B_PIN;
         pcnt_uint = PCNT_UNIT_1;
@@ -38,16 +33,18 @@ void HAL_Motor::init() {
     pinMode(pwm_pin, OUTPUT);
     pinMode(dir_pin1, OUTPUT);
     pinMode(dir_pin2, OUTPUT);
-    pinMode(stdy_pin, OUTPUT);
+    pinMode(stby_pin, OUTPUT);
     pinMode(enc_a_pin, INPUT);
     pinMode(enc_b_pin, INPUT);
 
+    // Arduino 2.x LEDC API
     ledcSetup(pwm_channel, PWM_FREQ, PWM_RES);
     ledcAttachPin(pwm_pin, pwm_channel);
     ledcWrite(pwm_channel, 0);
+    
     digitalWrite(dir_pin1, LOW);
     digitalWrite(dir_pin2, LOW);
-    digitalWrite(stdy_pin, LOW);
+    digitalWrite(stby_pin, LOW);
 
     count = 0;
     resetControllerState();
@@ -58,7 +55,7 @@ HAL_Motor::~HAL_Motor() {
     ledcWrite(pwm_channel, 0);
     digitalWrite(dir_pin1, LOW);
     digitalWrite(dir_pin2, LOW);
-    digitalWrite(stdy_pin, LOW);
+    digitalWrite(stby_pin, LOW);
 }
 
 void HAL_Motor::getPCNTCount() {
@@ -77,7 +74,7 @@ void HAL_Motor::update_rpm(float dt) {
 }
 
 void HAL_Motor::set_target_rpm(float target_rpm) {
-    target_rpm = constrain(target_rpm, -MAX_MOTOR_RPM, MAX_MOTOR_RPM);
+    target_rpm = constrain(target_rpm, -MAX_RPM, MAX_RPM);
     if (last_target_rpm - target_rpm > MAX_MOTOR_DELTA_RPM) {
         target_rpm = last_target_rpm - MAX_MOTOR_DELTA_RPM;
     } else if (target_rpm - last_target_rpm > MAX_MOTOR_DELTA_RPM) {
@@ -139,11 +136,11 @@ void HAL_Motor::set_enable(bool enable) {
     if (is_enable == enable) return;
     is_enable = enable;
     if (enable) {
-        digitalWrite(stdy_pin, HIGH);
+        digitalWrite(stby_pin, HIGH);
         resetControllerState();
     } else {
         resetControllerState();
-        digitalWrite(stdy_pin, LOW); // 關閉 H-Bridge (高阻抗/滑行)
+        digitalWrite(stby_pin, LOW); // 關閉 H-Bridge (高阻抗/滑行)
         ledcWrite(pwm_channel, 0);   // 確保 PWM 為 0
     }
 }

@@ -2,7 +2,7 @@
 
 #include "config.h"
 
-#if !HAS_BT_SERIAL
+#if HAS_BLUEPAD32
 #include "app/app_mode.h"
 #include <Bluepad32.h>
 
@@ -33,4 +33,4 @@ private:
   uint32_t last_buttons_;
   bool was_connected_;
 };
-#endif  // #!HAS_BT_SERIAL
+#endif  // HAS_BLUEPAD32

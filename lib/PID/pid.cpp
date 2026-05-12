@@ -4,6 +4,8 @@ void PID::setTunings(float kp, float ki, float kd) {
     this->kp = kp;
     this->ki = ki;
     this->kd = kd;
+    // Recalculate the anti-windup limit using the new I gain on next compute().
+    max_i = 0;
 }
 
 float PID::compute(float target, float current) {
