@@ -1,7 +1,7 @@
 #include "app_fail_safe.h"
 
-Failsafe::Failsafe(uint16_t period_ms, Processing_Motor* motor, HAL_LED* led, set_pending_mode_fn set_pending_mode_cb) 
-    : _motor(motor), _led(led), _set_pending_mode_cb(set_pending_mode_cb) {
+Failsafe::Failsafe(uint16_t period_ms, Processing_Motor* motor, set_pending_mode_fn set_pending_mode_cb) 
+    : _motor(motor), _set_pending_mode_cb(set_pending_mode_cb) {
     last_check_time = 0;
     pickup_start_time = 0;
     MAX_LOOP_TIME_MS = period_ms * 2; // 增加容錯空間，避免因系統抖動誤觸發
@@ -55,17 +55,14 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data, AHRS_STATE ahrs_state, Mode_t
     switch (error_state)
     {
     case FS_ERROR_NONE:
-        _led->set_state(SYSTEM_STATE::ARMED);
         if (!ready_auto_start && current_time_ms - last_disarm_time_ms > 3000) 
             ready_auto_start = true;
         break;
     case FS_ERROR_AHRS_UNREADY:
-        _led->set_state(SYSTEM_STATE::INITIALIZING);
         last_disarm_time_ms = current_time_ms;
         ready_auto_start = false;
         break;
     default:
-        _led->set_state(SYSTEM_STATE::DISARMED);
         last_disarm_time_ms = current_time_ms;
         ready_auto_start = false;
         break;

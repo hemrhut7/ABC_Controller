@@ -2,7 +2,6 @@
 #include "app/app_fail_safe.h"
 #include "app/app_mode.h"
 #include "app/app_script.h"
-#include "hal/hal_led.h"
 #include "hal/hal_storage.h"
 #include "hal/hal_telemetry.h"
 #include "processing/prs_ahrs.h"
@@ -49,10 +48,9 @@ void set_app_pending_mode(Mode_t mode) {
   app_mode.set_pending_mode(mode);
 }
 
-HAL_LED system_led; // Virtual LED
 HAL_Display system_display;
 HAL_Battery system_battery;
-Failsafe failsafe(PERIOD_CONTROLL, &motor, &system_led, set_app_pending_mode);
+Failsafe failsafe(PERIOD_CONTROLL, &motor, set_app_pending_mode);
 
 Telemetry uart_telemetry(Serial, PORT_USB);
 Telemetry uart1_telemetry(Serial1, PORT_UART1);
@@ -139,8 +137,7 @@ void Comm_Task(void *pvParameters) {
     uart_telemetry.process_serial_outgoing();
     app_script.check_serial(Serial, &uart_telemetry);
 
-    // system display: LED, Monitor
-    system_led.update();
+    // system display: Monitor
     system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_error_state());
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
@@ -169,11 +166,9 @@ void WiFi_Task(void *pvParameters) {
 #endif
 
 void setup() {
-  system_led.set_state(INITIALIZING);
-
   Serial.begin(115200);
   // Serial1 (Telemetry/Script)
-  Serial1.begin(230400, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
+  Serial1.begin(2000000, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
   // Serial2 (Sensor RX only)
   Serial2.begin(115200, SERIAL_8N1, UART2_RX_PIN, UART2_TX_PIN);
 

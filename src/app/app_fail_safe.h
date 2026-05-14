@@ -4,7 +4,6 @@
 #include "hal/hal_type_define.h"
 #include "processing/prs_ahrs.h"
 #include "processing/prs_motor.h"
-#include "hal/hal_led.h"
 
 typedef enum {
     FS_ERROR_LOOP_SLOW,
@@ -19,7 +18,7 @@ typedef void (*set_pending_mode_fn)(Mode_t);
 
 class Failsafe {
 public:
-    Failsafe(uint16_t period_ms, Processing_Motor* motor, HAL_LED* led, set_pending_mode_fn set_pending_mode_cb);
+    Failsafe(uint16_t period_ms, Processing_Motor* motor, set_pending_mode_fn set_pending_mode_cb);
 
     void init();
     bool check(const ahrs_data_t &ahrs_data, AHRS_STATE ahrs_state, Mode_t current_mode);
@@ -31,7 +30,6 @@ public:
 
 private:
     Processing_Motor* _motor;
-    HAL_LED* _led;
     failsafe_error_t error_state = FS_ERROR_NONE;
     
     // 時間相關變數
