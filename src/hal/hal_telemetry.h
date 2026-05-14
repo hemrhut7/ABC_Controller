@@ -5,6 +5,16 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
+#pragma pack(push, 1)
+typedef struct {
+    int16_t x;         // mm
+    int16_t y;         // mm
+    uint16_t distance; // mm
+    uint16_t angle;    // 0-65535 for 0-360 deg
+    uint8_t intensity;
+} lidar_point_packed_t;
+#pragma pack(pop)
+
 
 enum TelemetryFormat {
   FORMAT_DEFAULT = 0,

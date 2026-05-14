@@ -168,22 +168,23 @@ void Telemetry::process_serial_outgoing() {
       
       if (tx_chunk) {
           size_t offset = 0;
-          float count_f = (float)pt_count;
+          uint16_t pt_count_u16 = (uint16_t)pt_count;
           
-          // Copy Status (72) + Count (4)
+          // Copy Status (72) + Count (2)
           memcpy(tx_chunk + offset, status_packet, 72); offset += 72;
-          memcpy(tx_chunk + offset, &count_f, 4);       offset += 4;
+          memcpy(tx_chunk + offset, &pt_count_u16, 2);  offset += 2;
 
           if (has_lidar) {
               for (int i = 0; i < pt_count; i++) {
-                  float pt[5];
-                  pt[0] = _lidar_scan->points[i].x;
-                  pt[1] = _lidar_scan->points[i].y;
-                  pt[2] = _lidar_scan->points[i].distance;
-                  pt[3] = _lidar_scan->points[i].angle;
-                  pt[4] = (float)_lidar_scan->points[i].intensity;
+                  lidar_point_packed_t packed_pt;
+                  packed_pt.x = (int16_t)(_lidar_scan->points[i].x * 1000.0f);
+                  packed_pt.y = (int16_t)(_lidar_scan->points[i].y * 1000.0f);
+                  packed_pt.distance = (uint16_t)(_lidar_scan->points[i].distance * 1000.0f);
+                  packed_pt.angle = (uint16_t)(_lidar_scan->points[i].angle * (65535.0f / 360.0f));
+                  packed_pt.intensity = _lidar_scan->points[i].intensity;
                   
-                  memcpy(tx_chunk + offset, pt, 20); offset += 20;
+                  memcpy(tx_chunk + offset, &packed_pt, sizeof(lidar_point_packed_t)); 
+                  offset += sizeof(lidar_point_packed_t);
                   
                   // If buffer near MTU (approx 1400 bytes), send it
                   if (offset >= 1400) {
