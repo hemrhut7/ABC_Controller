@@ -13,6 +13,7 @@
 #include <WiFi.h>
 #include "hal/hal_udp_stream.h"
 #endif
+#include "app/app_lidar.h"
 
 #if HAS_BLUEPAD32
 #include "hal/hal_joystick.h"
@@ -23,6 +24,7 @@
 #define PRIORITY_UART1 12
 #define PRIORITY_COMM 10
 #define PRIORITY_GAMEPAD 8
+#define PRIORITY_LIDAR 10
 
 #define PERIOD_CONTROLL 5 // 200Hz
 #define PERIOD_COMM 5     // 200Hz
@@ -36,6 +38,7 @@ TaskHandle_t GamepadTaskHandle;
 #if HAS_WIFI_SERIAL
 TaskHandle_t WiFiTaskHandle;
 #endif
+TaskHandle_t LidarTaskHandle;
 
 ConfigStore config_store;
 Processing_Motor motor(PERIOD_CONTROLL);
@@ -63,6 +66,8 @@ HAL_Joystick joystick(&app_mode, PERIOD_GAMEPAD);
 UDPStream udp_stream(UDP_PORT);
 Telemetry udp_telemetry(udp_stream, PORT_WIFI);
 #endif
+
+AppLidar app_lidar(Serial2);
 
 
 // 1. 控制任務 (Core 1)
@@ -170,13 +175,14 @@ void setup() {
   // Serial1 (Telemetry/Script)
   Serial1.begin(2000000, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
   // Serial2 (Sensor RX only)
-  Serial2.begin(115200, SERIAL_8N1, UART2_RX_PIN, UART2_TX_PIN);
+  Serial2.begin(230400, SERIAL_8N1, UART2_RX_PIN, UART2_TX_PIN);
 
   config_store.begin();
   if (!ahrs.init()) {
     Serial.println("WARNING: AHRS initialization failed! System will run in degraded mode (no attitude control).");
   }
   motor.init();
+  app_lidar.init();
   uart_telemetry.init(1000 / PERIOD_COMM);
   uart1_telemetry.init(1000 / PERIOD_COMM);
 #if HAS_WIFI_SERIAL
@@ -205,23 +211,29 @@ void setup() {
   }
   udp_stream.begin();
 #endif
+  
+  app_lidar.register_telemetry(&uart_telemetry);
+  app_lidar.register_telemetry(&uart1_telemetry);
+#if HAS_WIFI_SERIAL
+  app_lidar.register_telemetry(&udp_telemetry);
+#endif
 
   app_mode.init();
   system_display.init();
   system_battery.init();
   app_mode.set_mode(MODE_FREE);
 
-  xTaskCreatePinnedToCore(Control_Task, "ControlTask", 8192, NULL,
+  xTaskCreatePinnedToCore(Control_Task, "ControlTask", 12288, NULL,
                           PRIORITY_CONTROL, &ControlTaskHandle, 1);
 
   xTaskCreatePinnedToCore(UART1_Task, "UART1Task", 4096, NULL, PRIORITY_UART1,
                           &UART1TaskHandle, 0);
 
-  xTaskCreatePinnedToCore(Comm_Task, "CommTask", 4096, NULL, PRIORITY_COMM,
+  xTaskCreatePinnedToCore(Comm_Task, "CommTask", 8192, NULL, PRIORITY_COMM,
                           &CommTaskHandle, 0);
 
 #if HAS_BLUEPAD32
-  xTaskCreatePinnedToCore(HAL_Joystick::task_entry, "Gamepad_Task", 6144,
+  xTaskCreatePinnedToCore(HAL_Joystick::task_entry, "Gamepad_Task", 8192,
                           &joystick,
                           PRIORITY_GAMEPAD, &GamepadTaskHandle, 0);
 #endif
@@ -230,6 +242,9 @@ void setup() {
   xTaskCreatePinnedToCore(WiFi_Task, "WiFi_Task", 4096, NULL, PRIORITY_COMM,
                           &WiFiTaskHandle, 0);
 #endif
+
+  xTaskCreatePinnedToCore(AppLidar::task_entry, "Lidar_Task", 16384, &app_lidar, 
+                          PRIORITY_LIDAR, &LidarTaskHandle, 0);
 }
 
 void loop() { vTaskDelete(NULL); }

@@ -78,6 +78,21 @@ typedef struct {
     float steer_rpm;
 } PID_target_t;
 
+
+typedef struct {
+    float x, y;
+    float distance;
+    float angle;
+    uint8_t intensity;
+} lidar_point_t;
+
+#define MAX_LIDAR_POINTS 512
+typedef struct {
+    uint64_t timestamp;
+    lidar_point_t points[MAX_LIDAR_POINTS];
+    uint16_t count;
+} lidar_scan_t;
+
 typedef struct {
     ABC_state_t abc_state;
     UserCommand_t cmd;
