@@ -17,7 +17,14 @@ public:
     bool is_connected() const { return _connected; }
 
     // 主要更新介面：傳入當前模式與待選模式
-    void update(Mode_t current_mode, Mode_t pending_mode, float battery_v = 0.0f, failsafe_error_t error_state = FS_ERROR_NONE);
+    struct WiFiStatus {
+        bool connected;
+        bool is_ap;
+        char ip[16];
+        bool data_active;
+    };
+    void update(Mode_t current_mode, Mode_t pending_mode, float battery_v = 0.0f, failsafe_error_t error_state = FS_ERROR_NONE, 
+                const WiFiStatus* wifi_status = nullptr, bool joystick_connected = false);
     void show_message(const char* line1, const char* line2 = nullptr);
 
 private:
@@ -34,5 +41,11 @@ private:
     Mode_t _last_pending_mode = MODE_STOP;
     failsafe_error_t _last_error_state = FS_ERROR_NONE;
     float  _last_battery_v = -1.0f;
+    
+    // New status tracking
+    bool _last_wifi_connected = false;
+    bool _last_wifi_data_active = false;
+    bool _last_joystick_connected = false;
+    char _last_ip[16] = {0};
 
 };

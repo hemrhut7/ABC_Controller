@@ -54,6 +54,7 @@ public:
   // Update lidar data for FORMAT_LIDAR
   void update_lidar_data(const lidar_scan_t &scan);
 
+  bool connected() const {return _enabled;};
   TelemetryPort_t get_port_id() const { return port_id; };
 
 private:

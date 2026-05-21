@@ -11,6 +11,7 @@ public:
   HAL_Joystick(AppMode *app_mode, uint32_t period_ms, float deadzone = 0.08f);
   void task_loop();
   static void task_entry(void *pvParameters);
+  bool is_connected() const { return was_connected_; }
 
 private:
   static HAL_Joystick *instance_;

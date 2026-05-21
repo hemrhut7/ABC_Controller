@@ -35,8 +35,13 @@ void HAL_Display::init() {
     _gfx->println(F("S3-LCD-2 Migration..."));
 }
 
-void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery_v, failsafe_error_t error_state) {
+void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery_v, failsafe_error_t error_state, 
+                         const WiFiStatus* wifi_status, bool joystick_connected) {
     if (!_connected) return;
+
+    bool wifi_connected = wifi_status ? wifi_status->connected : false;
+    bool wifi_data_active = wifi_status ? wifi_status->data_active : false;
+    const char* wifi_ip = wifi_status ? wifi_status->ip : "0.0.0.0";
 
     // Dirty check
     bool force_redraw = !_layout_drawn;
@@ -44,7 +49,11 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
      && current_mode == _last_current_mode 
      && pending_mode == _last_pending_mode
      && error_state == _last_error_state
-     && abs(battery_v - _last_battery_v) < 0.05f) {
+     && abs(battery_v - _last_battery_v) < 0.05f
+     && wifi_connected == _last_wifi_connected
+     && wifi_data_active == _last_wifi_data_active
+     && joystick_connected == _last_joystick_connected
+     && strcmp(wifi_ip, _last_ip) == 0) {
         return;
     }
 
@@ -63,7 +72,15 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
         _gfx->setTextColor(DARKGREY);
         _gfx->print(F("Pending: "));
 
-
+        // Status Area Labels (Optional, but icons/circles are better as requested)
+        _gfx->setTextSize(1);
+        _gfx->setTextColor(LIGHTGREY);
+        _gfx->setCursor(10, 190);
+        _gfx->print(F("WIFI:"));
+        _gfx->setCursor(200, 190);
+        _gfx->print(F("JOY:"));
+        _gfx->setCursor(260, 190);
+        _gfx->print(F("DATA:"));
 
         _layout_drawn = true;
     }
@@ -112,28 +129,37 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
         _gfx->print(F(" V"));
     }
 
-
-
-    // Status Indicator (Virtual LED)
-    if (force_redraw || current_mode != _last_current_mode) {
-        uint16_t status_color = RED;
-        const char* status_text = "DISARMED";
-        if (current_mode != MODE_STOP && current_mode != MODE_FREE) {
-            status_color = GREEN;
-            status_text = "ARMED";
-        }
-        
-        _gfx->fillRect(0, 200, 320, 40, status_color);
+    // WiFi Status (Circle + IP)
+    if (force_redraw || wifi_connected != _last_wifi_connected || strcmp(wifi_ip, _last_ip) != 0) {
+        _gfx->fillCircle(20, 215, 8, wifi_connected ? GREEN : RED);
+        _gfx->fillRect(40, 210, 150, 20, BLACK);
+        _gfx->setTextSize(2);
         _gfx->setTextColor(WHITE);
-        _gfx->setTextSize(3);
-        _gfx->setCursor(80, 210);
-        _gfx->print(status_text);
+        _gfx->setCursor(40, 210);
+        _gfx->print(wifi_ip);
+    }
+
+    // Joystick Status (Circle)
+    if (force_redraw || joystick_connected != _last_joystick_connected) {
+        _gfx->fillCircle(220, 215, 8, joystick_connected ? GREEN : RED);
+    }
+
+    // Data Activity Status (Circle)
+    if (force_redraw || wifi_data_active != _last_wifi_data_active) {
+        _gfx->fillCircle(280, 215, 8, wifi_data_active ? GREEN : BLUE); // Use BLUE for active data? User said Red/Green
+        // User requested Red/Green for "連線/斷線" but "傳輸資料" is also status.
+        // I'll use Green for active, Gray/Red for idle.
+        _gfx->fillCircle(280, 215, 8, wifi_data_active ? GREEN : DARKGREY);
     }
 
     _last_current_mode = current_mode;
     _last_pending_mode = pending_mode;
     _last_error_state = error_state;
     _last_battery_v = battery_v;
+    _last_wifi_connected = wifi_connected;
+    _last_wifi_data_active = wifi_data_active;
+    _last_joystick_connected = joystick_connected;
+    strncpy(_last_ip, wifi_ip, 16);
 }
 
 void HAL_Display::show_message(const char* line1, const char* line2) {
