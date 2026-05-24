@@ -23,7 +23,7 @@ bool Failsafe::check(const ahrs_data_t &ahrs_data, AHRS_STATE ahrs_state, Mode_t
     float rpm_r = motor_state.rpm_R;
 
     failsafe_error_t current_error_state = FS_ERROR_NONE;
-    const bool is_manual_mode = (current_mode == MODE_PWM || current_mode == MODE_MOTOR);
+    const bool is_manual_mode = (current_mode == MODE_PWM || current_mode == MODE_MOTOR || current_mode == MODE_FREE);
 
     // 檢查迴圈性能
     uint32_t current_time_ms = millis();

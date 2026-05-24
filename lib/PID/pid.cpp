@@ -39,10 +39,10 @@ float PID::compute(float target, float current) {
     if (dt > 0) integral += error * dt;
 
     // Anti-windup: clamp integral term
-    // default to set the max integral to 10 times of i gain
+    // Use max_output-based limit to prevent integral from exceeding useful range
     if (ki != 0) {
         float iTerm = integral * ki;
-        if (max_i <= 0) max_i = 10 * ki;
+        if (max_i <= 0) max_i = (max_output > 0) ? max_output : 10.0f * abs(ki);
         if (iTerm > max_i) integral = max_i / ki;
         else if (iTerm < -max_i) integral = -max_i / ki;
     }
@@ -89,10 +89,10 @@ float PID::compute(float dt, float target, float current) {
     if (dt > 0) integral += error * dt;
 
     // Anti-windup: clamp integral term
-    // default to set the max integral to 10 times of i gain
+    // Use max_output-based limit to prevent integral from exceeding useful range
     if (ki != 0) {
         float iTerm = integral * ki;
-        if (max_i <= 0) max_i = 10 * ki;
+        if (max_i <= 0) max_i = (max_output > 0) ? max_output : 10.0f * abs(ki);
         if (iTerm > max_i) integral = max_i / ki;
         else if (iTerm < -max_i) integral = -max_i / ki;
     }
@@ -138,10 +138,10 @@ float PID::compute(float dt, float target, float current, float derivative) {
     if (dt > 0) integral += error * dt;
 
     // Anti-windup: clamp integral term
-    // default to set the max integral to 10 times of i gain
+    // Use max_output-based limit to prevent integral from exceeding useful range
     if (ki != 0) {
         float iTerm = integral * ki;
-        if (max_i <= 0) max_i = 10 * ki;
+        if (max_i <= 0) max_i = (max_output > 0) ? max_output : 10.0f * abs(ki);
         if (iTerm > max_i) integral = max_i / ki;
         else if (iTerm < -max_i) integral = -max_i / ki;
     }
