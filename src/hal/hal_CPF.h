@@ -3,6 +3,9 @@
 
 #define LC_WINDOW_SEC 3
 #define LPF_FREQ_ACCL_CHECK 5
+#define RESET_ATT_ERR_THR 5.0f * M_PI / 180.0f
+#define RESET_ATT_PITCH_THR 50.0f * M_PI / 180.0f
+#define RESET_ATT_MAX_CNT 200
 
 #include "LPF.h"
 #include <Arduino.h>
@@ -41,9 +44,11 @@ private:
     float omg_threshold[3];
     
     LPF_3D lpf_acc;
+    uint8_t reset_counter = 0;
 
     float K_bias;
 
+    void check_reset_att(const float acc_cg[3], bool acc_is_reliable);
     void check_acc(const float acc[3], float& current_weight);
 
     // Orientation functions

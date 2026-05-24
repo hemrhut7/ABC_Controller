@@ -27,7 +27,7 @@ namespace Vec {
 CPF::CPF(uint32_t period_ms) : lpf_acc(1000 / period_ms, 5) {
     is_initialized = false;
     std::fill(pre_omg, pre_omg + 3, 0.0f);
-    g0 = 9.80665f;
+    g0 = 9.7895f;
     weight = 0.01f;
     acc_error = 0.0f;
     gyro_error = 0.0f;
@@ -63,8 +63,8 @@ void CPF::setInit(int fs) {
     float gyro_RRW = gyro_RRW_deg_hr_1_5 * (M_PI/180.0f) / pow(3600, 1.5); // to rad/s^1.5
 
     gyro_error = sqrt(pow(gyro_ARW, 2) * dt + pow(gyro_RRW, 2) * pow(dt, 3));
-    acc_error = accl_VRW / g0 * sqrt(fs);
-    weight = gyro_error / (gyro_error + acc_error);
+    acc_error = accl_VRW * sqrt(fs);
+    weight = gyro_error / (gyro_error + acc_error * g0);
     
     K_bias = 1.0f / fs;
 }
@@ -149,11 +149,15 @@ void CPF::update(float omg[3], float acc[3], float dt) {
     // Phase 3: 觀測更新與自適應權重 (Correction & Adaptive Weighting)
     // ==========================================
     float current_w = 0.0f;
-    check_acc(acc_cg, current_w); //
-    current_w *= weight; // 基礎權重
+    check_acc(acc_cg, current_w);
+    bool acc_is_reliable = (current_w >= 0.999f);
+    
+    // 自動安全機制：檢測姿態異常並自動消抖重置 (Debounced Auto-Reset for Anomaly/Large Tilt)
+    check_reset_att(acc_cg, acc_is_reliable);
     
     // 【新增】大角度自適應衰減 (Adaptive weight decay for large tilt)
     // dcm[2][2] 等同於 cos(Pitch)*cos(Roll)，代表重力在機體 Z 軸的投影比例
+    current_w *= weight; // 基礎權重
     float angle_confidence = std::abs(dcm[2][2]); 
     current_w = current_w * angle_confidence; 
     
@@ -179,6 +183,25 @@ void CPF::update(float omg[3], float acc[3], float dt) {
 
     std::copy(omg, omg + 3, pre_omg);
     gen_euler_by_dcm(dcm, euler);
+}
+
+void CPF::check_reset_att(const float acc_cg[3], bool acc_is_reliable) {
+    float p, r;
+    accLeveling(acc_cg, p, r);
+
+    if (reset_counter >= RESET_ATT_MAX_CNT) {
+        if (std::abs(p) < RESET_ATT_PITCH_THR && acc_is_reliable) {
+            euler[0] = p;
+            euler[1] = r;
+            euler[2] = 0.0f; // 確保 Yaw 被初始化
+            gen_dcm_by_euler(euler, dcm);
+            reset_counter = 0;
+        }
+    } else if (std::abs(p) >= RESET_ATT_PITCH_THR || std::abs(euler[0] - p) > RESET_ATT_ERR_THR || std::abs(euler[1] - r) > RESET_ATT_ERR_THR) {
+        reset_counter++;
+    } else {
+        reset_counter = 0;
+    }
 }
 
 void CPF::reset_att(float acc[3]) {
