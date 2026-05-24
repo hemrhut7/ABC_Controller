@@ -16,15 +16,28 @@ namespace {
     constexpr uint8_t kQmiStatus0Reg = 0x2E;
     constexpr uint8_t kQmiResetReg = 0x60;
 
-    // Config values
-    constexpr uint8_t kCtrl2Accel8gOdr2000Hz = 0x22;
-    constexpr uint8_t kCtrl3Gyro512dpsOdr2000Hz = 0x52;
+    // Config values (1000Hz ODR for Scheme A)
+    constexpr uint8_t kCtrl2Accel8gOdr1000Hz = 0x23;
+    constexpr uint8_t kCtrl3Gyro512dpsOdr1000Hz = 0x53;
     constexpr uint8_t kCtrl5Lpf106Hz = 0x55;
     
     constexpr float kAccelScale = (8.0f / 32768.0f) * 9.80665f; // to m/s^2
     constexpr float kGyroScale = (512.0f / 32768.0f) * DEG_TO_RAD; // to rad/s
 
     static bool is_initialized = false;
+    static uint32_t i2c_error_count = 0;
+
+    static SemaphoreHandle_t imu_sem = nullptr;
+
+    void IRAM_ATTR imu_isr_handler() {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        if (imu_sem) {
+            xSemaphoreGiveFromISR(imu_sem, &xHigherPriorityTaskWoken);
+            if (xHigherPriorityTaskWoken) {
+                portYIELD_FROM_ISR();
+            }
+        }
+    }
 
     bool writeReg(uint8_t reg, uint8_t val) {
         Wire.beginTransmission(kImuAddress);
@@ -125,9 +138,9 @@ void hal_imu_init() {
 
     // Config
     bool ok = true;
-    ok &= writeReg(kQmiCtrl1Reg, 0x40); // Address auto-increment
-    ok &= writeReg(kQmiCtrl2Reg, kCtrl2Accel8gOdr2000Hz);
-    ok &= writeReg(kQmiCtrl3Reg, kCtrl3Gyro512dpsOdr2000Hz);
+    ok &= writeReg(kQmiCtrl1Reg, 0x40 | 0x08); // Address auto-increment + INT1 enable
+    ok &= writeReg(kQmiCtrl2Reg, kCtrl2Accel8gOdr1000Hz);
+    ok &= writeReg(kQmiCtrl3Reg, kCtrl3Gyro512dpsOdr1000Hz);
     ok &= writeReg(kQmiCtrl5Reg, kCtrl5Lpf106Hz);
     ok &= writeReg(kQmiCtrl7Reg, 0x03); // Enable accel and gyro
 
@@ -136,46 +149,55 @@ void hal_imu_init() {
         return;
     }
 
+    // Initialize FreeRTOS semaphore for Data Ready Interrupt
+    imu_sem = xSemaphoreCreateBinary();
+
+    // Configure GPIO3 for IMU INT1
+    pinMode(IMU_INT1_PIN, INPUT);
+    attachInterrupt(digitalPinToInterrupt(IMU_INT1_PIN), imu_isr_handler, RISING);
+
     is_initialized = true;
-    Serial.println("QMI8658 initialized successfully");
+    Serial.println("QMI8658 initialized successfully with INT1 DRDY");
 }
 
 bool hal_imu_healthy() {
     return is_initialized;
 }
 
-void hal_imu_read(imu_data_t *data) {
-    if (!is_initialized) return;
+bool hal_imu_read(imu_data_t *data) {
+    if (!is_initialized) return false;
 
-    // Read status
-    // Use readReg directly to avoid overhead, but ensure it doesn't block
-    bool success = false;
-    uint8_t status = readReg(kQmiStatus0Reg, &success);
-    if (!success) {
-        is_initialized = false; // Mark IMU unhealthy on bus/read failure.
-        return;
-    }
-    if (!(status & 0x03)) return; // No new data
-
-    // Read 14 bytes: temp(2) + accel(6) + gyro(6)
+    // Read 14 bytes directly starting from TempLow register.
+    // Bypassing status register (0x2E) polling cuts I2C traffic in half, prevents timing clashes,
+    // and allows QMI8658's native hardware latching to cleanly lock all data registers.
     Wire.beginTransmission(kImuAddress);
     Wire.write(kQmiTempLowReg);
     if (Wire.endTransmission(false) != 0) {
+        i2c_error_count++;
         is_initialized = false;
-        return;
+        return false;
     }
     uint8_t count = Wire.requestFrom(kImuAddress, (uint8_t)14);
     if (count != 14) {
+        i2c_error_count++;
         is_initialized = false;
-        return;
+        return false;
     }
 
     uint8_t buf[14];
-    for (int i = 0; i < 14; i++) buf[i] = Wire.read();
-
-    data->timestamp = micros();
+    for (int i = 0; i < 14; i++) {
+        int val = Wire.read();
+        if (val == -1) {
+            i2c_error_count++;
+            // Transient read timeout/error detected mid-stream!
+            return false;
+        }
+        buf[i] = (uint8_t)val;
+    }
 
     int16_t t_raw = (int16_t)(buf[1] << 8 | buf[0]);
+    float temp_c = (float)t_raw / 256.0f;
+
     int16_t ax_raw = (int16_t)(buf[3] << 8 | buf[2]);
     int16_t ay_raw = (int16_t)(buf[5] << 8 | buf[4]);
     int16_t az_raw = (int16_t)(buf[7] << 8 | buf[6]);
@@ -183,22 +205,56 @@ void hal_imu_read(imu_data_t *data) {
     int16_t gy_raw = (int16_t)(buf[11] << 8 | buf[10]);
     int16_t gz_raw = (int16_t)(buf[13] << 8 | buf[12]);
 
-    data->temp = (float)t_raw / 256.0f;
-
-    // Map raw data to m/s^2 and rad/s
+    // Map raw data to m/s^2 and rad/s for physical scale validation
     float raw_x = (float)ax_raw * kAccelScale;
     float raw_y = (float)az_raw * kAccelScale;
     float raw_z = -(float)ay_raw * kAccelScale;
 
-    data->accl[0] = ACC_CAL_R00 * raw_x + ACC_CAL_R01 * raw_y + ACC_CAL_R02 * raw_z + ACC_CAL_B0;
-    data->accl[1] = ACC_CAL_R10 * raw_x + ACC_CAL_R11 * raw_y + ACC_CAL_R12 * raw_z + ACC_CAL_B1;
-    data->accl[2] = ACC_CAL_R20 * raw_x + ACC_CAL_R21 * raw_y + ACC_CAL_R22 * raw_z + ACC_CAL_B2;
+    float acc_val[3];
+    acc_val[0] = ACC_CAL_R00 * raw_x + ACC_CAL_R01 * raw_y + ACC_CAL_R02 * raw_z + ACC_CAL_B0;
+    acc_val[1] = ACC_CAL_R10 * raw_x + ACC_CAL_R11 * raw_y + ACC_CAL_R12 * raw_z + ACC_CAL_B1;
+    acc_val[2] = ACC_CAL_R20 * raw_x + ACC_CAL_R21 * raw_y + ACC_CAL_R22 * raw_z + ACC_CAL_B2;
 
     float raw_gx = (float)gx_raw * kGyroScale;
     float raw_gy = (float)gz_raw * kGyroScale;
     float raw_gz = -(float)gy_raw * kGyroScale;
 
-    data->gyro[0] = GYRO_CAL_R00 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R01 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R02 * (raw_gz - GYRO_CAL_B2);
-    data->gyro[1] = GYRO_CAL_R10 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R11 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R12 * (raw_gz - GYRO_CAL_B2);
-    data->gyro[2] = GYRO_CAL_R20 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R21 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R22 * (raw_gz - GYRO_CAL_B2);
+    float gyro_val[3];
+    gyro_val[0] = GYRO_CAL_R00 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R01 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R02 * (raw_gz - GYRO_CAL_B2);
+    gyro_val[1] = GYRO_CAL_R10 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R11 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R12 * (raw_gz - GYRO_CAL_B2);
+    gyro_val[2] = GYRO_CAL_R20 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R21 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R22 * (raw_gz - GYRO_CAL_B2);
+
+    // Physical Outlier Rejection Check (to catch transient byte shifts/register tearing)
+    static float last_temp = 0.0f;
+    static bool has_last_samples = false;
+
+    if (has_last_samples) {
+        // Temperature Delta Check (Threshold: 2.0 C in 1ms).
+        // Since temperature cannot physically change by > 2.0C in 1ms, this is a 100% safe
+        // hardware-level check that catches I2C byte alignment shifts with zero risk of
+        // rejecting real rapid robot motions.
+        if (abs(temp_c - last_temp) > 2.0f) {
+            i2c_error_count++;
+            return false;
+        }
+    }
+
+    last_temp = temp_c;
+    has_last_samples = true;
+
+    data->timestamp = micros();
+    data->temp = temp_c;
+    std::copy(acc_val, acc_val + 3, data->accl);
+    std::copy(gyro_val, gyro_val + 3, data->gyro);
+
+    return true;
+}
+
+uint32_t hal_imu_get_error_count() {
+    return i2c_error_count;
+}
+
+bool hal_imu_wait_for_data(uint32_t timeout_ms) {
+    if (!imu_sem) return false;
+    return xSemaphoreTake(imu_sem, pdMS_TO_TICKS(timeout_ms)) == pdTRUE;
 }
