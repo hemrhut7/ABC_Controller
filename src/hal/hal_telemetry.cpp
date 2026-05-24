@@ -79,7 +79,7 @@ void Telemetry::process_serial_outgoing() {
     if (_format == FORMAT_DEFAULT) {
       // A packet was successfully received.
       // Now, manually flatten the nested struct into a float array for VOFA+.
-      float data_packet[18];
+      float data_packet[22];
       data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
       data_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
       data_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
@@ -98,6 +98,17 @@ void Telemetry::process_serial_outgoing() {
       data_packet[15] = (float)pkt.cmd.mode;
       data_packet[16] = (float)pkt.delay_count;
       data_packet[17] = pkt.battery_v;
+      data_packet[18] = (pkt.abc_state.ahrs_data.imu_data.gyro[0] - pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[0]) * RAD_TO_DEG;
+      data_packet[19] = (pkt.abc_state.ahrs_data.imu_data.gyro[1] - pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[1]) * RAD_TO_DEG;
+      data_packet[20] = (pkt.abc_state.ahrs_data.imu_data.gyro[2] - pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[2]) * RAD_TO_DEG;
+
+      // Add byte-wise checksum in index 21
+      uint32_t checksum = 0;
+      uint8_t *byte_ptr = (uint8_t*)data_packet;
+      for (size_t i = 0; i < 21 * sizeof(float); i++) {
+          checksum += byte_ptr[i];
+      }
+      data_packet[21] = (float)checksum;
 
       // Write the data packet and the tail to the serial port.
       uint8_t send_buffer[sizeof(data_packet) + sizeof(vofa_tail)];
@@ -106,7 +117,7 @@ void Telemetry::process_serial_outgoing() {
       port.write(send_buffer, sizeof(send_buffer));
     } 
     else if (_format == FORMAT_PID) {
-      float data_packet[15];
+      float data_packet[16];
       data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
       data_packet[1] = pkt.cmd.target_value;
       data_packet[2] = pkt.pid_target.rpm_L;
@@ -122,6 +133,14 @@ void Telemetry::process_serial_outgoing() {
       data_packet[12] = pkt.abc_state.velocity;
       data_packet[13] = pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[2] * RAD_TO_DEG;
       data_packet[14] = pkt.battery_v;
+
+      // Add byte-wise checksum in index 15
+      uint32_t checksum = 0;
+      uint8_t *byte_ptr = (uint8_t*)data_packet;
+      for (size_t i = 0; i < 15 * sizeof(float); i++) {
+          checksum += byte_ptr[i];
+      }
+      data_packet[15] = (float)checksum;
 
       // Write the data packet and the tail to the serial port.
       uint8_t send_buffer[sizeof(data_packet) + sizeof(vofa_tail)];
@@ -142,7 +161,7 @@ void Telemetry::process_serial_outgoing() {
       }
 
       // Preparation of base status data
-      float status_packet[18];
+      float status_packet[22];
       status_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
       status_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
       status_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
@@ -161,6 +180,17 @@ void Telemetry::process_serial_outgoing() {
       status_packet[15] = (float)pkt.cmd.mode;
       status_packet[16] = (float)pkt.delay_count;
       status_packet[17] = pkt.battery_v;
+      status_packet[18] = (pkt.abc_state.ahrs_data.imu_data.gyro[0] - pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[0]) * RAD_TO_DEG;
+      status_packet[19] = (pkt.abc_state.ahrs_data.imu_data.gyro[1] - pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[1]) * RAD_TO_DEG;
+      status_packet[20] = (pkt.abc_state.ahrs_data.imu_data.gyro[2] - pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[2]) * RAD_TO_DEG;
+
+      // Add byte-wise checksum in index 21
+      uint32_t checksum = 0;
+      uint8_t *byte_ptr = (uint8_t*)status_packet;
+      for (size_t i = 0; i < 21 * sizeof(float); i++) {
+          checksum += byte_ptr[i];
+      }
+      status_packet[21] = (float)checksum;
 
       // Chunked Sending Logic (Optimized for UDP/Network performance)
       static uint8_t* tx_chunk = nullptr;
@@ -170,8 +200,8 @@ void Telemetry::process_serial_outgoing() {
           size_t offset = 0;
           uint16_t pt_count_u16 = (uint16_t)pt_count;
           
-          // Copy Status (72) + Count (2)
-          memcpy(tx_chunk + offset, status_packet, 72); offset += 72;
+          // Copy Status (84) + Count (2)
+          memcpy(tx_chunk + offset, status_packet, sizeof(status_packet)); offset += sizeof(status_packet);
           memcpy(tx_chunk + offset, &pt_count_u16, 2);  offset += 2;
 
           if (has_lidar) {

@@ -1,43 +1,45 @@
-ABC Controller Project Structure (Refined)
-========================================
+ABC Controller Project Structure (Updated)
+==========================================
 
-├── README.md
 ├── boards/
 │   └── waveshare_esp32_s3_lcd_2.json
 ├── doc/
 │   ├── ESP32-S3-LCD-2/
-│   │   ├── ESP32-S3-LCD-2 - Waveshare Wiki.pdf
-│   │   ├── ESP32-S3-LCD-2.pdf
-│   │   ├── ESP32-S3-Touch-LCD-2-SchDoc.pdf
-│   │   ├── SchDoc (ESP32-S3-Touch-LCD-2).md
-│   │   ├── esp32-s3_datasheet_en.pdf
-│   │   └── example_IMU+LCD/
+│   │   ├── example_IMU+LCD/
 │   │   │   ├── boards/
 │   │   │   │   └── waveshare_esp32_s3_lcd_2.json
 │   │   │   ├── main.cpp
 │   │   │   └── platformio.ini
+│   │   ├── ESP32-S3-LCD-2 - Waveshare Wiki.pdf
+│   │   ├── ESP32-S3-LCD-2.pdf
+│   │   ├── ESP32-S3-Touch-LCD-2-SchDoc.pdf
+│   │   ├── esp32-s3_datasheet_en.pdf
+│   │   └── SchDoc (ESP32-S3-Touch-LCD-2).md
 │   ├── MPU6050/
 │   │   ├── accl_alignment_params.csv
 │   │   ├── accl_alignment_result.csv
 │   │   └── gyro_rotate_by_accl.csv
 │   ├── hardware_migration_analysis.md
 │   └── nodemcu-32s-datasheet-2.0.pdf
+├── graphify-out/
+│   ├── cost.json
+│   ├── graph.html
+│   ├── graph.json
+│   ├── GRAPH_REPORT.md
+│   └── manifest.json
 ├── include/
 │   └── README
 ├── lib/
-│   ├── GFX_Library_for_Arduino/
-│   │   └── (omitted library internals)
 │   ├── LPF/
 │   │   ├── LPF.cpp
 │   │   └── LPF.h
 │   ├── PID/
 │   │   ├── pid.cpp
 │   │   └── pid.h
-│   ├── README
-│   └── RingBuffer/
+│   ├── RingBuffer/
 │   │   ├── ring_buffer.cpp
 │   │   └── ring_buffer.h
-├── platformio.ini
+│   └── README
 ├── src/
 │   ├── app/
 │   │   ├── app_fail_safe.cpp
@@ -48,20 +50,18 @@ ABC Controller Project Structure (Refined)
 │   │   ├── app_mode.h
 │   │   ├── app_script.cpp
 │   │   └── app_script.h
-│   ├── config.h
+│   ├── graphify-out/
 │   ├── hal/
-│   │   ├── hal_CPF.cpp
-│   │   ├── hal_CPF.h
 │   │   ├── hal_battery.cpp
 │   │   ├── hal_battery.h
+│   │   ├── hal_CPF.cpp
+│   │   ├── hal_CPF.h
 │   │   ├── hal_display.cpp
 │   │   ├── hal_display.h
 │   │   ├── hal_imu.cpp
 │   │   ├── hal_imu.h
 │   │   ├── hal_joystick.cpp
 │   │   ├── hal_joystick.h
-│   │   ├── hal_led.cpp
-│   │   ├── hal_led.h
 │   │   ├── hal_lidar.cpp
 │   │   ├── hal_lidar.h
 │   │   ├── hal_motor.cpp
@@ -72,11 +72,19 @@ ABC Controller Project Structure (Refined)
 │   │   ├── hal_telemetry.h
 │   │   ├── hal_type_define.h
 │   │   └── hal_udp_stream.h
-│   ├── main.cpp
-│   └── processing/
+│   ├── processing/
 │   │   ├── prs_ahrs.cpp
 │   │   ├── prs_ahrs.h
 │   │   ├── prs_motor.cpp
 │   │   └── prs_motor.h
-└── test/
+│   ├── config.h
+│   └── main.cpp
+├── test/
 │   └── README
+├── .gitattributes
+├── .gitignore
+├── .gitmodules
+├── image.png
+├── platformio.ini
+├── README.md
+└── structure.txt
