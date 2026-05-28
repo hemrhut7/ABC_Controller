@@ -16,28 +16,16 @@ namespace {
     constexpr uint8_t kQmiStatus0Reg = 0x2E;
     constexpr uint8_t kQmiResetReg = 0x60;
 
-    // Config values (1000Hz ODR for Scheme A)
-    constexpr uint8_t kCtrl2Accel8gOdr1000Hz = 0x23;
-    constexpr uint8_t kCtrl3Gyro512dpsOdr1000Hz = 0x53;
-    constexpr uint8_t kCtrl5Lpf106Hz = 0x55;
+    // Config values (250Hz ODR and 33.4Hz LPF)
+    constexpr uint8_t kCtrl2Accel8gOdr250Hz = 0x25;
+    constexpr uint8_t kCtrl3Gyro512dpsOdr250Hz = 0x55;
+    constexpr uint8_t kCtrl5Lpf33HzAt250Hz = 0x57; // 13.37% of 250Hz ODR = 33.4Hz LPF
     
     constexpr float kAccelScale = (8.0f / 32768.0f) * 9.80665f; // to m/s^2
     constexpr float kGyroScale = (512.0f / 32768.0f) * DEG_TO_RAD; // to rad/s
 
     static bool is_initialized = false;
     static uint32_t i2c_error_count = 0;
-
-    static SemaphoreHandle_t imu_sem = nullptr;
-
-    void IRAM_ATTR imu_isr_handler() {
-        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        if (imu_sem) {
-            xSemaphoreGiveFromISR(imu_sem, &xHigherPriorityTaskWoken);
-            if (xHigherPriorityTaskWoken) {
-                portYIELD_FROM_ISR();
-            }
-        }
-    }
 
     bool writeReg(uint8_t reg, uint8_t val) {
         Wire.beginTransmission(kImuAddress);
@@ -71,35 +59,35 @@ namespace {
 
 // Accelerometer Calibration Parameters
 // Matrix R
-constexpr float ACC_CAL_R00 = 0.9996914216f;
-constexpr float ACC_CAL_R01 = -0.0308126859f;
-constexpr float ACC_CAL_R02 = 0.0510088819f;
-constexpr float ACC_CAL_R10 = 0.0164932456f;
-constexpr float ACC_CAL_R11 = 1.0006602403f;
-constexpr float ACC_CAL_R12 = 0.0134431725f;
-constexpr float ACC_CAL_R20 = -0.0312931478f;
-constexpr float ACC_CAL_R21 = -0.0294243653f;
-constexpr float ACC_CAL_R22 = 1.028111305f;
+constexpr float ACC_CAL_R00 = 1.00293926f;
+constexpr float ACC_CAL_R01 = -0.01065710f;
+constexpr float ACC_CAL_R02 = -0.02632111f;
+constexpr float ACC_CAL_R10 = 0.00277165f;
+constexpr float ACC_CAL_R11 = 1.00133575f;
+constexpr float ACC_CAL_R12 = 0.02528025f;
+constexpr float ACC_CAL_R20 = -0.01596356f;
+constexpr float ACC_CAL_R21 = -0.00037471f;
+constexpr float ACC_CAL_R22 = 1.00018146f;
 // Bias Vector
-constexpr float ACC_CAL_B0  = -0.720579444f;
-constexpr float ACC_CAL_B1  = -0.2742577706f;
-constexpr float ACC_CAL_B2  = 0.5614902379f;
+constexpr float ACC_CAL_B0  = -0.63845346f;
+constexpr float ACC_CAL_B1  = -0.16649856f;
+constexpr float ACC_CAL_B2  = 0.67299230f;
 
 // Gyroscope Calibration Parameters
 // Matrix R
-constexpr float GYRO_CAL_R00 = 0.998848f;
-constexpr float GYRO_CAL_R01 = -0.024033f;
-constexpr float GYRO_CAL_R02 = 0.041541f;
-constexpr float GYRO_CAL_R10 = 0.023254f;
-constexpr float GYRO_CAL_R11 = 0.999546f;
-constexpr float GYRO_CAL_R12 = 0.019138f;
-constexpr float GYRO_CAL_R20 = -0.041982f;
-constexpr float GYRO_CAL_R21 = -0.018150f;
-constexpr float GYRO_CAL_R22 = 0.998954f;
+constexpr float GYRO_CAL_R00 = 0.9999681388f;
+constexpr float GYRO_CAL_R01 = -0.0032722149f;
+constexpr float GYRO_CAL_R02 = -0.0072810655f;
+constexpr float GYRO_CAL_R10 = 0.0033785253f;
+constexpr float GYRO_CAL_R11 = 0.9998871674f;
+constexpr float GYRO_CAL_R12 = 0.0146368705f;
+constexpr float GYRO_CAL_R20 = 0.007232349f;
+constexpr float GYRO_CAL_R21 = -0.0146610034f;
+constexpr float GYRO_CAL_R22 = 0.9998663651f;
 // Bias Vector
-constexpr float GYRO_CAL_B0  = -0.02208f;
-constexpr float GYRO_CAL_B1  = 0.02572f;
-constexpr float GYRO_CAL_B2  = 0.02238f;
+constexpr float GYRO_CAL_B0  = -788.2819f / 3600 * DEG_TO_RAD;
+constexpr float GYRO_CAL_B1  = -1341.4042f / 3600 * DEG_TO_RAD;
+constexpr float GYRO_CAL_B2  = -6613.7215f / 3600 * DEG_TO_RAD;
 
 void hal_imu_init() {
     if (!Wire.begin(IMU_SDA_PIN, IMU_SCL_PIN, 400000)) {
@@ -138,10 +126,10 @@ void hal_imu_init() {
 
     // Config
     bool ok = true;
-    ok &= writeReg(kQmiCtrl1Reg, 0x40 | 0x08); // Address auto-increment + INT1 enable
-    ok &= writeReg(kQmiCtrl2Reg, kCtrl2Accel8gOdr1000Hz);
-    ok &= writeReg(kQmiCtrl3Reg, kCtrl3Gyro512dpsOdr1000Hz);
-    ok &= writeReg(kQmiCtrl5Reg, kCtrl5Lpf106Hz);
+    ok &= writeReg(kQmiCtrl1Reg, 0x40); // Address auto-increment (INT1 disabled)
+    ok &= writeReg(kQmiCtrl2Reg, kCtrl2Accel8gOdr250Hz);
+    ok &= writeReg(kQmiCtrl3Reg, kCtrl3Gyro512dpsOdr250Hz);
+    ok &= writeReg(kQmiCtrl5Reg, kCtrl5Lpf33HzAt250Hz);
     ok &= writeReg(kQmiCtrl7Reg, 0x03); // Enable accel and gyro
 
     if (!ok) {
@@ -149,15 +137,8 @@ void hal_imu_init() {
         return;
     }
 
-    // Initialize FreeRTOS semaphore for Data Ready Interrupt
-    imu_sem = xSemaphoreCreateBinary();
-
-    // Configure GPIO3 for IMU INT1
-    pinMode(IMU_INT1_PIN, INPUT);
-    attachInterrupt(digitalPinToInterrupt(IMU_INT1_PIN), imu_isr_handler, RISING);
-
     is_initialized = true;
-    Serial.println("QMI8658 initialized successfully with INT1 DRDY");
+    Serial.println("QMI8658 initialized successfully at 250Hz ODR / 33.4Hz LPF");
 }
 
 bool hal_imu_healthy() {
@@ -220,9 +201,9 @@ bool hal_imu_read(imu_data_t *data) {
     float raw_gz = -(float)gy_raw * kGyroScale;
 
     float gyro_val[3];
-    gyro_val[0] = GYRO_CAL_R00 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R01 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R02 * (raw_gz - GYRO_CAL_B2);
-    gyro_val[1] = GYRO_CAL_R10 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R11 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R12 * (raw_gz - GYRO_CAL_B2);
-    gyro_val[2] = GYRO_CAL_R20 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R21 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R22 * (raw_gz - GYRO_CAL_B2);
+    gyro_val[0] = GYRO_CAL_R00 * raw_gx + GYRO_CAL_R01 * raw_gy + GYRO_CAL_R02 * raw_gz - GYRO_CAL_B0;
+    gyro_val[1] = GYRO_CAL_R10 * raw_gx + GYRO_CAL_R11 * raw_gy + GYRO_CAL_R12 * raw_gz - GYRO_CAL_B1;
+    gyro_val[2] = GYRO_CAL_R20 * raw_gx + GYRO_CAL_R21 * raw_gy + GYRO_CAL_R22 * raw_gz - GYRO_CAL_B2;
 
     // Physical Outlier Rejection Check (to catch transient byte shifts/register tearing)
     static float last_temp = 0.0f;
@@ -252,9 +233,4 @@ bool hal_imu_read(imu_data_t *data) {
 
 uint32_t hal_imu_get_error_count() {
     return i2c_error_count;
-}
-
-bool hal_imu_wait_for_data(uint32_t timeout_ms) {
-    if (!imu_sem) return false;
-    return xSemaphoreTake(imu_sem, pdMS_TO_TICKS(timeout_ms)) == pdTRUE;
 }

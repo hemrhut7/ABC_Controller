@@ -43,7 +43,7 @@ private:
     uint32_t MAX_LOOP_TIME_MS = 15; 
 
     // 2. 倒地保護角度 (45度)
-    const float CRITICAL_ANGLE_RAD = 45.0f * DEG_TO_RAD; 
+    const float CRITICAL_ANGLE_RAD = 60.0f * DEG_TO_RAD; 
     const float RECOVERY_ANGLE_RAD = 5.0f * DEG_TO_RAD;
 
     uint32_t loop_time_ms = 0;

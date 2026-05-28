@@ -38,7 +38,7 @@ private:
     float euler[3];
 
     float (*LC_list)[3];
-    uint16_t lc_list_count = 0;
+    int16_t lc_list_count = -10;
     uint16_t LC_WINDOW_SIZE = 0;
     float bias_omg[3];
     float omg_threshold[3];

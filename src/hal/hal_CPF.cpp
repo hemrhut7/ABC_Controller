@@ -36,7 +36,7 @@ CPF::CPF(uint32_t period_ms) : lpf_acc(1000 / period_ms, 5) {
     std::fill(euler, euler + 3, 0.0f); // 初始化成員變數 euler，而非宣告區域變數
     gen_dcm_by_euler(this->euler, dcm);
 
-    lc_list_count = 0;
+    lc_list_count = -10;
     std::fill(bias_omg, bias_omg + 3, 0.0f);
     std::fill(omg_threshold, omg_threshold + 3, 0.1f);
 
@@ -63,8 +63,8 @@ void CPF::setInit(int fs) {
     float gyro_RRW = gyro_RRW_deg_hr_1_5 * (M_PI/180.0f) / pow(3600, 1.5); // to rad/s^1.5
 
     gyro_error = sqrt(pow(gyro_ARW, 2) * dt + pow(gyro_RRW, 2) * pow(dt, 3));
-    acc_error = accl_VRW * sqrt(fs);
-    weight = gyro_error / (gyro_error + acc_error * g0);
+    acc_error = 0.01;
+    weight = 0.005;
     
     K_bias = 1.0f / fs;
 }
@@ -82,7 +82,10 @@ void CPF::update(float omg[3], float acc[3], float dt) {
     // Phase 1: 嚴格的靜態初始化 (Rigorous Static Initialization)
     // ==========================================
     if (!is_initialized) {
-        if (lc_list_count < LC_WINDOW_SIZE) {
+        if (lc_list_count < 0) {
+            lc_list_count++;
+            return;
+        } else if (lc_list_count < LC_WINDOW_SIZE) {
             std::copy(omg, omg + 3, LC_list[lc_list_count]);
             lc_list_count++;
         } else {
@@ -109,7 +112,7 @@ void CPF::update(float omg[3], float acc[3], float dt) {
             float threshold_sq = omg_threshold[0] * omg_threshold[0]; 
             if (var[0] > threshold_sq || var[1] > threshold_sq || var[2] > threshold_sq) {
                 // 機體受到擾動，放棄此次校準，重新收集數據
-                lc_list_count = 0; 
+                lc_list_count = 0;
                 return; 
             }
 

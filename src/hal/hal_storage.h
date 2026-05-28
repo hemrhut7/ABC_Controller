@@ -41,7 +41,7 @@ public:
     SystemConfig data;
 
 private:
-    const uint32_t CONFIG_MAGIC = 0xCAFEBABC; // 識別碼 (已更新以強制重置舊設定)
+    const uint32_t CONFIG_MAGIC = 0xCAFEBAAB; // 識別碼 (已更新以強制重置舊設定)
     const int EEPROM_ADDR = 0;                // 起始位址
     bool _dirty = false;
 };

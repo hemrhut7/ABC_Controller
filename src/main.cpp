@@ -27,12 +27,11 @@
 #define PRIORITY_GAMEPAD 8
 #define PRIORITY_LIDAR 10
 
-#define PERIOD_CONTROLL 5 // 200Hz
-#define PERIOD_COMM 5     // 200Hz
+#define PERIOD_CONTROLL 4 // 250Hz
+#define PERIOD_COMM     4 // 250Hz
 #define PERIOD_GAMEPAD 10 // 100Hz
 
 TaskHandle_t ControlTaskHandle;
-TaskHandle_t AHRSTaskHandle;
 TaskHandle_t UART1TaskHandle;
 TaskHandle_t CommTaskHandle;
 TaskHandle_t GamepadTaskHandle;
@@ -43,7 +42,7 @@ TaskHandle_t LidarTaskHandle;
 
 ConfigStore config_store;
 Processing_Motor motor(PERIOD_CONTROLL);
-Processing_AHRS ahrs(1);
+Processing_AHRS ahrs(PERIOD_CONTROLL);
 AppMode app_mode(&motor, &config_store, PERIOD_CONTROLL);
 
 AppScript app_script(&app_mode);
@@ -71,20 +70,7 @@ Telemetry udp_telemetry(udp_stream, PORT_WIFI);
 AppLidar app_lidar(Serial2);
 
 
-// 1.5 AHRS 讀取與姿態估計任務 (Core 0)
-void AHRS_Task(void *pvParameters) {
-  for (;;) {
-    // Block until new data is ready on GPIO3 (INT1 DRDY interrupt)
-    if (hal_imu_wait_for_data(20)) { // 20ms timeout
-      ahrs.update();
-    } else {
-      // Timeout occurred (e.g. startup sequence mismatch or IMU disconnected)
-      // Call update to trigger I2C error recovery and prevent thread lockup
-      ahrs.update();
-      vTaskDelay(pdMS_TO_TICKS(1)); // Brief sleep to prevent CPU starvation
-    }
-  }
-}
+
 
 // 1. 控制任務 (Core 1)
 void Control_Task(void *pvParameters) {
@@ -101,7 +87,8 @@ void Control_Task(void *pvParameters) {
     if (dt <= 0.0f || dt > 0.1f)
       dt = PERIOD_CONTROLL * 0.001f;
 
-    // Update IMU/AHRS state (Updated asynchronously at 1000Hz in AHRS_Task on Core 0)
+    // 同步更新 IMU 數據與姿態估計
+    ahrs.update();
     ahrs.get_ahrs_data(&current_sys_state.abc_state.ahrs_data);
 
     // update Motor State
@@ -259,8 +246,7 @@ void setup() {
   system_battery.init();
   app_mode.set_mode(MODE_FREE);
 
-  xTaskCreatePinnedToCore(AHRS_Task, "AHRSTask", 8192, NULL,
-                          PRIORITY_AHRS, &AHRSTaskHandle, 0);
+
 
   xTaskCreatePinnedToCore(Control_Task, "ControlTask", 12288, NULL,
                           PRIORITY_CONTROL, &ControlTaskHandle, 1);
