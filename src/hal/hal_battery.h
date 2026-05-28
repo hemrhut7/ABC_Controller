@@ -4,8 +4,8 @@
 
 #include "config.h"
 
-#define BAT_V_SLOPE   0.03136f
-#define BAT_V_OFFSET  -28.14f
+#define BAT_V_SLOPE   0.00680089f
+#define BAT_V_OFFSET  3.43306268f
 
 class HAL_Battery {
 public:
