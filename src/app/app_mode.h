@@ -99,5 +99,18 @@ private:
     int32_t wheel_accumulator = 0;  // 累積右輪相對轉動量 (PCNT count)
     Mode_t pending_mode = MODE_FREE;
 
+#if defined(ESP_PLATFORM)
+    portMUX_TYPE app_mode_mux = portMUX_INITIALIZER_UNLOCKED;
+#endif
+
+    // 靜止狀態與角度超限動態 PID 調節變數
+    uint32_t static_timer_ms = 0;
+    bool is_static_pid_active = false;
+    bool is_angle_boost_active = false;
+
+    // 基準 PID 參數紀錄（用於即時 Tuning，避免因 Flash 未寫入而被覆蓋）
+    PID_Params baseline_velocity_pid = {0};
+    PID_Params baseline_pitch_pid = {0};
+
     uint8_t loop_counter = 0;
 };

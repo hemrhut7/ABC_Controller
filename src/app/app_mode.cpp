@@ -1,5 +1,6 @@
 #include "app_mode.h"
 #include <Arduino.h> // For constrain, abs, etc.
+#include <cmath>
 
 
 AppMode::AppMode(Processing_Motor* motor, ConfigStore* config_store, int interval_ms) 
@@ -18,6 +19,10 @@ void AppMode::init() {
     // 初始化 ConfigStore 並讀取參數
     _config_store->begin();
     _config_store->load_config();
+    
+    // 初始化基準 PID 參數紀錄
+    baseline_velocity_pid = _config_store->data.velocity;
+    baseline_pitch_pid = _config_store->data.pitch;
     
     // Level 4: Velocity Loop (外環) - 輸入 m/s, 輸出 Target Pitch (rad)
     _pid_velocity.setTunings(_config_store->data.velocity.p, _config_store->data.velocity.i, _config_store->data.velocity.d);
@@ -89,6 +94,13 @@ void AppMode::reset_control_state() {
     _cmd.target_value = 0.0f;
     _cmd.target_steer = 0.0f;
 
+    // 重置動態調整狀態並恢復原始 PID 參數
+    static_timer_ms = 0;
+    is_static_pid_active = false;
+    is_angle_boost_active = false;
+    _pid_velocity.setTunings(baseline_velocity_pid.p, baseline_velocity_pid.i, baseline_velocity_pid.d);
+    _pid_angle.setTunings(baseline_pitch_pid.p, baseline_pitch_pid.i, baseline_pitch_pid.d);
+
     _pid_velocity.reset();
     _pid_angle.reset();
     _pid_steer.reset();
@@ -137,6 +149,56 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
     // 1. 獲取狀態 (State Estimation)
     current_velocity = current_rpm * RPM_TO_MS; // 需定義轉換係數
     current_velocity = lpf_current_velocity.update(current_velocity); // 10Hz 低通濾波
+
+    // --- 動態 PID 參數調整 ---
+
+    // Rule 1: 如果目標速度低、轉彎低，透過 2 秒 timeout 確認靜止後將 VEL_P / 10、VEL_D * 2
+    bool target_low = (std::abs(_cmd.target_value) < 0.01f) && (std::abs(_cmd.target_steer) < 0.01f);
+    bool actual_static = (std::abs(current_velocity) < 0.1f) && (std::abs(current_rpm) < 30.0f);
+
+#if defined(ESP_PLATFORM)
+    portENTER_CRITICAL(&app_mode_mux);
+#endif
+    if (target_low && actual_static) {
+        static_timer_ms += (uint32_t)(dt * 1000.0f);
+        if (static_timer_ms >= 2000) { // 2 seconds timeout
+            if (!is_static_pid_active) {
+                is_static_pid_active = true;
+                float new_kp = baseline_velocity_pid.p * 0.1f;
+                float new_ki = baseline_velocity_pid.i;
+                float new_kd = baseline_velocity_pid.d;
+                _pid_velocity.setTunings(new_kp, new_ki, new_kd);
+            }
+        }
+    } else {
+        static_timer_ms = 0;
+        if (is_static_pid_active) {
+            is_static_pid_active = false;
+            _pid_velocity.setTunings(baseline_velocity_pid.p, baseline_velocity_pid.i, baseline_velocity_pid.d);
+        }
+    }
+
+    // Rule 2: 如果實際角度大於限制角度 MAX_PITCH，暫時性的將 ANG_P、ANG_I 調高 20%
+    if (_cmd.mode >= MODE_ANGLE) {
+        if (std::abs(current_pitch) > MAX_PITCH) {
+            if (!is_angle_boost_active) {
+                is_angle_boost_active = true;
+                float boosted_kp = baseline_pitch_pid.p * 1.20f;
+                float boosted_ki = baseline_pitch_pid.i * 1.20f;
+                float kd = baseline_pitch_pid.d;
+                _pid_angle.setTunings(boosted_kp, boosted_ki, kd);
+            }
+        } else {
+            if (is_angle_boost_active) {
+                is_angle_boost_active = false;
+                _pid_angle.setTunings(baseline_pitch_pid.p, baseline_pitch_pid.i, baseline_pitch_pid.d);
+            }
+        }
+    }
+#if defined(ESP_PLATFORM)
+    portEXIT_CRITICAL(&app_mode_mux);
+#endif
+
     velocity_loop_dt += dt;
     steer_loop_dt += dt;
     const bool run_outer_loop = (loop_counter % OUTER_LOOP_DIVIDER) == 0;
@@ -226,16 +288,23 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
 }
 
 void AppMode::set_pid_gains(PID_id_t pid_id, float kp, float ki, float kd) {
+#if defined(ESP_PLATFORM)
+    portENTER_CRITICAL(&app_mode_mux);
+#endif
     switch (pid_id) {
         case PID_MOTOR:
             _motor->set_pid_gains(kp, ki, kd);
             _config_store->data.motor = {kp, ki, kd};
             break;
         case PID_ANGLE: 
+            is_angle_boost_active = false; // 重置以防狀態不一致
+            baseline_pitch_pid = {kp, ki, kd}; // 記錄調試中的基準參數
             _pid_angle.setTunings(kp, ki, kd); 
             _config_store->data.pitch = {kp, ki, kd};
             break;
         case PID_VELOCITY: 
+            is_static_pid_active = false; // 重置以防狀態不一致
+            baseline_velocity_pid = {kp, ki, kd}; // 記錄調試中的基準參數
             _pid_velocity.setTunings(kp, ki, kd); 
             _config_store->data.velocity = {kp, ki, kd};
             break;
@@ -247,6 +316,9 @@ void AppMode::set_pid_gains(PID_id_t pid_id, float kp, float ki, float kd) {
             // Optional: handle invalid ID
             break;
     }
+#if defined(ESP_PLATFORM)
+    portEXIT_CRITICAL(&app_mode_mux);
+#endif
 }
 
 PID_Params AppMode::get_pid_gains(PID_id_t pid_id) {

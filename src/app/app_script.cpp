@@ -42,6 +42,15 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
     if (sscanf(cmd_line.c_str(), "PID %d %f %f %f", &id, &kp, &ki, &kd) == 4) {
       // 安全檢查: ID 範圍
       if (id >= 0 && id < PID_ID_COUNT) {
+        // Principal Engineer Safety Check: Reject negative, NaN, or infinite gains
+        if (isnan(kp) || isinf(kp) || kp < 0.0f ||
+            isnan(ki) || isinf(ki) || ki < 0.0f ||
+            isnan(kd) || isinf(kd) || kd < 0.0f) {
+          snprintf(tx_buffer, sizeof(tx_buffer),
+                   "[ERR] Rejected PID %d: Values must be finite and non-negative\n", id);
+          telemetry->queue_string(tx_buffer);
+          return;
+        }
         _app_mode->set_pid_gains((PID_id_t)id, kp, ki, kd);
         snprintf(tx_buffer, sizeof(tx_buffer),
                  "[OK] PID %d Updated: P=%.3f I=%.3f D=%.3f\n", id, kp, ki, kd);

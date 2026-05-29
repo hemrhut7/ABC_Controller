@@ -1,6 +1,10 @@
 #include "pid.h"
 
 void PID::setTunings(float kp, float ki, float kd) {
+    // Bumpless Transfer: scale integral to keep iTerm continuous when ki changes
+    if (this->ki != 0.0f && ki != 0.0f && this->ki != ki) {
+        this->integral = this->integral * (this->ki / ki);
+    }
     this->kp = kp;
     this->ki = ki;
     this->kd = kd;
