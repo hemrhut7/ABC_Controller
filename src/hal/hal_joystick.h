@@ -5,6 +5,8 @@
 #if HAS_BLUEPAD32
 #include "app/app_mode.h"
 #include <Bluepad32.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 class HAL_Joystick {
 public:
@@ -26,6 +28,7 @@ private:
 
   AppMode *app_mode_;
   GamepadPtr gamepad_;
+  SemaphoreHandle_t mutex_;
   uint32_t period_ms_;
   float deadzone_;
   float last_val_;

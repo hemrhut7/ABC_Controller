@@ -30,7 +30,9 @@ float apply_deadzone(float input, float deadzone) {
 HAL_Joystick::HAL_Joystick(AppMode *app_mode, uint32_t period_ms, float deadzone)
     : app_mode_(app_mode), gamepad_(nullptr), period_ms_(period_ms),
       deadzone_(deadzone), last_val_(0.0f), last_steer_(0.0f), last_push_tick_(0),
-      last_buttons_(0), was_connected_(false) {}
+      last_buttons_(0), was_connected_(false) {
+  mutex_ = xSemaphoreCreateMutex();
+}
 
 void HAL_Joystick::setup_driver() {
   instance_ = this;
@@ -51,16 +53,22 @@ void HAL_Joystick::on_disconnected_callback(GamepadPtr gamepad) {
 }
 
 void HAL_Joystick::on_connected(GamepadPtr gamepad) {
-  if (gamepad_ == nullptr) {
-    gamepad_ = gamepad;
-    app_mode_->enqueue_target(0.0f, 0.0f);
+  if (mutex_ != nullptr && xSemaphoreTake(mutex_, portMAX_DELAY) == pdTRUE) {
+    if (gamepad_ == nullptr || !gamepad_->isConnected()) {
+      gamepad_ = gamepad;
+      app_mode_->enqueue_target(0.0f, 0.0f);
+    }
+    xSemaphoreGive(mutex_);
   }
 }
 
 void HAL_Joystick::on_disconnected(GamepadPtr gamepad) {
-  if (gamepad_ == gamepad) {
-    gamepad_ = nullptr;
-    last_buttons_ = 0;
+  if (mutex_ != nullptr && xSemaphoreTake(mutex_, portMAX_DELAY) == pdTRUE) {
+    if (gamepad_ == gamepad) {
+      gamepad_ = nullptr;
+      last_buttons_ = 0;
+    }
+    xSemaphoreGive(mutex_);
   }
   app_mode_->enqueue_mode(MODE_REMOTE);
   app_mode_->enqueue_target(0.0f, 0.0f);
@@ -72,8 +80,15 @@ void HAL_Joystick::update_gamepad() {
 
   BP32.update();
 
+  if (mutex_ == nullptr || xSemaphoreTake(mutex_, portMAX_DELAY) != pdTRUE) {
+    return;
+  }
+
   bool connected = (gamepad_ != nullptr) && gamepad_->isConnected();
   if (!connected) {
+    if (gamepad_ != nullptr) {
+      gamepad_ = nullptr; // Clear stale pointer immediately to allow reconnection
+    }
     if (was_connected_) {
       app_mode_->enqueue_target(0.0f, 0.0f);
       app_mode_->enqueue_mode(MODE_REMOTE);
@@ -83,6 +98,7 @@ void HAL_Joystick::update_gamepad() {
       last_buttons_ = 0;
     }
     was_connected_ = false;
+    xSemaphoreGive(mutex_);
     return;
   }
 
@@ -136,6 +152,7 @@ void HAL_Joystick::update_gamepad() {
     }
   }
 
+  xSemaphoreGive(mutex_);
 }
 
 void HAL_Joystick::task_loop() {
