@@ -12,12 +12,14 @@ namespace {
     constexpr uint8_t kMpuGyroConfigReg = 0x1B;
     constexpr uint8_t kMpuAccelConfigReg = 0x1C;
     constexpr uint8_t kMpuAccelXOutHReg = 0x3B;
+    constexpr uint8_t kMpuIntPinCfgReg = 0x37;
+    constexpr uint8_t kMpuIntEnableReg = 0x38;
 
     // Config values
     constexpr uint8_t kMpuAccel8gVal = 0x10;       // Range +/- 8G
     constexpr uint8_t kMpuGyro500dpsVal = 0x08;    // Range +/- 500 deg/s
     constexpr uint8_t kMpuDpf44HzVal = 0x03;       // DLPF Bandwidth 44Hz (Fs=1kHz)
-    constexpr uint8_t kMpuSmplrtDivVal = 0x04;     // 1kHz / (1 + 4) = 200Hz sample rate
+    constexpr uint8_t kMpuSmplrtDivVal = 0x03;     // 1kHz / (1 + 3) = 250Hz sample rate
 
     constexpr float kAccelScale = (8.0f / 32768.0f) * 9.80665f; // to m/s^2
     constexpr float kGyroScale = (500.0f / 32768.0f) * DEG_TO_RAD; // to rad/s
@@ -25,6 +27,18 @@ namespace {
 
     static bool is_initialized = false;
     static uint32_t i2c_error_count = 0;
+
+    static SemaphoreHandle_t imu_sem = nullptr;
+
+    void IRAM_ATTR imu_isr_handler() {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        if (imu_sem) {
+            xSemaphoreGiveFromISR(imu_sem, &xHigherPriorityTaskWoken);
+            if (xHigherPriorityTaskWoken) {
+                portYIELD_FROM_ISR();
+            }
+        }
+    }
 
     bool writeReg(uint8_t reg, uint8_t val) {
         Wire.beginTransmission(kImuAddress);
@@ -126,14 +140,23 @@ void hal_imu_init() {
     ok &= writeReg(kMpuSmplrtDivReg, kMpuSmplrtDivVal);
     ok &= writeReg(kMpuGyroConfigReg, kMpuGyro500dpsVal);
     ok &= writeReg(kMpuAccelConfigReg, kMpuAccel8gVal);
+    ok &= writeReg(kMpuIntPinCfgReg, 0x30);   // Latch active-high, clear on any read
+    ok &= writeReg(kMpuIntEnableReg, 0x01);  // Enable Data Ready interrupt
 
     if (!ok) {
         Serial.println("IMU: Configuration failed");
         return;
     }
 
+    // Initialize FreeRTOS semaphore for Data Ready Interrupt
+    imu_sem = xSemaphoreCreateBinary();
+
+    // Configure GPIO for IMU INT
+    pinMode(IMU_INT1_PIN, INPUT);
+    attachInterrupt(digitalPinToInterrupt(IMU_INT1_PIN), imu_isr_handler, RISING);
+
     is_initialized = true;
-    Serial.println("MPU6050 initialized successfully at 200Hz ODR / 44Hz LPF");
+    Serial.println("MPU6050 initialized successfully at 250Hz ODR / 44Hz LPF with interrupt");
 }
 
 bool hal_imu_healthy() {
@@ -211,4 +234,9 @@ bool hal_imu_read(imu_data_t *data) {
 
 uint32_t hal_imu_get_error_count() {
     return i2c_error_count;
+}
+
+bool hal_imu_wait_for_data(uint32_t timeout_ms) {
+    if (!imu_sem) return false;
+    return xSemaphoreTake(imu_sem, pdMS_TO_TICKS(timeout_ms)) == pdTRUE;
 }

@@ -31,7 +31,7 @@
 #define LCD_CS_PIN      45
 #define IMU_SCL_PIN     47
 #define IMU_SDA_PIN     48
-#define IMU_INT1_PIN    3
+#define IMU_INT1_PIN    14
 #define BAT_ADC_PIN     6
 
 // Motor Control

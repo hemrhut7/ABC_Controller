@@ -27,8 +27,8 @@
 #define PRIORITY_GAMEPAD 8
 #define PRIORITY_LIDAR 10
 
-#define PERIOD_CONTROLL 5 // 200Hz
-#define PERIOD_COMM     5 // 200Hz
+#define PERIOD_CONTROLL 4 // 250Hz
+#define PERIOD_COMM     4 // 250Hz
 #define PERIOD_GAMEPAD 10 // 100Hz
 
 TaskHandle_t ControlTaskHandle;
@@ -74,11 +74,17 @@ AppLidar app_lidar(Serial2);
 
 // 1. 控制任務 (Core 1)
 void Control_Task(void *pvParameters) {
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_CONTROLL);
   unsigned long last_micros = micros();
 
   for (;;) {
+    // Block until MPU6050 asserts Data Ready (200Hz)
+    // We set a 10ms timeout (twice the 5ms period) as a fallback
+    bool got_interrupt = hal_imu_wait_for_data(10);
+    if (!got_interrupt) {
+      // Fallback delay to prevent CPU starvation if interrupt is missing
+      vTaskDelay(pdMS_TO_TICKS(1));
+    }
+
     unsigned long current_micros = micros();
     float dt = (current_micros - last_micros) * 1e-6f;
     last_micros = current_micros;
@@ -119,8 +125,6 @@ void Control_Task(void *pvParameters) {
 #if HAS_WIFI_SERIAL
     udp_telemetry.push_data(current_sys_state);
 #endif
-
-    vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
 
