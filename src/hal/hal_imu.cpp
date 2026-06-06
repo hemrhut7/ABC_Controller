@@ -2,27 +2,26 @@
 #include <Wire.h>
 
 namespace {
-    // QMI8658 Registers
-    constexpr uint8_t kImuAddress = 0x6B;
-    constexpr uint8_t kQmiWhoAmIReg = 0x00;
-    constexpr uint8_t kQmiWhoAmIValue = 0x05;
-    constexpr uint8_t kQmiCtrl1Reg = 0x02;
-    constexpr uint8_t kQmiCtrl2Reg = 0x03;
-    constexpr uint8_t kQmiCtrl3Reg = 0x04;
-    constexpr uint8_t kQmiCtrl5Reg = 0x06;
-    constexpr uint8_t kQmiCtrl7Reg = 0x08;
-    constexpr uint8_t kQmiTempLowReg = 0x33;
-    constexpr uint8_t kQmiAccelLowReg = 0x35;
-    constexpr uint8_t kQmiStatus0Reg = 0x2E;
-    constexpr uint8_t kQmiResetReg = 0x60;
+    // MPU6050 Registers
+    constexpr uint8_t kImuAddress = 0x68; // Standard MPU6050 address (AD0 low)
+    constexpr uint8_t kMpuWhoAmIReg = 0x75;
+    constexpr uint8_t kMpuWhoAmIValue = 0x68;
+    constexpr uint8_t kMpuPwrMgmt1Reg = 0x6B;
+    constexpr uint8_t kMpuSmplrtDivReg = 0x19;
+    constexpr uint8_t kMpuConfigReg = 0x1A;
+    constexpr uint8_t kMpuGyroConfigReg = 0x1B;
+    constexpr uint8_t kMpuAccelConfigReg = 0x1C;
+    constexpr uint8_t kMpuAccelXOutHReg = 0x3B;
 
-    // Config values (250Hz ODR and 33.4Hz LPF)
-    constexpr uint8_t kCtrl2Accel8gOdr250Hz = 0x25;
-    constexpr uint8_t kCtrl3Gyro512dpsOdr250Hz = 0x55;
-    constexpr uint8_t kCtrl5Lpf33HzAt250Hz = 0x57; // 13.37% of 250Hz ODR = 33.4Hz LPF
-    
+    // Config values
+    constexpr uint8_t kMpuAccel8gVal = 0x10;       // Range +/- 8G
+    constexpr uint8_t kMpuGyro500dpsVal = 0x08;    // Range +/- 500 deg/s
+    constexpr uint8_t kMpuDpf44HzVal = 0x03;       // DLPF Bandwidth 44Hz (Fs=1kHz)
+    constexpr uint8_t kMpuSmplrtDivVal = 0x04;     // 1kHz / (1 + 4) = 200Hz sample rate
+
     constexpr float kAccelScale = (8.0f / 32768.0f) * 9.80665f; // to m/s^2
-    constexpr float kGyroScale = (512.0f / 32768.0f) * DEG_TO_RAD; // to rad/s
+    constexpr float kGyroScale = (500.0f / 32768.0f) * DEG_TO_RAD; // to rad/s
+    constexpr float kTempScale = 1.0f / 340.0f;
 
     static bool is_initialized = false;
     static uint32_t i2c_error_count = 0;
@@ -32,10 +31,6 @@ namespace {
         Wire.write(reg);
         Wire.write(val);
         byte error = Wire.endTransmission();
-        if (error != 0 && is_initialized) {
-             // Only print if we were already running, to avoid spam during search
-             // Serial.printf("I2C Write Error: %d at reg 0x%02X\n", error, reg);
-        }
         return (error == 0);
     }
 
@@ -57,37 +52,37 @@ namespace {
     }
 }
 
-// Accelerometer Calibration Parameters
+// Accelerometer Calibration Parameters (Identity matrix and zero bias)
 // Matrix R
-constexpr float ACC_CAL_R00 = 1.00293926f;
-constexpr float ACC_CAL_R01 = -0.01065710f;
-constexpr float ACC_CAL_R02 = -0.02632111f;
-constexpr float ACC_CAL_R10 = 0.00277165f;
-constexpr float ACC_CAL_R11 = 1.00133575f;
-constexpr float ACC_CAL_R12 = 0.02528025f;
-constexpr float ACC_CAL_R20 = -0.01596356f;
-constexpr float ACC_CAL_R21 = -0.00037471f;
-constexpr float ACC_CAL_R22 = 1.00018146f;
+constexpr float ACC_CAL_R00 = 1.0f;
+constexpr float ACC_CAL_R01 = 0.0f;
+constexpr float ACC_CAL_R02 = 0.0f;
+constexpr float ACC_CAL_R10 = 0.0f;
+constexpr float ACC_CAL_R11 = 1.0f;
+constexpr float ACC_CAL_R12 = 0.0f;
+constexpr float ACC_CAL_R20 = 0.0f;
+constexpr float ACC_CAL_R21 = 0.0f;
+constexpr float ACC_CAL_R22 = 1.0f;
 // Bias Vector
-constexpr float ACC_CAL_B0  = -0.63845346f;
-constexpr float ACC_CAL_B1  = -0.16649856f;
-constexpr float ACC_CAL_B2  = 0.67299230f;
+constexpr float ACC_CAL_B0  = 0.0f;
+constexpr float ACC_CAL_B1  = 0.0f;
+constexpr float ACC_CAL_B2  = 0.0f;
 
-// Gyroscope Calibration Parameters
+// Gyroscope Calibration Parameters (Identity matrix and zero bias)
 // Matrix R
-constexpr float GYRO_CAL_R00 = 0.9999681388f;
-constexpr float GYRO_CAL_R01 = -0.0032722149f;
-constexpr float GYRO_CAL_R02 = -0.0072810655f;
-constexpr float GYRO_CAL_R10 = 0.0033785253f;
-constexpr float GYRO_CAL_R11 = 0.9998871674f;
-constexpr float GYRO_CAL_R12 = 0.0146368705f;
-constexpr float GYRO_CAL_R20 = 0.007232349f;
-constexpr float GYRO_CAL_R21 = -0.0146610034f;
-constexpr float GYRO_CAL_R22 = 0.9998663651f;
+constexpr float GYRO_CAL_R00 = 1.0f;
+constexpr float GYRO_CAL_R01 = 0.0f;
+constexpr float GYRO_CAL_R02 = 0.0f;
+constexpr float GYRO_CAL_R10 = 0.0f;
+constexpr float GYRO_CAL_R11 = 1.0f;
+constexpr float GYRO_CAL_R12 = 0.0f;
+constexpr float GYRO_CAL_R20 = 0.0f;
+constexpr float GYRO_CAL_R21 = 0.0f;
+constexpr float GYRO_CAL_R22 = 1.0f;
 // Bias Vector
-constexpr float GYRO_CAL_B0  = -788.2819f / 3600 * DEG_TO_RAD;
-constexpr float GYRO_CAL_B1  = -1341.4042f / 3600 * DEG_TO_RAD;
-constexpr float GYRO_CAL_B2  = -6613.7215f / 3600 * DEG_TO_RAD;
+constexpr float GYRO_CAL_B0  = 0.0f;
+constexpr float GYRO_CAL_B1  = 0.0f;
+constexpr float GYRO_CAL_B2  = 0.0f;
 
 void hal_imu_init() {
     if (!Wire.begin(IMU_SDA_PIN, IMU_SCL_PIN, 400000)) {
@@ -96,41 +91,41 @@ void hal_imu_init() {
     }
     Wire.setTimeOut(10); // 10ms timeout to prevent hanging
     
-    Serial.println("IMU: Searching for QMI8658...");
+    Serial.println("IMU: Searching for MPU6050...");
     
     // Check WHO_AM_I with retries
     uint8_t whoAmI = 0;
     bool found = false;
     for (int i = 0; i < 5; i++) {
         bool success = false;
-        whoAmI = readReg(kQmiWhoAmIReg, &success);
-        if (success && whoAmI == kQmiWhoAmIValue) {
+        whoAmI = readReg(kMpuWhoAmIReg, &success);
+        if (success && whoAmI == kMpuWhoAmIValue) {
             found = true;
             break;
         }
-        Serial.printf("IMU: WHO_AM_I check failed (attempt %d/5), got 0x%02X\n", i+1, whoAmI);
+        Serial.printf("IMU: MPU6050 WHO_AM_I check failed (attempt %d/5), got 0x%02X\n", i+1, whoAmI);
         delay(50);
     }
 
     if (!found) {
-        Serial.printf("QMI8658 not found! Final WHO_AM_I=0x%02X\n", whoAmI);
+        Serial.printf("MPU6050 not found! Final WHO_AM_I=0x%02X\n", whoAmI);
         return;
     }
 
-    // Reset
-    if (!writeReg(kQmiResetReg, 0xB0)) {
+    // Reset device
+    if (!writeReg(kMpuPwrMgmt1Reg, 0x80)) {
         Serial.println("IMU: Reset command failed");
         return;
     }
-    delay(50); // Give it some time to reset
+    delay(100); // Give it some time to reset
 
-    // Config
+    // Config MPU6050 registers
     bool ok = true;
-    ok &= writeReg(kQmiCtrl1Reg, 0x40); // Address auto-increment (INT1 disabled)
-    ok &= writeReg(kQmiCtrl2Reg, kCtrl2Accel8gOdr250Hz);
-    ok &= writeReg(kQmiCtrl3Reg, kCtrl3Gyro512dpsOdr250Hz);
-    ok &= writeReg(kQmiCtrl5Reg, kCtrl5Lpf33HzAt250Hz);
-    ok &= writeReg(kQmiCtrl7Reg, 0x03); // Enable accel and gyro
+    ok &= writeReg(kMpuPwrMgmt1Reg, 0x03);      // Clear sleep & set clock source to PLL with Gyro X reference
+    ok &= writeReg(kMpuConfigReg, kMpuDpf44HzVal);
+    ok &= writeReg(kMpuSmplrtDivReg, kMpuSmplrtDivVal);
+    ok &= writeReg(kMpuGyroConfigReg, kMpuGyro500dpsVal);
+    ok &= writeReg(kMpuAccelConfigReg, kMpuAccel8gVal);
 
     if (!ok) {
         Serial.println("IMU: Configuration failed");
@@ -138,7 +133,7 @@ void hal_imu_init() {
     }
 
     is_initialized = true;
-    Serial.println("QMI8658 initialized successfully at 250Hz ODR / 33.4Hz LPF");
+    Serial.println("MPU6050 initialized successfully at 200Hz ODR / 44Hz LPF");
 }
 
 bool hal_imu_healthy() {
@@ -148,11 +143,9 @@ bool hal_imu_healthy() {
 bool hal_imu_read(imu_data_t *data) {
     if (!is_initialized) return false;
 
-    // Read 14 bytes directly starting from TempLow register.
-    // Bypassing status register (0x2E) polling cuts I2C traffic in half, prevents timing clashes,
-    // and allows QMI8658's native hardware latching to cleanly lock all data registers.
+    // Read 14 bytes directly starting from AccelXOutH register.
     Wire.beginTransmission(kImuAddress);
-    Wire.write(kQmiTempLowReg);
+    Wire.write(kMpuAccelXOutHReg);
     if (Wire.endTransmission(false) != 0) {
         i2c_error_count++;
         is_initialized = false;
@@ -176,52 +169,37 @@ bool hal_imu_read(imu_data_t *data) {
         buf[i] = (uint8_t)val;
     }
 
-    int16_t t_raw = (int16_t)(buf[1] << 8 | buf[0]);
-    float temp_c = (float)t_raw / 256.0f;
+    int16_t ax_raw = (int16_t)(buf[0] << 8 | buf[1]);
+    int16_t ay_raw = (int16_t)(buf[2] << 8 | buf[3]);
+    int16_t az_raw = (int16_t)(buf[4] << 8 | buf[5]);
+    int16_t t_raw  = (int16_t)(buf[6] << 8 | buf[7]);
+    int16_t gx_raw = (int16_t)(buf[8] << 8 | buf[9]);
+    int16_t gy_raw = (int16_t)(buf[10] << 8 | buf[11]);
+    int16_t gz_raw = (int16_t)(buf[12] << 8 | buf[13]);
 
-    int16_t ax_raw = (int16_t)(buf[3] << 8 | buf[2]);
-    int16_t ay_raw = (int16_t)(buf[5] << 8 | buf[4]);
-    int16_t az_raw = (int16_t)(buf[7] << 8 | buf[6]);
-    int16_t gx_raw = (int16_t)(buf[9] << 8 | buf[8]);
-    int16_t gy_raw = (int16_t)(buf[11] << 8 | buf[10]);
-    int16_t gz_raw = (int16_t)(buf[13] << 8 | buf[12]);
+    float temp_c = (float)t_raw * kTempScale + 36.53f;
 
-    // Map raw data to m/s^2 and rad/s for physical scale validation
-    float raw_x = (float)ax_raw * kAccelScale;
-    float raw_y = (float)az_raw * kAccelScale;
-    float raw_z = -(float)ay_raw * kAccelScale;
+    // Map raw data to m/s^2 and rad/s
+    // Restored MPU6050 axis mapping from commit 05f1b1e:
+    // raw_x = -ax, raw_y = ay, raw_z = -az
+    // raw_gx = -gx, raw_gy = gy, raw_gz = -gz
+    float raw_x = -(float)ax_raw * kAccelScale;
+    float raw_y = (float)ay_raw * kAccelScale;
+    float raw_z = -(float)az_raw * kAccelScale;
 
     float acc_val[3];
     acc_val[0] = ACC_CAL_R00 * raw_x + ACC_CAL_R01 * raw_y + ACC_CAL_R02 * raw_z + ACC_CAL_B0;
     acc_val[1] = ACC_CAL_R10 * raw_x + ACC_CAL_R11 * raw_y + ACC_CAL_R12 * raw_z + ACC_CAL_B1;
     acc_val[2] = ACC_CAL_R20 * raw_x + ACC_CAL_R21 * raw_y + ACC_CAL_R22 * raw_z + ACC_CAL_B2;
 
-    float raw_gx = (float)gx_raw * kGyroScale;
-    float raw_gy = (float)gz_raw * kGyroScale;
-    float raw_gz = -(float)gy_raw * kGyroScale;
+    float raw_gx = -(float)gx_raw * kGyroScale;
+    float raw_gy = (float)gy_raw * kGyroScale;
+    float raw_gz = -(float)gz_raw * kGyroScale;
 
     float gyro_val[3];
-    gyro_val[0] = GYRO_CAL_R00 * raw_gx + GYRO_CAL_R01 * raw_gy + GYRO_CAL_R02 * raw_gz - GYRO_CAL_B0;
-    gyro_val[1] = GYRO_CAL_R10 * raw_gx + GYRO_CAL_R11 * raw_gy + GYRO_CAL_R12 * raw_gz - GYRO_CAL_B1;
-    gyro_val[2] = GYRO_CAL_R20 * raw_gx + GYRO_CAL_R21 * raw_gy + GYRO_CAL_R22 * raw_gz - GYRO_CAL_B2;
-
-    // Physical Outlier Rejection Check (to catch transient byte shifts/register tearing)
-    static float last_temp = 0.0f;
-    static bool has_last_samples = false;
-
-    if (has_last_samples) {
-        // Temperature Delta Check (Threshold: 2.0 C in 1ms).
-        // Since temperature cannot physically change by > 2.0C in 1ms, this is a 100% safe
-        // hardware-level check that catches I2C byte alignment shifts with zero risk of
-        // rejecting real rapid robot motions.
-        if (abs(temp_c - last_temp) > 2.0f) {
-            i2c_error_count++;
-            return false;
-        }
-    }
-
-    last_temp = temp_c;
-    has_last_samples = true;
+    gyro_val[0] = GYRO_CAL_R00 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R01 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R02 * (raw_gz - GYRO_CAL_B2);
+    gyro_val[1] = GYRO_CAL_R10 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R11 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R12 * (raw_gz - GYRO_CAL_B2);
+    gyro_val[2] = GYRO_CAL_R20 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R21 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R22 * (raw_gz - GYRO_CAL_B2);
 
     data->timestamp = micros();
     data->temp = temp_c;

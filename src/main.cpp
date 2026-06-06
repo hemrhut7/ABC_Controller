@@ -27,8 +27,8 @@
 #define PRIORITY_GAMEPAD 8
 #define PRIORITY_LIDAR 10
 
-#define PERIOD_CONTROLL 4 // 250Hz
-#define PERIOD_COMM     4 // 250Hz
+#define PERIOD_CONTROLL 5 // 200Hz
+#define PERIOD_COMM     5 // 200Hz
 #define PERIOD_GAMEPAD 10 // 100Hz
 
 TaskHandle_t ControlTaskHandle;
