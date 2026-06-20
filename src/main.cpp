@@ -15,6 +15,8 @@
 #include "hal/hal_udp_stream.h"
 #endif
 #include "app/app_lidar.h"
+#include "hal/hal_microros.h"
+
 
 #if HAS_BLUEPAD32
 #include "hal/hal_joystick.h"
@@ -56,7 +58,8 @@ HAL_Battery system_battery;
 Failsafe failsafe(PERIOD_CONTROLL, &motor, set_app_pending_mode);
 
 Telemetry uart_telemetry(Serial, PORT_USB);
-Telemetry uart1_telemetry(Serial1, PORT_UART1);
+
+HAL_MicroROS uros_telemetry;
 
 #if HAS_BLUEPAD32
 HAL_Joystick joystick(&app_mode, PERIOD_GAMEPAD);
@@ -120,7 +123,6 @@ void Control_Task(void *pvParameters) {
     current_sys_state.pid_target = app_mode.get_pid_target();
 
     uart_telemetry.push_data(current_sys_state);
-    uart1_telemetry.push_data(current_sys_state); // Push to UART1 too
 
 #if HAS_WIFI_SERIAL
     udp_telemetry.push_data(current_sys_state);
@@ -130,15 +132,27 @@ void Control_Task(void *pvParameters) {
 
 // 2. 通訊與管理任務 (Core 0)
 void UART1_Task(void *pvParameters) {
+  // Wait for board startup to settle
+  vTaskDelay(pdMS_TO_TICKS(2000));
+
+  uros_telemetry.init();
+
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
+
   for (;;) {
-    uart1_telemetry.process_serial_outgoing();
-    app_script.check_serial(Serial1, &uart1_telemetry);
+    ahrs_data_t ahrs_data;
+    ahrs.get_ahrs_data(&ahrs_data);
+
+    motor_state_t motor_state;
+    motor.get_motor_state(&motor_state);
+
+    uros_telemetry.update(motor_state.rpm_L, motor_state.rpm_R, ahrs_data);
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
+
 
 // 3. 通訊與管理任務 (Core 0)
 void Comm_Task(void *pvParameters) {
@@ -212,7 +226,6 @@ void setup() {
   motor.init();
   app_lidar.init();
   uart_telemetry.init(1000 / PERIOD_COMM);
-  uart1_telemetry.init(1000 / PERIOD_COMM);
 #if HAS_WIFI_SERIAL
   udp_telemetry.init(1000 / PERIOD_COMM);
 
@@ -241,7 +254,6 @@ void setup() {
 #endif
   
   app_lidar.register_telemetry(&uart_telemetry);
-  app_lidar.register_telemetry(&uart1_telemetry);
 #if HAS_WIFI_SERIAL
   app_lidar.register_telemetry(&udp_telemetry);
 #endif
