@@ -45,6 +45,7 @@ private:
     double right_joint_pos;
     uint32_t last_pub_time;
     uint32_t last_ping_check;
+    uint32_t last_sync_time;
 
     rosidl_runtime_c__String joint_names[2];
     double joint_positions[2];

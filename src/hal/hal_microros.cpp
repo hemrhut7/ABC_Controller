@@ -29,7 +29,8 @@ HAL_MicroROS::HAL_MicroROS() :
     left_joint_pos(0.0),
     right_joint_pos(0.0),
     last_pub_time(0),
-    last_ping_check(0) {
+    last_ping_check(0),
+    last_sync_time(0) {
     memset(&uros_support, 0, sizeof(uros_support));
     memset(&uros_executor, 0, sizeof(uros_executor));
     memset(&uros_imu_publisher, 0, sizeof(uros_imu_publisher));
@@ -158,6 +159,8 @@ void HAL_MicroROS::update(float rpm_L, float rpm_R, const ahrs_data_t &ahrs_data
       case AGENT_AVAILABLE:
         if (init_node_and_publishers()) {
           state = AGENT_CONNECTED;
+          last_sync_time = millis();
+          rmw_uros_sync_session(100);
         } else {
           state = WAITING_AGENT;
         }
@@ -174,6 +177,12 @@ void HAL_MicroROS::update(float rpm_L, float rpm_R, const ahrs_data_t &ahrs_data
           }
         }
 
+        // Periodically sync micro-ROS clock with Agent (every 15 seconds)
+        if (now_ms - last_sync_time > 15000) {
+          last_sync_time = now_ms;
+          rmw_uros_sync_session(10);
+        }
+
         // Get dt for joint position accumulation
         uint32_t current_time_us = micros();
         double dt = (last_pub_time > 0) ? (current_time_us - last_pub_time) * 1e-6 : 0.01;
@@ -188,8 +197,17 @@ void HAL_MicroROS::update(float rpm_L, float rpm_R, const ahrs_data_t &ahrs_data
         right_joint_pos += right_vel * dt;
 
         // Populate IMU Message
-        uros_imu_msg.header.stamp.sec = ahrs_data.imu_data.timestamp * 1e-6;
-        uros_imu_msg.header.stamp.nanosec = (ahrs_data.imu_data.timestamp % 1000000) * 1000;
+        if (rmw_uros_epoch_synchronized()) {
+          int64_t time_ns = rmw_uros_epoch_nanos();
+          // Compensate for scheduling/sampling delay since data->timestamp was captured
+          uint32_t delay_us = current_time_us - (uint32_t)ahrs_data.imu_data.timestamp;
+          time_ns -= (int64_t)delay_us * 1000;
+          uros_imu_msg.header.stamp.sec = time_ns / 1000000000LL;
+          uros_imu_msg.header.stamp.nanosec = time_ns % 1000000000LL;
+        } else {
+          uros_imu_msg.header.stamp.sec = ahrs_data.imu_data.timestamp / 1000000;
+          uros_imu_msg.header.stamp.nanosec = (ahrs_data.imu_data.timestamp % 1000000) * 1000;
+        }
 
         // Gyroscope is in rad/s in calibrated imu_data
         uros_imu_msg.angular_velocity.x = ahrs_data.imu_data.gyro[0];
