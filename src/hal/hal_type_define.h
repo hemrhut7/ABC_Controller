@@ -111,6 +111,8 @@ typedef struct {
     uint32_t delay_count;
     PID_target_t pid_target;
     float battery_v;
+    mag_data_t mag_data;
+    baro_data_t baro_data;
 } system_state_t;
 
 enum AHRS_STATE {

@@ -79,7 +79,7 @@ void Telemetry::process_serial_outgoing() {
     if (_format == FORMAT_DEFAULT) {
       // A packet was successfully received.
       // Now, manually flatten the nested struct into a float array for VOFA+.
-      float data_packet[19];
+      float data_packet[25];
       data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
       data_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
       data_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
@@ -98,14 +98,20 @@ void Telemetry::process_serial_outgoing() {
       data_packet[15] = (float)pkt.cmd.mode;
       data_packet[16] = (float)pkt.delay_count;
       data_packet[17] = pkt.battery_v;
+      data_packet[18] = pkt.mag_data.mag[0];
+      data_packet[19] = pkt.mag_data.mag[1];
+      data_packet[20] = pkt.mag_data.mag[2];
+      data_packet[21] = pkt.baro_data.pressure;
+      data_packet[22] = pkt.baro_data.temperature;
+      data_packet[23] = pkt.baro_data.altitude;
 
-      // Add byte-wise checksum in index 18
+      // Add byte-wise checksum in index 24
       uint32_t checksum = 0;
       uint8_t *byte_ptr = (uint8_t*)data_packet;
-      for (size_t i = 0; i < 18 * sizeof(float); i++) {
+      for (size_t i = 0; i < 24 * sizeof(float); i++) {
           checksum += byte_ptr[i];
       }
-      data_packet[18] = (float)checksum;
+      data_packet[24] = (float)checksum;
 
       // Write the data packet and the tail to the serial port.
       uint8_t send_buffer[sizeof(data_packet) + sizeof(vofa_tail)];
@@ -158,7 +164,7 @@ void Telemetry::process_serial_outgoing() {
       }
 
       // Preparation of base status data
-      float status_packet[19];
+      float status_packet[25];
       status_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
       status_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
       status_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
@@ -177,14 +183,20 @@ void Telemetry::process_serial_outgoing() {
       status_packet[15] = (float)pkt.cmd.mode;
       status_packet[16] = (float)pkt.delay_count;
       status_packet[17] = pkt.battery_v;
+      status_packet[18] = pkt.mag_data.mag[0];
+      status_packet[19] = pkt.mag_data.mag[1];
+      status_packet[20] = pkt.mag_data.mag[2];
+      status_packet[21] = pkt.baro_data.pressure;
+      status_packet[22] = pkt.baro_data.temperature;
+      status_packet[23] = pkt.baro_data.altitude;
 
-      // Add byte-wise checksum in index 18
+      // Add byte-wise checksum in index 24
       uint32_t checksum = 0;
       uint8_t *byte_ptr = (uint8_t*)status_packet;
-      for (size_t i = 0; i < 18 * sizeof(float); i++) {
+      for (size_t i = 0; i < 24 * sizeof(float); i++) {
           checksum += byte_ptr[i];
       }
-      status_packet[18] = (float)checksum;
+      status_packet[24] = (float)checksum;
 
       // LwIP Automatic IP Fragmentation: Allocate a single buffer large enough for a full scan (approx 4.7 KB)
       static uint8_t* tx_chunk = nullptr;

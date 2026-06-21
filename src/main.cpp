@@ -40,7 +40,62 @@ TaskHandle_t GamepadTaskHandle;
 #if HAS_WIFI_SERIAL
 TaskHandle_t WiFiTaskHandle;
 #endif
-TaskHandle_t LidarTaskHandle;
+TaskHandle_t SensorTaskHandle;
+extern AppLidar app_lidar;
+
+// Shared sensor variables and thread-safe protection
+static portMUX_TYPE shared_sensor_mux = portMUX_INITIALIZER_UNLOCKED;
+static mag_data_t g_mag_data = {0};
+static baro_data_t g_baro_data = {0};
+
+void update_shared_sensors(const mag_data_t &mag, const baro_data_t &baro, bool has_mag, bool has_baro) {
+  portENTER_CRITICAL(&shared_sensor_mux);
+  if (has_mag) g_mag_data = mag;
+  if (has_baro) g_baro_data = baro;
+  portEXIT_CRITICAL(&shared_sensor_mux);
+}
+
+void get_shared_sensors(mag_data_t &mag, baro_data_t &baro) {
+  portENTER_CRITICAL(&shared_sensor_mux);
+  mag = g_mag_data;
+  baro = g_baro_data;
+  portEXIT_CRITICAL(&shared_sensor_mux);
+}
+
+void Sensor_Task(void *pvParameters) {
+  uint32_t last_mag_read_ms = 0;
+  uint32_t last_baro_read_ms = 0;
+
+  for (;;) {
+    // 1. Update Lidar (runs continuously to empty UART buffer)
+    app_lidar.update_step();
+
+    uint32_t now = millis();
+
+    // 2. Read Magnetometer at 20Hz (every 50ms)
+    bool mag_updated = false;
+    mag_data_t mag;
+    if (now - last_mag_read_ms >= 50) {
+      mag_updated = hal_mag_read(&mag);
+      last_mag_read_ms = now;
+    }
+
+    // 3. Read Barometer at 10Hz (every 100ms)
+    bool baro_updated = false;
+    baro_data_t baro;
+    if (now - last_baro_read_ms >= 100) {
+      baro_updated = hal_baro_read(&baro);
+      last_baro_read_ms = now;
+    }
+
+    // 4. Update shared sensor data structures
+    if (mag_updated || baro_updated) {
+      update_shared_sensors(mag, baro, mag_updated, baro_updated);
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
 
 #include "esp_timer.h"
 static SemaphoreHandle_t control_timer_sem = nullptr;
@@ -86,26 +141,14 @@ AppLidar app_lidar(Serial2);
 
 
 
-// 1. 控制任務 (Core 1)
 void Control_Task(void *pvParameters) {
   unsigned long last_micros = micros();
-  static uint32_t loop_count = 0;
-  static uint32_t last_report_ms = 0;
 
   for (;;) {
     if (control_timer_sem) {
       xSemaphoreTake(control_timer_sem, portMAX_DELAY);
     } else {
       vTaskDelay(pdMS_TO_TICKS(2));
-    }
-
-    loop_count++;
-    uint32_t now_ms = millis();
-    if (now_ms - last_report_ms >= 1000) {
-      float rate = (float)loop_count * 1000.0f / (float)(now_ms - last_report_ms);
-      Serial.printf("[Control Rate] Loop Rate: %0.2f Hz\n", rate);
-      loop_count = 0;
-      last_report_ms = now_ms;
     }
 
     unsigned long current_micros = micros();
@@ -141,6 +184,9 @@ void Control_Task(void *pvParameters) {
     current_sys_state.cmd.mode = app_mode.get_mode();
     current_sys_state.abc_state.velocity = app_mode.get_velocity();
     current_sys_state.pid_target = app_mode.get_pid_target();
+    
+    // Copy thread-safe sensor data into current telemetry packet
+    get_shared_sensors(current_sys_state.mag_data, current_sys_state.baro_data);
 
     uart_telemetry.push_data(current_sys_state);
     uart1_telemetry.push_data(current_sys_state); // Push to UART1 too
@@ -194,62 +240,6 @@ void Comm_Task(void *pvParameters) {
 #endif
 
     system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_error_state(), &wifi_s, joy_connected);
-
-    static uint32_t loop_cnt = 0;
-    static uint32_t mag_read_count = 0;
-    static uint32_t baro_read_count = 0;
-    static uint32_t last_rate_report_ms = 0;
-    static mag_data_t latest_mag;
-    static baro_data_t latest_baro;
-    static bool latest_mag_ok = false;
-    static bool latest_baro_ok = false;
-
-    loop_cnt++;
-
-    // 1. Read Magnetometer at 20Hz (every 10 ticks * 5ms = 50ms)
-    if (loop_cnt % 10 == 0) {
-        if (hal_mag_read(&latest_mag)) {
-            mag_read_count++;
-            latest_mag_ok = true;
-        } else {
-            latest_mag_ok = false;
-        }
-    }
-
-    // 2. Read Barometer at 10Hz (every 20 ticks * 5ms = 100ms)
-    if (loop_cnt % 20 == 0) {
-        if (hal_baro_read(&latest_baro)) {
-            baro_read_count++;
-            latest_baro_ok = true;
-        } else {
-            latest_baro_ok = false;
-        }
-    }
-
-    // 3. Print rate diagnostics and sensor values once per second
-    uint32_t now_ms = millis();
-    if (now_ms - last_rate_report_ms >= 1000) {
-        float mag_rate = (float)mag_read_count * 1000.0f / (float)(now_ms - last_rate_report_ms);
-        float baro_rate = (float)baro_read_count * 1000.0f / (float)(now_ms - last_rate_report_ms);
-        
-        Serial.printf("[Sensor Rates] MAG: %0.2f Hz, BARO: %0.2f Hz\n", mag_rate, baro_rate);
-        
-        if (latest_mag_ok) {
-            Serial.printf("[Sensor Data] MAG: X=%0.2f Y=%0.2f Z=%0.2f uT\n", latest_mag.mag[0], latest_mag.mag[1], latest_mag.mag[2]);
-        } else {
-            Serial.println("[Sensor Data] MAG: Read failed");
-        }
-        
-        if (latest_baro_ok) {
-            Serial.printf("[Sensor Data] BARO: Temp=%0.2f C, Press=%0.2f hPa, Alt=%0.2f m\n", latest_baro.temperature, latest_baro.pressure, latest_baro.altitude);
-        } else {
-            Serial.println("[Sensor Data] BARO: Read failed");
-        }
-
-        mag_read_count = 0;
-        baro_read_count = 0;
-        last_rate_report_ms = now_ms;
-    }
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
@@ -363,8 +353,8 @@ void setup() {
                           &WiFiTaskHandle, 0);
 #endif
 
-  xTaskCreatePinnedToCore(AppLidar::task_entry, "Lidar_Task", 16384, &app_lidar, 
-                          PRIORITY_LIDAR, &LidarTaskHandle, 0);
+  xTaskCreatePinnedToCore(Sensor_Task, "SensorTask", 16384, NULL, 
+                          PRIORITY_LIDAR, &SensorTaskHandle, 0);
 }
 
 void loop() { vTaskDelete(NULL); }
