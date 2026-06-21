@@ -1,7 +1,7 @@
 #include "hal_motor.h"
 
 
-HAL_Motor::HAL_Motor(MotorPosition position, uint32_t period_ms) {
+HAL_Motor::HAL_Motor(MotorPosition position, float period_ms) {
     if (position == LEFT_MOTOR) {
         pwm_pin = MOTOR_L_PWM_PIN;
         dir_pin1 = MOTOR_L_DIR1_PIN;
@@ -24,8 +24,8 @@ HAL_Motor::HAL_Motor(MotorPosition position, uint32_t period_ms) {
         pwm_channel = 1;
     }
     init();
-    update_rate_hz = 1000 / period_ms;
-    dt = (float)period_ms * 1e-3f;
+    update_rate_hz = 1000.0f / period_ms;
+    dt = period_ms * 1e-3f;
     MAX_MOTOR_DELTA_RPM = MAX_MOTOR_RPM_RATE * dt;
 }
 

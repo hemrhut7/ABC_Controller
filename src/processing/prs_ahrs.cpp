@@ -6,7 +6,7 @@
 static portMUX_TYPE ahrs_mux = portMUX_INITIALIZER_UNLOCKED;
 #endif
 
-Processing_AHRS::Processing_AHRS(uint32_t period_ms) : cpf(period_ms){
+Processing_AHRS::Processing_AHRS(float period_ms) : cpf(period_ms){
     // Constructor
 }
 

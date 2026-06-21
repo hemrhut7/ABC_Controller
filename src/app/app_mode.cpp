@@ -3,12 +3,12 @@
 #include <cmath>
 
 
-AppMode::AppMode(Processing_Motor* motor, ConfigStore* config_store, int interval_ms) 
+AppMode::AppMode(Processing_Motor* motor, ConfigStore* config_store, float interval_ms) 
     : _motor(motor), _config_store(config_store), _cmd_queue(nullptr),
-    lpf_velocity(1000 / interval_ms, cut_off_freq_velocity), 
-    lpf_steer(1000 / interval_ms, cut_off_freq_steer),
-    lpf_current_velocity(1000 / interval_ms, cut_off_freq_current_velocity),
-    lpf_gyro_z(1000 / interval_ms, cut_off_freq_gyro_z) {
+    lpf_velocity(1000.0f / interval_ms, cut_off_freq_velocity), 
+    lpf_steer(1000.0f / interval_ms, cut_off_freq_steer),
+    lpf_current_velocity(1000.0f / interval_ms, cut_off_freq_current_velocity),
+    lpf_gyro_z(1000.0f / interval_ms, cut_off_freq_gyro_z) {
     _cmd.mode = MODE_STOP;
     _cmd.target_value = 0.0f;
     _cmd.target_steer = 0.0f;

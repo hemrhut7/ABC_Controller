@@ -1,10 +1,10 @@
 #include "app_fail_safe.h"
 
-Failsafe::Failsafe(uint16_t period_ms, Processing_Motor* motor, set_pending_mode_fn set_pending_mode_cb) 
+Failsafe::Failsafe(float period_ms, Processing_Motor* motor, set_pending_mode_fn set_pending_mode_cb) 
     : _motor(motor), _set_pending_mode_cb(set_pending_mode_cb) {
     last_check_time = 0;
     pickup_start_time = 0;
-    MAX_LOOP_TIME_MS = period_ms * 2; // 增加容錯空間，避免因系統抖動誤觸發
+    MAX_LOOP_TIME_MS = (uint32_t)(period_ms * 2.0f); // 增加容錯空間，避免因系統抖動誤觸發
     is_pickup_condition_met = false;
 }
 

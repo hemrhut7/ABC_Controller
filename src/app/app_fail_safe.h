@@ -18,7 +18,7 @@ typedef void (*set_pending_mode_fn)(Mode_t);
 
 class Failsafe {
 public:
-    Failsafe(uint16_t period_ms, Processing_Motor* motor, set_pending_mode_fn set_pending_mode_cb);
+    Failsafe(float period_ms, Processing_Motor* motor, set_pending_mode_fn set_pending_mode_cb);
 
     void init();
     bool check(const ahrs_data_t &ahrs_data, AHRS_STATE ahrs_state, Mode_t current_mode);

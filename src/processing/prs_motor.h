@@ -5,7 +5,7 @@
 
 class Processing_Motor {
 public:
-    Processing_Motor(uint32_t period_ms);
+    Processing_Motor(float period_ms);
     ~Processing_Motor();
 
     void init();

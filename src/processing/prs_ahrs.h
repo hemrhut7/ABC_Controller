@@ -7,7 +7,7 @@
 
 class Processing_AHRS {
 public:
-    Processing_AHRS(uint32_t period_ms);
+    Processing_AHRS(float period_ms);
     ~Processing_AHRS();
 
     bool init();

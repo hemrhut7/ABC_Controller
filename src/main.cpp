@@ -9,6 +9,8 @@
 #include "hal/hal_display.h"
 #include "hal/hal_battery.h"
 #include "hal/hal_imu.h"
+#include "hal/hal_mag.h"
+#include "hal/hal_baro.h"
 
 #if HAS_WIFI_SERIAL
 #include <WiFi.h>
@@ -27,8 +29,8 @@
 #define PRIORITY_GAMEPAD 8
 #define PRIORITY_LIDAR 10
 
-#define PERIOD_CONTROLL 4 // 250Hz
-#define PERIOD_COMM     4 // 250Hz
+#define PERIOD_CONTROLL 2.5f // 400Hz
+#define PERIOD_COMM     5 // 200Hz
 #define PERIOD_GAMEPAD 10 // 100Hz
 
 TaskHandle_t ControlTaskHandle;
@@ -39,6 +41,18 @@ TaskHandle_t GamepadTaskHandle;
 TaskHandle_t WiFiTaskHandle;
 #endif
 TaskHandle_t LidarTaskHandle;
+
+#include "esp_timer.h"
+static SemaphoreHandle_t control_timer_sem = nullptr;
+static void IRAM_ATTR control_timer_callback(void* arg) {
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  if (control_timer_sem) {
+    xSemaphoreGiveFromISR(control_timer_sem, &xHigherPriorityTaskWoken);
+    if (xHigherPriorityTaskWoken) {
+      portYIELD_FROM_ISR();
+    }
+  }
+}
 
 ConfigStore config_store;
 Processing_Motor motor(PERIOD_CONTROLL);
@@ -75,14 +89,23 @@ AppLidar app_lidar(Serial2);
 // 1. 控制任務 (Core 1)
 void Control_Task(void *pvParameters) {
   unsigned long last_micros = micros();
+  static uint32_t loop_count = 0;
+  static uint32_t last_report_ms = 0;
 
   for (;;) {
-    // Block until MPU6050 asserts Data Ready (200Hz)
-    // We set a 10ms timeout (twice the 5ms period) as a fallback
-    bool got_interrupt = hal_imu_wait_for_data(10);
-    if (!got_interrupt) {
-      // Fallback delay to prevent CPU starvation if interrupt is missing
-      vTaskDelay(pdMS_TO_TICKS(1));
+    if (control_timer_sem) {
+      xSemaphoreTake(control_timer_sem, portMAX_DELAY);
+    } else {
+      vTaskDelay(pdMS_TO_TICKS(2));
+    }
+
+    loop_count++;
+    uint32_t now_ms = millis();
+    if (now_ms - last_report_ms >= 1000) {
+      float rate = (float)loop_count * 1000.0f / (float)(now_ms - last_report_ms);
+      Serial.printf("[Control Rate] Loop Rate: %0.2f Hz\n", rate);
+      loop_count = 0;
+      last_report_ms = now_ms;
     }
 
     unsigned long current_micros = micros();
@@ -172,6 +195,26 @@ void Comm_Task(void *pvParameters) {
 
     system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_error_state(), &wifi_s, joy_connected);
 
+    static uint32_t log_counter = 0;
+    log_counter++;
+    if (log_counter >= 200) { // 200 * 5ms = 1000ms (1 second)
+        log_counter = 0;
+        mag_data_t mag;
+        baro_data_t baro;
+        bool mag_ok = hal_mag_read(&mag);
+        bool baro_ok = hal_baro_read(&baro);
+        if (mag_ok) {
+            Serial.printf("[Sensor Data] MAG: X=%0.2f Y=%0.2f Z=%0.2f uT\n", mag.mag[0], mag.mag[1], mag.mag[2]);
+        } else {
+            Serial.println("[Sensor Data] MAG: Read failed");
+        }
+        if (baro_ok) {
+            Serial.printf("[Sensor Data] BARO: Temp=%0.2f C, Press=%0.2f hPa, Alt=%0.2f m\n", baro.temperature, baro.pressure, baro.altitude);
+        } else {
+            Serial.println("[Sensor Data] BARO: Read failed");
+        }
+    }
+
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
@@ -209,6 +252,8 @@ void setup() {
   if (!ahrs.init()) {
     Serial.println("WARNING: AHRS initialization failed! System will run in degraded mode (no attitude control).");
   }
+  hal_mag_init();
+  hal_baro_init();
   motor.init();
   app_lidar.init();
   uart_telemetry.init(1000 / PERIOD_COMM);
@@ -251,7 +296,16 @@ void setup() {
   system_battery.init();
   app_mode.set_mode(MODE_FREE);
 
-
+  control_timer_sem = xSemaphoreCreateBinary();
+  const esp_timer_create_args_t timer_args = {
+      .callback = &control_timer_callback,
+      .arg = nullptr,
+      .dispatch_method = ESP_TIMER_TASK,
+      .name = "control_timer"
+  };
+  esp_timer_handle_t timer;
+  esp_timer_create(&timer_args, &timer);
+  esp_timer_start_periodic(timer, 2500); // 2500us = 400Hz
 
   xTaskCreatePinnedToCore(Control_Task, "ControlTask", 12288, NULL,
                           PRIORITY_CONTROL, &ControlTaskHandle, 1);
