@@ -128,7 +128,7 @@ namespace {
         uint8_t user_ctrl = readReg(0, kRegUserCtrl, &ok);
         if (!ok) return false;
         ok &= writeReg(0, kRegUserCtrl, user_ctrl | kValI2cMstEn);
-        delayMicroseconds(1500); // 1.5ms is safe for internal I2C transaction to finish
+        delayMicroseconds(500); // 500us is safe for 1-byte write
         ok &= writeReg(0, kRegUserCtrl, user_ctrl & ~kValI2cMstEn);
         return ok;
     }
@@ -143,8 +143,7 @@ namespace {
         uint8_t user_ctrl = readReg(0, kRegUserCtrl, &ok);
         if (!ok) return false;
         ok &= writeReg(0, kRegUserCtrl, user_ctrl | kValI2cMstEn);
-        delayMicroseconds(1500); // 1.5ms is safe for internal I2C transaction to finish
-        ok &= writeReg(0, kRegUserCtrl, user_ctrl & ~kValI2cMstEn);
+        delayMicroseconds(1000); // 1000us (1.0ms) is safe for 7-byte read
 
         // Read from external sensor registers in Bank 0
         ok &= readRegs(0, kRegExtSensData00, buf, len);

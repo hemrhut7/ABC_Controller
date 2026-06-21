@@ -195,24 +195,60 @@ void Comm_Task(void *pvParameters) {
 
     system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_error_state(), &wifi_s, joy_connected);
 
-    static uint32_t log_counter = 0;
-    log_counter++;
-    if (log_counter >= 200) { // 200 * 5ms = 1000ms (1 second)
-        log_counter = 0;
-        mag_data_t mag;
-        baro_data_t baro;
-        bool mag_ok = hal_mag_read(&mag);
-        bool baro_ok = hal_baro_read(&baro);
-        if (mag_ok) {
-            Serial.printf("[Sensor Data] MAG: X=%0.2f Y=%0.2f Z=%0.2f uT\n", mag.mag[0], mag.mag[1], mag.mag[2]);
+    static uint32_t loop_cnt = 0;
+    static uint32_t mag_read_count = 0;
+    static uint32_t baro_read_count = 0;
+    static uint32_t last_rate_report_ms = 0;
+    static mag_data_t latest_mag;
+    static baro_data_t latest_baro;
+    static bool latest_mag_ok = false;
+    static bool latest_baro_ok = false;
+
+    loop_cnt++;
+
+    // 1. Read Magnetometer at 20Hz (every 10 ticks * 5ms = 50ms)
+    if (loop_cnt % 10 == 0) {
+        if (hal_mag_read(&latest_mag)) {
+            mag_read_count++;
+            latest_mag_ok = true;
+        } else {
+            latest_mag_ok = false;
+        }
+    }
+
+    // 2. Read Barometer at 10Hz (every 20 ticks * 5ms = 100ms)
+    if (loop_cnt % 20 == 0) {
+        if (hal_baro_read(&latest_baro)) {
+            baro_read_count++;
+            latest_baro_ok = true;
+        } else {
+            latest_baro_ok = false;
+        }
+    }
+
+    // 3. Print rate diagnostics and sensor values once per second
+    uint32_t now_ms = millis();
+    if (now_ms - last_rate_report_ms >= 1000) {
+        float mag_rate = (float)mag_read_count * 1000.0f / (float)(now_ms - last_rate_report_ms);
+        float baro_rate = (float)baro_read_count * 1000.0f / (float)(now_ms - last_rate_report_ms);
+        
+        Serial.printf("[Sensor Rates] MAG: %0.2f Hz, BARO: %0.2f Hz\n", mag_rate, baro_rate);
+        
+        if (latest_mag_ok) {
+            Serial.printf("[Sensor Data] MAG: X=%0.2f Y=%0.2f Z=%0.2f uT\n", latest_mag.mag[0], latest_mag.mag[1], latest_mag.mag[2]);
         } else {
             Serial.println("[Sensor Data] MAG: Read failed");
         }
-        if (baro_ok) {
-            Serial.printf("[Sensor Data] BARO: Temp=%0.2f C, Press=%0.2f hPa, Alt=%0.2f m\n", baro.temperature, baro.pressure, baro.altitude);
+        
+        if (latest_baro_ok) {
+            Serial.printf("[Sensor Data] BARO: Temp=%0.2f C, Press=%0.2f hPa, Alt=%0.2f m\n", latest_baro.temperature, latest_baro.pressure, latest_baro.altitude);
         } else {
             Serial.println("[Sensor Data] BARO: Read failed");
         }
+
+        mag_read_count = 0;
+        baro_read_count = 0;
+        last_rate_report_ms = now_ms;
     }
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
@@ -296,7 +332,7 @@ void setup() {
   system_battery.init();
   app_mode.set_mode(MODE_FREE);
 
-  control_timer_sem = xSemaphoreCreateBinary();
+  control_timer_sem = xSemaphoreCreateCounting(10, 0);
   const esp_timer_create_args_t timer_args = {
       .callback = &control_timer_callback,
       .arg = nullptr,
