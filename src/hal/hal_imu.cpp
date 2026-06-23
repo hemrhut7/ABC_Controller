@@ -128,7 +128,7 @@ namespace {
         uint8_t user_ctrl = readReg(0, kRegUserCtrl, &ok);
         if (!ok) return false;
         ok &= writeReg(0, kRegUserCtrl, user_ctrl | kValI2cMstEn);
-        delayMicroseconds(500); // 500us is safe for 1-byte write
+        delayMicroseconds(150); // 150us is safe for 1-byte write (was 500us)
         ok &= writeReg(0, kRegUserCtrl, user_ctrl & ~kValI2cMstEn);
         return ok;
     }
@@ -143,7 +143,11 @@ namespace {
         uint8_t user_ctrl = readReg(0, kRegUserCtrl, &ok);
         if (!ok) return false;
         ok &= writeReg(0, kRegUserCtrl, user_ctrl | kValI2cMstEn);
-        delayMicroseconds(1000); // 1000us (1.0ms) is safe for 7-byte read
+        
+        // 345kHz I2C Master speed: 7 bytes read takes ~235us.
+        // We set delay to 300us for 7-byte read, and 100us for 1-byte read.
+        uint32_t delay_us = (len == 1) ? 100 : (100 + len * 30);
+        delayMicroseconds(delay_us); 
 
         // Read from external sensor registers in Bank 0
         ok &= readRegs(0, kRegExtSensData00, buf, len);
@@ -185,7 +189,7 @@ void hal_imu_init() {
         Serial.println("Failed to initialize I2C bus");
         return;
     }
-    Wire.setTimeOut(10); // 10ms timeout to prevent hanging
+    Wire.setTimeOut(2); // 2ms timeout is safer for 3ms control rate (was 10ms)
     
     Serial.println("IMU: Searching for ICM20948...");
     
@@ -288,19 +292,18 @@ bool hal_imu_read(imu_data_t *data) {
     float temp_c = (float)t_raw * kTempScale + 21.0f;
 
     // Scale raw values
-    // raw_x = -ax, raw_y = ay, raw_z = -az (same as MPU6050 alignment mapping)
-    float raw_x = -(float)ax_raw * kAccelScale;
-    float raw_y = (float)ay_raw * kAccelScale;
-    float raw_z = -(float)az_raw * kAccelScale;
+    float raw_x = -(float)ay_raw * kAccelScale;
+    float raw_y = (float)ax_raw * kAccelScale;
+    float raw_z = (float)az_raw * kAccelScale;
 
     float acc_val[3];
     acc_val[0] = ACC_CAL_R00 * raw_x + ACC_CAL_R01 * raw_y + ACC_CAL_R02 * raw_z + ACC_CAL_B0;
     acc_val[1] = ACC_CAL_R10 * raw_x + ACC_CAL_R11 * raw_y + ACC_CAL_R12 * raw_z + ACC_CAL_B1;
     acc_val[2] = ACC_CAL_R20 * raw_x + ACC_CAL_R21 * raw_y + ACC_CAL_R22 * raw_z + ACC_CAL_B2;
 
-    float raw_gx = -(float)gx_raw * kGyroScale;
-    float raw_gy = (float)gy_raw * kGyroScale;
-    float raw_gz = -(float)gz_raw * kGyroScale;
+    float raw_gx = -(float)gy_raw * kGyroScale;
+    float raw_gy = (float)gx_raw * kGyroScale;
+    float raw_gz = (float)gz_raw * kGyroScale;
 
     float gyro_val[3];
     gyro_val[0] = GYRO_CAL_R00 * (raw_gx - GYRO_CAL_B0) + GYRO_CAL_R01 * (raw_gy - GYRO_CAL_B1) + GYRO_CAL_R02 * (raw_gz - GYRO_CAL_B2);
@@ -358,19 +361,14 @@ bool hal_imu_mag_healthy() {
 bool hal_imu_mag_read(mag_data_t *data) {
     if (!is_mag_initialized) return false;
 
-    uint8_t mag_status = 0;
-    uint8_t raw[8]; // read status and data
-    
+    uint8_t buf[7];
     xSemaphoreTake(i2c_mutex, portMAX_DELAY);
     
-    // Poll ST1 to make sure data is ready
-    bool read_ok = readSecondary(kMagAddress, kRegMagStatus2, &mag_status, 1);
+    // Directly read ST1 + data (7 bytes starting from ST1 0x10)
+    // kRegMagStatus2 is 0x10 (ST1 status register)
+    bool read_ok = readSecondary(kMagAddress, kRegMagStatus2, buf, 7);
     
-    // Wait, the status register ST1 is 0x10. If bit 0 is 1, data ready
-    // ST2 is 0x18. The actual data is at 0x11.
-    // Let's directly read ST1 + data (7 bytes starting from ST1 0x10)
-    uint8_t buf[7];
-    if (readSecondary(kMagAddress, kRegMagStatus2, buf, 7)) {
+    if (read_ok) {
         // buf[0] is ST1, buf[1]..buf[6] is X_L, X_H, Y_L, Y_H, Z_L, Z_H
         int16_t mx = (int16_t)(buf[2] << 8 | buf[1]);
         int16_t my = (int16_t)(buf[4] << 8 | buf[3]);
@@ -381,9 +379,6 @@ bool hal_imu_mag_read(mag_data_t *data) {
         data->mag[1] = (float)my * 0.15f;
         data->mag[2] = (float)mz * 0.15f;
         data->timestamp = micros();
-        read_ok = true;
-    } else {
-        read_ok = false;
     }
     
     selectBank(0);

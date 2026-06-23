@@ -29,7 +29,7 @@
 #define PRIORITY_GAMEPAD 8
 #define PRIORITY_LIDAR 10
 
-#define PERIOD_CONTROLL 2.5f // 400Hz
+#define PERIOD_CONTROLL 3.0f // 333.3Hz (3ms)
 #define PERIOD_COMM     5 // 200Hz
 #define PERIOD_GAMEPAD 10 // 100Hz
 
@@ -331,7 +331,7 @@ void setup() {
   };
   esp_timer_handle_t timer;
   esp_timer_create(&timer_args, &timer);
-  esp_timer_start_periodic(timer, 2500); // 2500us = 400Hz
+  esp_timer_start_periodic(timer, 3000); // 3000us = 333.3Hz (3ms)
 
   xTaskCreatePinnedToCore(Control_Task, "ControlTask", 12288, NULL,
                           PRIORITY_CONTROL, &ControlTaskHandle, 1);
