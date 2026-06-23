@@ -228,12 +228,12 @@ void hal_imu_init() {
     ok &= writeReg(0, kRegIntEnable1, kValIntEnable1);
 
     // Config Sample rates and DLPF in Bank 2
-    // Gyro ODR = 1100 / (1 + 4) = 220Hz. Config range = ±500dps, DLPF = 51.2Hz
-    ok &= writeReg(2, kRegGyroSmplrtDiv, 0x04);
+    // Gyro ODR = 1125 / (1 + 1) = 562.5Hz. Config range = ±500dps, DLPF = 50.4Hz
+    ok &= writeReg(2, kRegGyroSmplrtDiv, 0x01);
     ok &= writeReg(2, kRegGyroConfig1, 0x1B);
     
-    // Accel ODR = 1125 / (1 + 4) = 225Hz. Config range = ±8g, DLPF = 50.4Hz
-    ok &= writeReg(2, kRegAccelSmplrtDiv2, 0x04);
+    // Accel ODR = 1125 / (1 + 1) = 562.5Hz. Config range = ±8g, DLPF = 50.4Hz
+    ok &= writeReg(2, kRegAccelSmplrtDiv2, 0x01);
     ok &= writeReg(2, kRegAccelConfig, 0x1D);
 
     // Make sure we end up in Bank 0 for continuous reading
@@ -253,7 +253,7 @@ void hal_imu_init() {
     attachInterrupt(digitalPinToInterrupt(IMU_INT1_PIN), imu_isr_handler, RISING);
 
     is_initialized = true;
-    Serial.println("ICM20948 initialized successfully at 220Hz ODR / 50Hz DLPF with interrupt");
+    Serial.println("ICM20948 initialized successfully at 562.5Hz ODR / 50.4Hz DLPF with interrupt");
     
     xSemaphoreGive(i2c_mutex);
 }
