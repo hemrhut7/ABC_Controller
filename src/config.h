@@ -45,8 +45,8 @@
 #define MOTOR_R_PWM_PIN     16     // P1 Pin 4
 #define MOTOR_R_DIR1_PIN    18     // P1 Pin 6
 #define MOTOR_R_DIR2_PIN    17     // P1 Pin 5
-#define MOTOR_R_E2A_PIN     43     // P2 Pin 8
-#define MOTOR_R_E2B_PIN     44     // P2 Pin 7
+#define MOTOR_R_E2A_PIN     44     // P2 Pin 8
+#define MOTOR_R_E2B_PIN     43     // P2 Pin 7
 
 // UART Interfaces
 #define UART1_TX_PIN       15      // P2 Pin 3
