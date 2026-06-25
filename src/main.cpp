@@ -29,9 +29,10 @@
 #define PRIORITY_GAMEPAD 8
 #define PRIORITY_LIDAR 10
 
-#define PERIOD_CONTROLL 3.0f // 333.3Hz (3ms)
-#define PERIOD_COMM     5 // 200Hz
-#define PERIOD_GAMEPAD 10 // 100Hz
+#define MAIN_LOOP_RATE_HZ  200.0f
+#define PERIOD_CONTROLL    1000.0f/MAIN_LOOP_RATE_HZ
+#define PERIOD_COMM        5  // 200Hz
+#define PERIOD_GAMEPAD     20 // 50Hz
 
 TaskHandle_t ControlTaskHandle;
 TaskHandle_t UART1TaskHandle;
@@ -266,6 +267,7 @@ void WiFi_Task(void *pvParameters) {
 }
 #endif
 
+#ifndef UNIT_TEST
 void setup() {
   Serial.begin(230400);
   // Serial1 (Telemetry/Script)
@@ -303,7 +305,6 @@ void setup() {
     Serial.println(WiFi.localIP());
   } else {
     Serial.println("\nWiFi connection failed. Starting AP mode...");
-    WiFi.mode(WIFI_AP);
     WiFi.softAP(AP_SSID, AP_PASS);
     Serial.print("AP IP: ");
     Serial.println(WiFi.softAPIP());
@@ -358,3 +359,4 @@ void setup() {
 }
 
 void loop() { vTaskDelete(NULL); }
+#endif

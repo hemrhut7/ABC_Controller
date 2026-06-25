@@ -22,31 +22,20 @@ namespace {
     constexpr uint8_t kRegAccelSmplrtDiv2 = 0x11;
     constexpr uint8_t kRegAccelConfig = 0x14;
 
-    // User Bank 3 Registers
-    constexpr uint8_t kRegI2cSlv0Addr = 0x03;
-    constexpr uint8_t kRegI2cSlv0Reg = 0x04;
-    constexpr uint8_t kRegI2cSlv0Ctrl = 0x05;
-    constexpr uint8_t kRegI2cSlv1Addr = 0x07;
-    constexpr uint8_t kRegI2cSlv1Reg = 0x08;
-    constexpr uint8_t kRegI2cSlv1Ctrl = 0x09;
-    constexpr uint8_t kRegI2cSlv1Do = 0x0A;
-    constexpr uint8_t kRegExtSensData00 = 0x3B;
-
     // AK09916 Magnetometer Registers
     constexpr uint8_t kMagAddress = 0x0C;
     constexpr uint8_t kRegMagWia1 = 0x00;
     constexpr uint8_t kRegMagWia2 = 0x01;
-    constexpr uint8_t kRegMagStatus2 = 0x10;
-    constexpr uint8_t kRegMagDataStart = 0x11;
+    constexpr uint8_t kRegMagStatus1 = 0x10;
     constexpr uint8_t kRegMagCntl2 = 0x31;
+    constexpr uint8_t kValMagWia1 = 0x48;
+    constexpr uint8_t kValMagWia2 = 0x09;
 
     // Configuration constants
     constexpr uint8_t kValPwrMgmtReset = 0x80;
     constexpr uint8_t kValPwrMgmtPll = 0x01;
-    constexpr uint8_t kValIntPinCfg = 0x30;      // Latch, Active High, Push-Pull, Clear on Any Read
+    constexpr uint8_t kValIntPinCfg = 0x32;      // Latch, clear on read, and bypass AUX I2C for AK09916
     constexpr uint8_t kValIntEnable1 = 0x01;     // Raw Data Ready Interrupt
-    constexpr uint8_t kValI2cMstEn = 0x20;
-    constexpr uint8_t kValSlvEn = 0x80;
     constexpr uint8_t kValMagMode20Hz = 0x04;
 
     // Scaling constants for ±8g and ±500dps
@@ -118,70 +107,51 @@ namespace {
     }
 
     bool writeSecondary(uint8_t dev_addr, uint8_t reg, uint8_t val) {
-        bool ok = true;
-        ok &= writeReg(3, kRegI2cSlv1Addr, dev_addr | 0x00); // 0x00 for write
-        ok &= writeReg(3, kRegI2cSlv1Reg, reg);
-        ok &= writeReg(3, kRegI2cSlv1Do, val);
-        ok &= writeReg(3, kRegI2cSlv1Ctrl, kValSlvEn | 1); // Enable SLV1 and write 1 byte
-
-        // Switch to Bank 0 to enable I2C Master temporarily
-        uint8_t user_ctrl = readReg(0, kRegUserCtrl, &ok);
-        if (!ok) return false;
-        ok &= writeReg(0, kRegUserCtrl, user_ctrl | kValI2cMstEn);
-        delayMicroseconds(150); // 150us is safe for 1-byte write (was 500us)
-        ok &= writeReg(0, kRegUserCtrl, user_ctrl & ~kValI2cMstEn);
-        return ok;
+        Wire.beginTransmission(dev_addr);
+        Wire.write(reg);
+        Wire.write(val);
+        return Wire.endTransmission() == 0;
     }
 
     bool readSecondary(uint8_t dev_addr, uint8_t reg, uint8_t *buf, uint8_t len) {
-        bool ok = true;
-        ok &= writeReg(3, kRegI2cSlv0Addr, dev_addr | 0x80); // 0x80 for read
-        ok &= writeReg(3, kRegI2cSlv0Reg, reg);
-        ok &= writeReg(3, kRegI2cSlv0Ctrl, kValSlvEn | len); // Enable SLV0 and read len bytes
-
-        // Trigger read via USER_CTRL in Bank 0
-        uint8_t user_ctrl = readReg(0, kRegUserCtrl, &ok);
-        if (!ok) return false;
-        ok &= writeReg(0, kRegUserCtrl, user_ctrl | kValI2cMstEn);
-        
-        // 345kHz I2C Master speed: 7 bytes read takes ~235us.
-        // We set delay to 300us for 7-byte read, and 100us for 1-byte read.
-        uint32_t delay_us = (len == 1) ? 100 : (100 + len * 30);
-        delayMicroseconds(delay_us); 
-
-        // Read from external sensor registers in Bank 0
-        ok &= readRegs(0, kRegExtSensData00, buf, len);
-        return ok;
+        Wire.beginTransmission(dev_addr);
+        Wire.write(reg);
+        if (Wire.endTransmission(false) != 0) return false;
+        if (Wire.requestFrom(dev_addr, len) != len) return false;
+        for (uint8_t i = 0; i < len; i++) {
+            buf[i] = Wire.read();
+        }
+        return true;
     }
 }
 
-// Accelerometer Calibration Parameters (Identity matrix and zero bias)
-constexpr float ACC_CAL_R00 = 1.0f;
-constexpr float ACC_CAL_R01 = 0.0f;
-constexpr float ACC_CAL_R02 = 0.0f;
-constexpr float ACC_CAL_R10 = 0.0f;
-constexpr float ACC_CAL_R11 = 1.0f;
-constexpr float ACC_CAL_R12 = 0.0f;
-constexpr float ACC_CAL_R20 = 0.0f;
-constexpr float ACC_CAL_R21 = 0.0f;
-constexpr float ACC_CAL_R22 = 1.0f;
-constexpr float ACC_CAL_B0  = 0.0f;
-constexpr float ACC_CAL_B1  = 0.0f;
-constexpr float ACC_CAL_B2  = 0.0f;
+// Accelerometer Calibration Parameters
+constexpr float ACC_CAL_R00 = 1.00765771f;
+constexpr float ACC_CAL_R01 = -0.02964496f;
+constexpr float ACC_CAL_R02 = -0.00856531f;
+constexpr float ACC_CAL_R10 = 0.02389086f;
+constexpr float ACC_CAL_R11 = 0.99820328f;
+constexpr float ACC_CAL_R12 = -0.02310126f;
+constexpr float ACC_CAL_R20 = -0.00284598f;
+constexpr float ACC_CAL_R21 = 0.00961370f;
+constexpr float ACC_CAL_R22 = 0.98263066f;
+constexpr float ACC_CAL_B0  = -0.00367951f;
+constexpr float ACC_CAL_B1  = -0.00003947f;
+constexpr float ACC_CAL_B2  = -0.24658646f;
 
-// Gyroscope Calibration Parameters (Identity matrix and zero bias)
-constexpr float GYRO_CAL_R00 = 1.0f;
-constexpr float GYRO_CAL_R01 = 0.0f;
-constexpr float GYRO_CAL_R02 = 0.0f;
-constexpr float GYRO_CAL_R10 = 0.0f;
-constexpr float GYRO_CAL_R11 = 1.0f;
-constexpr float GYRO_CAL_R12 = 0.0f;
-constexpr float GYRO_CAL_R20 = 0.0f;
-constexpr float GYRO_CAL_R21 = 0.0f;
-constexpr float GYRO_CAL_R22 = 1.0f;
-constexpr float GYRO_CAL_B0  = 0.0f;
-constexpr float GYRO_CAL_B1  = 0.0f;
-constexpr float GYRO_CAL_B2  = 0.0f;
+// Gyroscope Calibration Parameters (Biases kept at 0)
+constexpr float GYRO_CAL_R00 = 0.99963391919f;
+constexpr float GYRO_CAL_R01 = -0.027022216304f;
+constexpr float GYRO_CAL_R02 = 0.0013518234656f;
+constexpr float GYRO_CAL_R10 = 0.027038313894f;
+constexpr float GYRO_CAL_R11 = 0.99953917082f;
+constexpr float GYRO_CAL_R12 = -0.013797665526f;
+constexpr float GYRO_CAL_R20 = -0.00097835700361f;
+constexpr float GYRO_CAL_R21 = 0.013829165492f;
+constexpr float GYRO_CAL_R22 = 0.99990389388f;
+constexpr float GYRO_CAL_B0  = 0.013262f;
+constexpr float GYRO_CAL_B1  = -0.026f;
+constexpr float GYRO_CAL_B2  = 0.004840951f;
 
 void hal_imu_init() {
     i2c_mutex = xSemaphoreCreateMutex();
@@ -333,16 +303,29 @@ void hal_imu_mag_init() {
     
     xSemaphoreTake(i2c_mutex, portMAX_DELAY);
     
-    // Check WIA WIA of magnetometer
+    // Check AK09916 identity. WIA1 must be 0x48 and WIA2 must be 0x09.
     uint8_t wia[2] = {0};
     if (readSecondary(kMagAddress, kRegMagWia1, wia, 2)) {
-        if (wia[0] == kRegMagWia1 || wia[0] == 0x48) { // check whoami
+        if (wia[0] == kValMagWia1 && wia[1] == kValMagWia2) {
             // Write Mode_20Hz
             if (writeSecondary(kMagAddress, kRegMagCntl2, kValMagMode20Hz)) {
                 is_mag_initialized = true;
                 Serial.println("AK09916 Magnetometer initialized successfully at 20Hz");
+                delay(60);
+                uint8_t sample[9] = {0};
+                if (readSecondary(kMagAddress, kRegMagStatus1, sample, 9)) {
+                    int16_t mx = (int16_t)(sample[2] << 8 | sample[1]);
+                    int16_t my = (int16_t)(sample[4] << 8 | sample[3]);
+                    int16_t mz = (int16_t)(sample[6] << 8 | sample[5]);
+                    Serial.printf("AK09916 initial raw: st1=0x%02X x=%d y=%d z=%d st2=0x%02X\n",
+                                  sample[0], mx, my, mz, sample[8]);
+                }
             }
+        } else {
+            Serial.printf("AK09916 unexpected WIA, expected 0x%02X 0x%02X\n", kValMagWia1, kValMagWia2);
         }
+    } else {
+        Serial.println("AK09916 WIA read failed");
     }
     
     if (!is_mag_initialized) {
@@ -361,12 +344,12 @@ bool hal_imu_mag_healthy() {
 bool hal_imu_mag_read(mag_data_t *data) {
     if (!is_mag_initialized) return false;
 
-    uint8_t buf[7];
+    uint8_t buf[9];
     xSemaphoreTake(i2c_mutex, portMAX_DELAY);
     
-    // Directly read ST1 + data (7 bytes starting from ST1 0x10)
-    // kRegMagStatus2 is 0x10 (ST1 status register)
-    bool read_ok = readSecondary(kMagAddress, kRegMagStatus2, buf, 7);
+    // Read ST1 + data + TMPS + ST2 (9 bytes starting from ST1 0x10).
+    // ST2 (0x18) must be read to release the AK09916 data protection latch.
+    bool read_ok = readSecondary(kMagAddress, kRegMagStatus1, buf, 9);
     
     if (read_ok) {
         // buf[0] is ST1, buf[1]..buf[6] is X_L, X_H, Y_L, Y_H, Z_L, Z_H

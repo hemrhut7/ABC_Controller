@@ -29,8 +29,8 @@
 #define LCD_MISO_PIN    40
 #define LCD_DC_PIN      42
 #define LCD_CS_PIN      45
-#define IMU_SCL_PIN     47
-#define IMU_SDA_PIN     48
+#define IMU_SCL_PIN     11
+#define IMU_SDA_PIN     12
 #define IMU_INT1_PIN    14
 #define BAT_ADC_PIN     6
 
@@ -45,14 +45,14 @@
 #define MOTOR_R_PWM_PIN     16     // P1 Pin 4
 #define MOTOR_R_DIR1_PIN    18     // P1 Pin 6
 #define MOTOR_R_DIR2_PIN    17     // P1 Pin 5
-#define MOTOR_R_E2A_PIN     13     // P2 Pin 8
-#define MOTOR_R_E2B_PIN     15     // P2 Pin 7
+#define MOTOR_R_E2A_PIN     43     // P2 Pin 8
+#define MOTOR_R_E2B_PIN     44     // P2 Pin 7
 
 // UART Interfaces
-#define UART1_TX_PIN       43      // P2 Pin 3
-#define UART1_RX_PIN       44      // P2 Pin 4
-#define UART2_TX_PIN       12      // P2 Pin 9
-#define UART2_RX_PIN       11      // P2 Pin 10
+#define UART1_TX_PIN       15      // P2 Pin 3
+#define UART1_RX_PIN       13      // P2 Pin 4
+#define UART2_TX_PIN       47      // P2 Pin 9
+#define UART2_RX_PIN       48      // P2 Pin 10
 // ---------------------------------
 
 #define WIFI_SSID "TP-Link_E428"
@@ -73,8 +73,6 @@
 #define MAX_VELOCITY_RAMP 100.0f
 #define MAX_VELOCITY MAX_RPM * 0.5f * 0.7f * RPM_TO_MS
 #define MAX_STEER_RPM MAX_RPM * 0.5f * 0.65f
-
-#define PERIOD_CONTROLL 3.0f // 333.3Hz (3ms)
 
 #define PARM_LPF_CUTOFF_FREQ_VELOCITY 5.0f
 #define PARM_LPF_CUTOFF_FREQ_STEER 5.0f
