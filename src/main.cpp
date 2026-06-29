@@ -9,8 +9,7 @@
 #include "hal/hal_display.h"
 #include "hal/hal_battery.h"
 #include "hal/hal_imu.h"
-#include "hal/hal_mag.h"
-#include "hal/hal_baro.h"
+#include "processing/prs_i2c_sensor.h"
 
 #if HAS_WIFI_SERIAL
 #include <WiFi.h>
@@ -44,56 +43,10 @@ TaskHandle_t WiFiTaskHandle;
 TaskHandle_t SensorTaskHandle;
 extern AppLidar app_lidar;
 
-// Shared sensor variables and thread-safe protection
-static portMUX_TYPE shared_sensor_mux = portMUX_INITIALIZER_UNLOCKED;
-static mag_data_t g_mag_data = {0};
-static baro_data_t g_baro_data = {0};
-
-void update_shared_sensors(const mag_data_t &mag, const baro_data_t &baro, bool has_mag, bool has_baro) {
-  portENTER_CRITICAL(&shared_sensor_mux);
-  if (has_mag) g_mag_data = mag;
-  if (has_baro) g_baro_data = baro;
-  portEXIT_CRITICAL(&shared_sensor_mux);
-}
-
-void get_shared_sensors(mag_data_t &mag, baro_data_t &baro) {
-  portENTER_CRITICAL(&shared_sensor_mux);
-  mag = g_mag_data;
-  baro = g_baro_data;
-  portEXIT_CRITICAL(&shared_sensor_mux);
-}
-
 void Sensor_Task(void *pvParameters) {
-  uint32_t last_mag_read_ms = 0;
-  uint32_t last_baro_read_ms = 0;
-
   for (;;) {
-    // 1. Update Lidar (runs continuously to empty UART buffer)
+    // Update Lidar (runs continuously to empty UART buffer)
     app_lidar.update_step();
-
-    uint32_t now = millis();
-
-    // 2. Read Magnetometer at 20Hz (every 50ms)
-    bool mag_updated = false;
-    mag_data_t mag;
-    if (now - last_mag_read_ms >= 50) {
-      mag_updated = hal_mag_read(&mag);
-      last_mag_read_ms = now;
-    }
-
-    // 3. Read Barometer at 10Hz (every 100ms)
-    bool baro_updated = false;
-    baro_data_t baro;
-    if (now - last_baro_read_ms >= 100) {
-      baro_updated = hal_baro_read(&baro);
-      last_baro_read_ms = now;
-    }
-
-    // 4. Update shared sensor data structures
-    if (mag_updated || baro_updated) {
-      update_shared_sensors(mag, baro, mag_updated, baro_updated);
-    }
-
     vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
@@ -113,6 +66,7 @@ static void IRAM_ATTR control_timer_callback(void* arg) {
 ConfigStore config_store;
 Processing_Motor motor(PERIOD_CONTROLL);
 Processing_AHRS ahrs(PERIOD_CONTROLL);
+Processing_I2CSensor i2c_sensor(MAIN_LOOP_RATE_HZ);
 AppMode app_mode(&motor, &config_store, PERIOD_CONTROLL);
 
 AppScript app_script(&app_mode);
@@ -160,6 +114,9 @@ void Control_Task(void *pvParameters) {
     if (dt <= 0.0f || dt > 0.1f)
       dt = PERIOD_CONTROLL * 0.001f;
 
+    // 分頻無鎖讀取磁力計與氣壓計
+    i2c_sensor.update();
+
     // 同步更新 IMU 數據與姿態估計
     ahrs.update();
     ahrs.get_ahrs_data(&current_sys_state.abc_state.ahrs_data);
@@ -186,8 +143,8 @@ void Control_Task(void *pvParameters) {
     current_sys_state.abc_state.velocity = app_mode.get_velocity();
     current_sys_state.pid_target = app_mode.get_pid_target();
     
-    // Copy thread-safe sensor data into current telemetry packet
-    get_shared_sensors(current_sys_state.mag_data, current_sys_state.baro_data);
+    // Copy cached sensor data into current telemetry packet
+    i2c_sensor.get_sensor_data(&current_sys_state.mag_data, &current_sys_state.baro_data);
 
     uart_telemetry.push_data(current_sys_state);
     uart1_telemetry.push_data(current_sys_state); // Push to UART1 too
@@ -280,8 +237,7 @@ void setup() {
   if (!ahrs.init()) {
     Serial.println("WARNING: AHRS initialization failed! System will run in degraded mode (no attitude control).");
   }
-  hal_mag_init();
-  hal_baro_init();
+  i2c_sensor.init();
   motor.init();
   app_lidar.init();
   uart_telemetry.init(1000 / PERIOD_COMM);
@@ -332,7 +288,7 @@ void setup() {
   };
   esp_timer_handle_t timer;
   esp_timer_create(&timer_args, &timer);
-  esp_timer_start_periodic(timer, 3000); // 3000us = 333.3Hz (3ms)
+  esp_timer_start_periodic(timer, (uint64_t)(1000000.0f / MAIN_LOOP_RATE_HZ));
 
   xTaskCreatePinnedToCore(Control_Task, "ControlTask", 12288, NULL,
                           PRIORITY_CONTROL, &ControlTaskHandle, 1);
