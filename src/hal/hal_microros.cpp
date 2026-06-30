@@ -35,6 +35,8 @@ HAL_MicroROS::HAL_MicroROS() :
     memset(&uros_executor, 0, sizeof(uros_executor));
     memset(&uros_imu_publisher, 0, sizeof(uros_imu_publisher));
     memset(&uros_joint_state_publisher, 0, sizeof(uros_joint_state_publisher));
+    memset(&uros_mag_publisher, 0, sizeof(uros_mag_publisher));
+    memset(&uros_baro_publisher, 0, sizeof(uros_baro_publisher));
 
     joint_positions[0] = 0.0;
     joint_positions[1] = 0.0;
@@ -95,8 +97,35 @@ bool HAL_MicroROS::init_node_and_publishers() {
     return false;
   }
 
+  if (rclc_publisher_init_default(
+      &uros_mag_publisher,
+      &uros_node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, MagneticField),
+      "/imu/mag") != RCL_RET_OK) {
+    FORCE_UNUSED(rcl_publisher_fini(&uros_joint_state_publisher, &uros_node));
+    FORCE_UNUSED(rcl_publisher_fini(&uros_imu_publisher, &uros_node));
+    FORCE_UNUSED(rcl_node_fini(&uros_node));
+    FORCE_UNUSED(rclc_support_fini(&uros_support));
+    return false;
+  }
+
+  if (rclc_publisher_init_default(
+      &uros_baro_publisher,
+      &uros_node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, FluidPressure),
+      "/baro/pressure") != RCL_RET_OK) {
+    FORCE_UNUSED(rcl_publisher_fini(&uros_mag_publisher, &uros_node));
+    FORCE_UNUSED(rcl_publisher_fini(&uros_joint_state_publisher, &uros_node));
+    FORCE_UNUSED(rcl_publisher_fini(&uros_imu_publisher, &uros_node));
+    FORCE_UNUSED(rcl_node_fini(&uros_node));
+    FORCE_UNUSED(rclc_support_fini(&uros_support));
+    return false;
+  }
+
   // Create executor
   if (rclc_executor_init(&uros_executor, &uros_support.context, 0, &uros_allocator) != RCL_RET_OK) {
+    FORCE_UNUSED(rcl_publisher_fini(&uros_baro_publisher, &uros_node));
+    FORCE_UNUSED(rcl_publisher_fini(&uros_mag_publisher, &uros_node));
     FORCE_UNUSED(rcl_publisher_fini(&uros_joint_state_publisher, &uros_node));
     FORCE_UNUSED(rcl_publisher_fini(&uros_imu_publisher, &uros_node));
     FORCE_UNUSED(rcl_node_fini(&uros_node));
@@ -108,6 +137,14 @@ bool HAL_MicroROS::init_node_and_publishers() {
   uros_imu_msg.header.frame_id.data = (char*)"imu_link";
   uros_imu_msg.header.frame_id.size = strlen(uros_imu_msg.header.frame_id.data);
   uros_imu_msg.header.frame_id.capacity = uros_imu_msg.header.frame_id.size + 1;
+
+  uros_mag_msg.header.frame_id.data = (char*)"mag_link";
+  uros_mag_msg.header.frame_id.size = strlen(uros_mag_msg.header.frame_id.data);
+  uros_mag_msg.header.frame_id.capacity = uros_mag_msg.header.frame_id.size + 1;
+
+  uros_baro_msg.header.frame_id.data = (char*)"baro_link";
+  uros_baro_msg.header.frame_id.size = strlen(uros_baro_msg.header.frame_id.data);
+  uros_baro_msg.header.frame_id.capacity = uros_baro_msg.header.frame_id.size + 1;
 
   joint_names[0].data = (char*)"left_wheel";
   joint_names[0].size = strlen(joint_names[0].data);
@@ -137,13 +174,15 @@ bool HAL_MicroROS::init_node_and_publishers() {
 
 void HAL_MicroROS::destroy_node_and_publishers() {
   FORCE_UNUSED(rclc_executor_fini(&uros_executor));
+  FORCE_UNUSED(rcl_publisher_fini(&uros_baro_publisher, &uros_node));
+  FORCE_UNUSED(rcl_publisher_fini(&uros_mag_publisher, &uros_node));
   FORCE_UNUSED(rcl_publisher_fini(&uros_joint_state_publisher, &uros_node));
   FORCE_UNUSED(rcl_publisher_fini(&uros_imu_publisher, &uros_node));
   FORCE_UNUSED(rcl_node_fini(&uros_node));
   FORCE_UNUSED(rclc_support_fini(&uros_support));
 }
 
-void HAL_MicroROS::update(float rpm_L, float rpm_R, const ahrs_data_t &ahrs_data) {
+void HAL_MicroROS::update(float rpm_L, float rpm_R, const ahrs_data_t &ahrs_data, const mag_data_t &mag_data, const baro_data_t &baro_data) {
     switch (state) {
       case WAITING_AGENT: {
         uint32_t now_ms = millis();
@@ -196,17 +235,34 @@ void HAL_MicroROS::update(float rpm_L, float rpm_R, const ahrs_data_t &ahrs_data
         left_joint_pos += left_vel * dt;
         right_joint_pos += right_vel * dt;
 
-        // Populate IMU Message
+        // Populate Stamp Headers
         if (rmw_uros_epoch_synchronized()) {
           int64_t time_ns = rmw_uros_epoch_nanos();
+          
           // Compensate for scheduling/sampling delay since data->timestamp was captured
-          uint32_t delay_us = current_time_us - (uint32_t)ahrs_data.imu_data.timestamp;
-          time_ns -= (int64_t)delay_us * 1000;
-          uros_imu_msg.header.stamp.sec = time_ns / 1000000000LL;
-          uros_imu_msg.header.stamp.nanosec = time_ns % 1000000000LL;
+          uint32_t delay_imu_us = current_time_us - (uint32_t)ahrs_data.imu_data.timestamp;
+          int64_t imu_time_ns = time_ns - (int64_t)delay_imu_us * 1000;
+          uros_imu_msg.header.stamp.sec = imu_time_ns / 1000000000LL;
+          uros_imu_msg.header.stamp.nanosec = imu_time_ns % 1000000000LL;
+
+          uint32_t delay_mag_us = current_time_us - (uint32_t)mag_data.timestamp;
+          int64_t mag_time_ns = time_ns - (int64_t)delay_mag_us * 1000;
+          uros_mag_msg.header.stamp.sec = mag_time_ns / 1000000000LL;
+          uros_mag_msg.header.stamp.nanosec = mag_time_ns % 1000000000LL;
+
+          uint32_t delay_baro_us = current_time_us - (uint32_t)baro_data.timestamp;
+          int64_t baro_time_ns = time_ns - (int64_t)delay_baro_us * 1000;
+          uros_baro_msg.header.stamp.sec = baro_time_ns / 1000000000LL;
+          uros_baro_msg.header.stamp.nanosec = baro_time_ns % 1000000000LL;
         } else {
           uros_imu_msg.header.stamp.sec = ahrs_data.imu_data.timestamp / 1000000;
           uros_imu_msg.header.stamp.nanosec = (ahrs_data.imu_data.timestamp % 1000000) * 1000;
+
+          uros_mag_msg.header.stamp.sec = mag_data.timestamp / 1000000;
+          uros_mag_msg.header.stamp.nanosec = (mag_data.timestamp % 1000000) * 1000;
+
+          uros_baro_msg.header.stamp.sec = baro_data.timestamp / 1000000;
+          uros_baro_msg.header.stamp.nanosec = (baro_data.timestamp % 1000000) * 1000;
         }
 
         // Gyroscope is in rad/s in calibrated imu_data
@@ -219,6 +275,16 @@ void HAL_MicroROS::update(float rpm_L, float rpm_R, const ahrs_data_t &ahrs_data
         uros_imu_msg.linear_acceleration.y = ahrs_data.imu_data.accl[1];
         uros_imu_msg.linear_acceleration.z = ahrs_data.imu_data.accl[2];
 
+        // Populate Magnetometer Message (convert uT to Tesla)
+        uros_mag_msg.magnetic_field.x = mag_data.mag[0] * 1e-6;
+        uros_mag_msg.magnetic_field.y = mag_data.mag[1] * 1e-6;
+        uros_mag_msg.magnetic_field.z = mag_data.mag[2] * 1e-6;
+        memset(uros_mag_msg.magnetic_field_covariance, 0, sizeof(uros_mag_msg.magnetic_field_covariance));
+
+        // Populate Barometer Message (convert hPa to Pascals)
+        uros_baro_msg.fluid_pressure = baro_data.pressure * 100.0;
+        uros_baro_msg.variance = 0.0; // 0 means variance unknown
+
         // Populate JointState Message
         uros_joint_state_msg.header.stamp.sec = uros_imu_msg.header.stamp.sec;
         uros_joint_state_msg.header.stamp.nanosec = uros_imu_msg.header.stamp.nanosec;
@@ -229,9 +295,11 @@ void HAL_MicroROS::update(float rpm_L, float rpm_R, const ahrs_data_t &ahrs_data
         uros_joint_state_msg.velocity.data[0] = left_vel;
         uros_joint_state_msg.velocity.data[1] = right_vel;
 
-        // Publish IMU and JointState
+        // Publish IMU, JointState, Magnetometer, and Barometer
         FORCE_UNUSED(rcl_publish(&uros_imu_publisher, &uros_imu_msg, NULL));
         FORCE_UNUSED(rcl_publish(&uros_joint_state_publisher, &uros_joint_state_msg, NULL));
+        FORCE_UNUSED(rcl_publish(&uros_mag_publisher, &uros_mag_msg, NULL));
+        FORCE_UNUSED(rcl_publish(&uros_baro_publisher, &uros_baro_msg, NULL));
 
         // Spin executor
         rclc_executor_spin_some(&uros_executor, RCL_MS_TO_NS(10));

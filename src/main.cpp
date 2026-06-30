@@ -174,7 +174,11 @@ void UART1_Task(void *pvParameters) {
     motor_state_t motor_state;
     motor.get_motor_state(&motor_state);
 
-    uros_telemetry.update(motor_state.rpm_L, motor_state.rpm_R, ahrs_data);
+    mag_data_t mag_data;
+    baro_data_t baro_data;
+    i2c_sensor.get_sensor_data(&mag_data, &baro_data);
+
+    uros_telemetry.update(motor_state.rpm_L, motor_state.rpm_R, ahrs_data, mag_data, baro_data);
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }

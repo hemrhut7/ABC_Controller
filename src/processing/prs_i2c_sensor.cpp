@@ -23,15 +23,41 @@ void Processing_I2CSensor::init() {
 
 void Processing_I2CSensor::update() {
     _loop_cnt++;
+    bool mag_updated = false;
+    bool baro_updated = false;
+    mag_data_t temp_mag;
+    baro_data_t temp_baro;
+
     if (_loop_cnt % _mag_interval == 0) {
-        hal_mag_read(&_cached_mag);
+        if (hal_mag_read(&temp_mag)) {
+            mag_updated = true;
+        }
     }
     if (_loop_cnt % _baro_interval == 0) {
-        hal_baro_read(&_cached_baro);
+        if (hal_baro_read(&temp_baro)) {
+            baro_updated = true;
+        }
+    }
+
+    if (mag_updated || baro_updated) {
+#if defined(ESP_PLATFORM)
+        portENTER_CRITICAL(&_sensor_mux);
+#endif
+        if (mag_updated) _cached_mag = temp_mag;
+        if (baro_updated) _cached_baro = temp_baro;
+#if defined(ESP_PLATFORM)
+        portEXIT_CRITICAL(&_sensor_mux);
+#endif
     }
 }
 
 void Processing_I2CSensor::get_sensor_data(mag_data_t *mag, baro_data_t *baro) const {
+#if defined(ESP_PLATFORM)
+    portENTER_CRITICAL(&_sensor_mux);
+#endif
     if (mag) *mag = _cached_mag;
     if (baro) *baro = _cached_baro;
+#if defined(ESP_PLATFORM)
+    portEXIT_CRITICAL(&_sensor_mux);
+#endif
 }

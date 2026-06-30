@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Arduino.h>
 #include "hal/hal_mag.h"
 #include "hal/hal_baro.h"
 
@@ -23,4 +24,8 @@ private:
 
     mutable mag_data_t _cached_mag;
     mutable baro_data_t _cached_baro;
+
+#if defined(ESP_PLATFORM)
+    mutable portMUX_TYPE _sensor_mux = portMUX_INITIALIZER_UNLOCKED;
+#endif
 };
