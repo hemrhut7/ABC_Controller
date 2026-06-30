@@ -26,7 +26,7 @@ void Processing_I2CSensor::update() {
     if (_loop_cnt % _mag_interval == 0) {
         hal_mag_read(&_cached_mag);
     }
-    if (_loop_cnt % _baro_interval == 0) {
+    if ((_loop_cnt + 1) % _baro_interval == 0) {
         hal_baro_read(&_cached_baro);
     }
 }

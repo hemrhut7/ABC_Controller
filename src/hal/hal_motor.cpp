@@ -64,12 +64,23 @@ void HAL_Motor::getPCNTCount() {
 }
 
 void HAL_Motor::update_rpm(float dt) {
-    this->dt = dt;
-    this->update_rate_hz = 1.0f / dt;
-    this->MAX_MOTOR_DELTA_RPM = MAX_MOTOR_RPM_RATE * dt;
+    uint32_t now = micros();
+    float actual_dt = dt;
+    if (last_time != 0) {
+        actual_dt = (now - last_time) * 1e-6f;
+        // Protect against invalid values
+        if (actual_dt <= 0.0f || actual_dt > 0.1f) {
+            actual_dt = dt;
+        }
+    }
+    last_time = now;
+
+    this->dt = actual_dt;
+    this->update_rate_hz = 1.0f / actual_dt;
+    this->MAX_MOTOR_DELTA_RPM = MAX_MOTOR_RPM_RATE * actual_dt;
 
     getPCNTCount();
-    float dps = (float)count * DEG_PER_CNT * update_rate_hz;
+    float dps = (float)count * DEG_PER_CNT * this->update_rate_hz;
     current_rpm = dps * DPS_2_RPM * dir_forward;
 }
 
@@ -97,6 +108,7 @@ void HAL_Motor::resetControllerState() {
     last_rpm = current_rpm;
     last_pwm_out = 0;
     dither_dir = 1;
+    last_time = micros(); // Initialize timer tracking on reset to avoid large first dt
 }
 
 void HAL_Motor::drive_moter(int pwm) {
