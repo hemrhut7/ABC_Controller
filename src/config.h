@@ -29,8 +29,8 @@
 #define LCD_MISO_PIN    40
 #define LCD_DC_PIN      42
 #define LCD_CS_PIN      45
-#define IMU_SCL_PIN     47
-#define IMU_SDA_PIN     48
+#define IMU_SCL_PIN     11
+#define IMU_SDA_PIN     12
 #define IMU_INT1_PIN    14
 #define BAT_ADC_PIN     6
 
@@ -45,14 +45,14 @@
 #define MOTOR_R_PWM_PIN     16     // P1 Pin 4
 #define MOTOR_R_DIR1_PIN    18     // P1 Pin 6
 #define MOTOR_R_DIR2_PIN    17     // P1 Pin 5
-#define MOTOR_R_E2A_PIN     13     // P2 Pin 8
-#define MOTOR_R_E2B_PIN     15     // P2 Pin 7
+#define MOTOR_R_E2A_PIN     44     // P2 Pin 8
+#define MOTOR_R_E2B_PIN     43     // P2 Pin 7
 
 // UART Interfaces
-#define UART1_TX_PIN       43      // P2 Pin 3
-#define UART1_RX_PIN       44      // P2 Pin 4
-#define UART2_TX_PIN       12      // P2 Pin 9
-#define UART2_RX_PIN       11      // P2 Pin 10
+#define UART1_TX_PIN       15      // P2 Pin 3
+#define UART1_RX_PIN       13      // P2 Pin 4
+#define UART2_TX_PIN       47      // P2 Pin 9
+#define UART2_RX_PIN       48      // P2 Pin 10
 // ---------------------------------
 
 #define WIFI_SSID "TP-Link_E428"
@@ -83,13 +83,13 @@
 #define PARM_PID_KI_MOTOR 220.0f
 #define PARM_PID_KD_MOTOR 0.05f
 
-#define PARM_PID_KP_ANGLE 550.0f
-#define PARM_PID_KI_ANGLE 4000.0f
-#define PARM_PID_KD_ANGLE 22.0f
+#define PARM_PID_KP_ANGLE 1000.0f
+#define PARM_PID_KI_ANGLE 28000.0f
+#define PARM_PID_KD_ANGLE 15.0f
 
-#define PARM_PID_KP_VELOCITY 0.27f
-#define PARM_PID_KI_VELOCITY 0.15f
-#define PARM_PID_KD_VELOCITY 0.04f
+#define PARM_PID_KP_VELOCITY 0.3f
+#define PARM_PID_KI_VELOCITY 0.2f
+#define PARM_PID_KD_VELOCITY 0.03f
 
 #define PARM_PID_KP_STEER 1.0f
 #define PARM_PID_KI_STEER 0.0f

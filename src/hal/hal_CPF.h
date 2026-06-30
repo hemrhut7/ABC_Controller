@@ -13,7 +13,7 @@
 
 class CPF {
 public:
-    CPF(uint32_t period_ms);
+    CPF(float period_ms);
     ~CPF();
     void setInit(int fs = 100);
     void update(float omg[3], float acc[3], float dt);

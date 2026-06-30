@@ -12,7 +12,7 @@
 
 class AppMode {
 public:
-    AppMode(Processing_Motor* motor, ConfigStore* config_store, int interval_ms);
+    AppMode(Processing_Motor* motor, ConfigStore* config_store, float interval_ms);
     void init();
     void update(float dt, const ahrs_data_t &ahrs_state);
     void set_mode(Mode_t mode);
@@ -66,7 +66,7 @@ private:
     UserCommand_t _cmd;
 
     // Parameters (MUST be declared before LPF/PID objects for correct C++ initialization order)
-    uint8_t loop_rate_hz = 200;
+    uint16_t loop_rate_hz = 400;
     float cut_off_freq_velocity = PARM_LPF_CUTOFF_FREQ_VELOCITY;
     float cut_off_freq_steer = PARM_LPF_CUTOFF_FREQ_STEER;
     float cut_off_freq_gyro_z = PARM_LPF_CUTOFF_FREQ_GYRO_Z;

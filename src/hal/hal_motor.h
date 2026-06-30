@@ -32,7 +32,7 @@ enum MotorPosition {
 class HAL_Motor {
     public:
         // HAL_Motor(uint8_t pwm_pin, uint8_t dir_pin1, uint8_t dir_pin2, uint8_t stby_pin,  uint8_t enc_a_pin, uint8_t enc_b_pin);
-        HAL_Motor(MotorPosition position, uint32_t period_ms);
+        HAL_Motor(MotorPosition position, float period_ms);
         ~HAL_Motor();
         void set_target_rpm(float target_rpm);
         void update_rpm(float dt);

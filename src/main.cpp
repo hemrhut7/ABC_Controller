@@ -9,6 +9,7 @@
 #include "hal/hal_display.h"
 #include "hal/hal_battery.h"
 #include "hal/hal_imu.h"
+#include "processing/prs_i2c_sensor.h"
 
 #if HAS_WIFI_SERIAL
 #include <WiFi.h>
@@ -29,9 +30,10 @@
 #define PRIORITY_GAMEPAD 8
 #define PRIORITY_LIDAR 10
 
-#define PERIOD_CONTROLL 4 // 250Hz
-#define PERIOD_COMM     4 // 250Hz
-#define PERIOD_GAMEPAD 10 // 100Hz
+#define MAIN_LOOP_RATE_HZ  200.0f
+#define PERIOD_CONTROLL    1000.0f/MAIN_LOOP_RATE_HZ
+#define PERIOD_COMM        5  // 200Hz
+#define PERIOD_GAMEPAD     20 // 50Hz
 
 TaskHandle_t ControlTaskHandle;
 TaskHandle_t UART1TaskHandle;
@@ -40,11 +42,33 @@ TaskHandle_t GamepadTaskHandle;
 #if HAS_WIFI_SERIAL
 TaskHandle_t WiFiTaskHandle;
 #endif
-TaskHandle_t LidarTaskHandle;
+TaskHandle_t SensorTaskHandle;
+extern AppLidar app_lidar;
+
+void Sensor_Task(void *pvParameters) {
+  for (;;) {
+    // Update Lidar (runs continuously to empty UART buffer)
+    app_lidar.update_step();
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
+
+#include "esp_timer.h"
+static SemaphoreHandle_t control_timer_sem = nullptr;
+static void IRAM_ATTR control_timer_callback(void* arg) {
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  if (control_timer_sem) {
+    xSemaphoreGiveFromISR(control_timer_sem, &xHigherPriorityTaskWoken);
+    if (xHigherPriorityTaskWoken) {
+      portYIELD_FROM_ISR();
+    }
+  }
+}
 
 ConfigStore config_store;
 Processing_Motor motor(PERIOD_CONTROLL);
 Processing_AHRS ahrs(PERIOD_CONTROLL);
+Processing_I2CSensor i2c_sensor(MAIN_LOOP_RATE_HZ);
 AppMode app_mode(&motor, &config_store, PERIOD_CONTROLL);
 
 AppScript app_script(&app_mode);
@@ -75,17 +99,14 @@ AppLidar app_lidar(Serial2);
 
 
 
-// 1. 控制任務 (Core 1)
 void Control_Task(void *pvParameters) {
   unsigned long last_micros = micros();
 
   for (;;) {
-    // Block until MPU6050 asserts Data Ready (200Hz)
-    // We set a 10ms timeout (twice the 5ms period) as a fallback
-    bool got_interrupt = hal_imu_wait_for_data(10);
-    if (!got_interrupt) {
-      // Fallback delay to prevent CPU starvation if interrupt is missing
-      vTaskDelay(pdMS_TO_TICKS(1));
+    if (control_timer_sem) {
+      xSemaphoreTake(control_timer_sem, portMAX_DELAY);
+    } else {
+      vTaskDelay(pdMS_TO_TICKS(2));
     }
 
     unsigned long current_micros = micros();
@@ -95,6 +116,9 @@ void Control_Task(void *pvParameters) {
 
     if (dt <= 0.0f || dt > 0.1f)
       dt = PERIOD_CONTROLL * 0.001f;
+
+    // 分頻無鎖讀取磁力計與氣壓計
+    i2c_sensor.update();
 
     // 同步更新 IMU 數據與姿態估計
     ahrs.update();
@@ -121,6 +145,9 @@ void Control_Task(void *pvParameters) {
     current_sys_state.cmd.mode = app_mode.get_mode();
     current_sys_state.abc_state.velocity = app_mode.get_velocity();
     current_sys_state.pid_target = app_mode.get_pid_target();
+    
+    // Copy cached sensor data into current telemetry packet
+    i2c_sensor.get_sensor_data(&current_sys_state.mag_data, &current_sys_state.baro_data);
 
     uart_telemetry.push_data(current_sys_state);
 
@@ -211,6 +238,7 @@ void WiFi_Task(void *pvParameters) {
 }
 #endif
 
+#ifndef UNIT_TEST
 void setup() {
   Serial.begin(230400);
   // Serial1 (Telemetry/Script)
@@ -223,6 +251,7 @@ void setup() {
   if (!ahrs.init()) {
     Serial.println("WARNING: AHRS initialization failed! System will run in degraded mode (no attitude control).");
   }
+  i2c_sensor.init();
   motor.init();
   app_lidar.init();
   uart_telemetry.init(1000 / PERIOD_COMM);
@@ -245,7 +274,6 @@ void setup() {
     Serial.println(WiFi.localIP());
   } else {
     Serial.println("\nWiFi connection failed. Starting AP mode...");
-    WiFi.mode(WIFI_AP);
     WiFi.softAP(AP_SSID, AP_PASS);
     Serial.print("AP IP: ");
     Serial.println(WiFi.softAPIP());
@@ -263,7 +291,16 @@ void setup() {
   system_battery.init();
   app_mode.set_mode(MODE_FREE);
 
-
+  control_timer_sem = xSemaphoreCreateCounting(10, 0);
+  const esp_timer_create_args_t timer_args = {
+      .callback = &control_timer_callback,
+      .arg = nullptr,
+      .dispatch_method = ESP_TIMER_TASK,
+      .name = "control_timer"
+  };
+  esp_timer_handle_t timer;
+  esp_timer_create(&timer_args, &timer);
+  esp_timer_start_periodic(timer, (uint64_t)(1000000.0f / MAIN_LOOP_RATE_HZ));
 
   xTaskCreatePinnedToCore(Control_Task, "ControlTask", 12288, NULL,
                           PRIORITY_CONTROL, &ControlTaskHandle, 1);
@@ -285,8 +322,9 @@ void setup() {
                           &WiFiTaskHandle, 0);
 #endif
 
-  xTaskCreatePinnedToCore(AppLidar::task_entry, "Lidar_Task", 16384, &app_lidar, 
-                          PRIORITY_LIDAR, &LidarTaskHandle, 0);
+  xTaskCreatePinnedToCore(Sensor_Task, "SensorTask", 16384, NULL, 
+                          PRIORITY_LIDAR, &SensorTaskHandle, 0);
 }
 
 void loop() { vTaskDelete(NULL); }
+#endif

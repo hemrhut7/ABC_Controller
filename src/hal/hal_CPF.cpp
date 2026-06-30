@@ -24,7 +24,7 @@ namespace Vec {
 }
 
 
-CPF::CPF(uint32_t period_ms) : lpf_acc(1000 / period_ms, 5) {
+CPF::CPF(float period_ms) : lpf_acc(1000.0f / period_ms, 5) {
     is_initialized = false;
     std::fill(pre_omg, pre_omg + 3, 0.0f);
     g0 = 9.7895f;

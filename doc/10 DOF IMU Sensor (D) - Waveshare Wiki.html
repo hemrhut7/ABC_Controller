@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html class="client-nojs" lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8"/>
+<title>10 DOF IMU Sensor (D) - Waveshare Wiki</title>
+<script>document.documentElement.className="client-js";RLCONF={"wgBreakFrames":!1,"wgSeparatorTransformTable":["",""],"wgDigitTransformTable":["",""],"wgDefaultDateFormat":"dmy","wgMonthNames":["","January","February","March","April","May","June","July","August","September","October","November","December"],"wgRequestId":"cf1a2c2f85e5139673e98da0","wgCSPNonce":!1,"wgCanonicalNamespace":"","wgCanonicalSpecialPageName":!1,"wgNamespaceNumber":0,"wgPageName":"10_DOF_IMU_Sensor_(D)","wgTitle":"10 DOF IMU Sensor (D)","wgCurRevisionId":72506,"wgRevisionId":72506,"wgArticleId":5276,"wgIsArticle":!0,"wgIsRedirect":!1,"wgAction":"view","wgUserName":null,"wgUserGroups":["*"],"wgCategories":["I2C interface"],"wgPageContentLanguage":"en","wgPageContentModel":"wikitext","wgRelevantPageName":"10_DOF_IMU_Sensor_(D)","wgRelevantArticleId":5276,"wgIsProbablyEditable":!1,"wgRelevantPageIsProbablyEditable":!1,"wgRestrictionEdit":[],"wgRestrictionMove":[]};RLSTATE={"ext.gadget.tabber":"ready",
+"site.styles":"ready","noscript":"ready","user.styles":"ready","user":"ready","user.options":"loading","mediawiki.toc.styles":"ready","skins.tweeki.styles":"ready","skins.tweeki.bootstraptheme.styles":"ready","skins.tweeki.externallinks.styles":"ready","skins.tweeki.awesome.styles":"ready"};RLPAGEMODULES=["site","mediawiki.page.startup","mediawiki.page.ready","mediawiki.toc","ext.FancyBoxThumbs","ext.HighlightjsIntegration","skins.tweeki.messages","skins.tweeki.scripts"];</script>
+<script>(RLQ=window.RLQ||[]).push(function(){mw.loader.implement("user.options@1hzgi",function($,jQuery,require,module){/*@nomin*/mw.user.tokens.set({"patrolToken":"+\\","watchToken":"+\\","csrfToken":"+\\"});
+});});</script>
+<link rel="stylesheet" href="/w/Uy8Yw0y/aAdkk0o.php?lang=en&amp;modules=mediawiki.toc.styles%7Cskins.tweeki.awesome.styles%7Cskins.tweeki.bootstraptheme.styles%7Cskins.tweeki.externallinks.styles%7Cskins.tweeki.styles&amp;only=styles&amp;skin=tweeki"/>
+<script async="" src="/w/Uy8Yw0y/aAdkk0o.php?lang=en&amp;modules=startup&amp;only=scripts&amp;raw=1&amp;skin=tweeki"></script>
+<meta name="ResourceLoaderDynamicStyles" content=""/>
+<link rel="stylesheet" href="/w/Uy8Yw0y/aAdkk0o.php?lang=en&amp;modules=ext.gadget.tabber&amp;only=styles&amp;skin=tweeki"/>
+<link rel="stylesheet" href="/w/Uy8Yw0y/aAdkk0o.php?lang=en&amp;modules=site.styles&amp;only=styles&amp;skin=tweeki"/>
+<meta name="generator" content="MediaWiki 1.35.5"/>
+<meta property="og:image" content="https://www.waveshare.com/w/upload/3/3b/10-DOF-IMU-Sensor-D-1.jpg"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="shortcut icon" href="/w/favicon.ico"/>
+<link rel="search" type="application/opensearchdescription+xml" href="/w/opensearch_desc.php" title="Waveshare Wiki (en)"/>
+<link rel="EditURI" type="application/rsd+xml" href="https://www.waveshare.com/w/api.php?action=rsd"/>
+<link rel="alternate" type="application/atom+xml" title="Waveshare Wiki Atom feed" href="/w/index.php?title=Special:RecentChanges&amp;feed=atom"/>
+<!--[if lt IE 9]><script src="/w/resources/lib/html5shiv/html5shiv.js"></script><![endif]-->
+</head>
+<body class="mediawiki ltr sitedir-ltr mw-hide-empty-elt ns-0 ns-subject page-10_DOF_IMU_Sensor_D rootpage-10_DOF_IMU_Sensor_D skin-tweeki action-view tweeki-animateLayout tweeki-non-advanced tweeki-user-anon">			<!-- navbar -->
+			<div id="mw-navigation" class="navbar navbar-default navbar-fixed-top navbar-expand-lg fixed-top navbar-light bg-light" role="navigation">
+				<h2>Navigation menu</h2>
+				<div id="mw-head" class="navbar-inner">
+					<div class="container">
+
+						<div class="navbar-header">
+							<button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+								<span class="sr-only">Toggle navigation</span>
+								<span class="icon-bar"></span>
+								<span class="icon-bar"></span>
+								<span class="icon-bar"></span>
+							</button>
+
+							<a href="/wiki/Main_Page" class="navbar-brand"><img src="https://www.waveshare.com/w/upload/a/a7/Ws-watermark-en.svg" alt="Waveshare Wiki" /></a>
+						</div>
+
+						<div id="navbar" class="navbar-collapse collapse">
+													<ul class="nav navbar-nav">
+							<li class="nav"><a href="#" id="n-raspberry-pi" class="dropdown-toggle" data-toggle="dropdown">Raspberry Pi <b class="caret"></b></a><ul class="dropdown-menu " role="menu"><li id="n-main_page.2523rpi-boards"><a href="/wiki/Main_Page#RPi-Boards" tabindex="-1">Boards/Kits</a></li><li id="n-main_page.2523rpi-displays"><a href="/wiki/Main_Page#RPi-Displays" tabindex="-1">Displays</a></li><li id="n-main_page.2523rpi-cameras"><a href="/wiki/Main_Page#RPi-Cameras" tabindex="-1">Cameras</a></li><li id="n-main_page.2523rpi-expansions"><a href="/wiki/Main_Page#RPi-Expansions" tabindex="-1">Expansions</a></li><li id="n-main_page.2523rpi-laptops"><a href="/wiki/Main_Page#RPi-Laptops" tabindex="-1">All-in-one</a></li><li id="n-main_page.2523rpi-robots"><a href="/wiki/Main_Page#RPi-Robots" tabindex="-1">Robots</a></li><li id="n-main_page.2523rpi-games"><a href="/wiki/Main_Page#RPi-Games" tabindex="-1">Portable Gaming</a></li><li id="n-main_page.2523rpi-acces"><a href="/wiki/Main_Page#RPi-Acces" tabindex="-1">Accessories</a></li><li id="n-main_page.2523android-linux-boards"><a href="/wiki/Main_Page#Android-Linux-Boards" tabindex="-1">Other Android/Linux Boards</a></li></ul></li><li class="nav"><a href="#" id="n-ai" class="dropdown-toggle" data-toggle="dropdown">AI <b class="caret"></b></a><ul class="dropdown-menu " role="menu"><li id="n-main_page.2523jetson-ai-boards"><a href="/wiki/Main_Page#Jetson-AI-Boards" tabindex="-1">Boards/Kits</a></li><li id="n-main_page.2523jetson-ai-displays"><a href="/wiki/Main_Page#Jetson-AI-Displays" tabindex="-1">Displays</a></li><li id="n-main_page.2523jetson-ai-cameras"><a href="/wiki/Main_Page#Jetson-AI-Cameras" tabindex="-1">Cameras</a></li><li id="n-main_page.2523jetson-ai-hat"><a href="/wiki/Main_Page#Jetson-AI-HAT" tabindex="-1">Expansions</a></li><li id="n-main_page.2523jetson-ai-robots"><a href="/wiki/Main_Page#Jetson-AI-Robots" tabindex="-1">Robots</a></li></ul></li><li class="nav"><a href="#" id="n-displays" class="dropdown-toggle" data-toggle="dropdown">Displays <b class="caret"></b></a><ul class="dropdown-menu " role="menu"><li id="n-main_page.2523display-lcd-oleds"><a href="/wiki/Main_Page#Display-LCD-OLEDs" tabindex="-1">LCD/OLED</a></li><li id="n-main_page.2523display-e-paper"><a href="/wiki/Main_Page#Display-e-Paper" tabindex="-1">e-Paper</a></li></ul></li><li class="nav"><a href="#" id="n-iot" class="dropdown-toggle" data-toggle="dropdown">IoT <b class="caret"></b></a><ul class="dropdown-menu " role="menu"><li id="n-main_page.2523long-range-wireless-comm"><a href="/wiki/Main_Page#Long-range-wireless-comm" tabindex="-1">Long Range Wireless</a></li><li id="n-main_page.2523short-range-wireless-comm"><a href="/wiki/Main_Page#Short-range-wireless-comm" tabindex="-1">Short Range Wireless</a></li><li id="n-main_page.2523wired-communication"><a href="/wiki/Main_Page#Wired-communication" tabindex="-1">Wired Comm / Converter</a></li><li id="n-main_page.2523misc-cameras-av"><a href="/wiki/Main_Page#Misc-cameras-av" tabindex="-1">Cameras / Audio / Video</a></li><li id="n-main_page.2523misc-sensor-modules"><a href="/wiki/Main_Page#Misc-sensor-modules" tabindex="-1">Sensors</a></li><li id="n-main_page.2523misc-servos-motors"><a href="/wiki/Main_Page#Misc-servos-motors" tabindex="-1">Motors / Servos</a></li><li id="n-main_page.2523misc-other-modules"><a href="/wiki/Main_Page#Misc-other-modules" tabindex="-1">others</a></li></ul></li><li class="nav"><a href="#" id="n-robotics" class="dropdown-toggle" data-toggle="dropdown">Robotics <b class="caret"></b></a><ul class="dropdown-menu " role="menu"><li id="n-main_page.2523robotics-cars"><a href="/wiki/Main_Page#Robotics-cars" tabindex="-1">Mobile Robots</a></li><li id="n-main_page.2523dog-like-robots"><a href="/wiki/Main_Page#Dog-like-Robots" tabindex="-1">Dog-like Robots</a></li><li id="n-main_page.2523robotics-drivers-sensors"><a href="/wiki/Main_Page#Robotics-drivers-sensors" tabindex="-1">Drivers / Sensors</a></li><li id="n-main_page.2523robotics-robot-arms"><a href="/wiki/Main_Page#Robotics-robot-arms" tabindex="-1">Robot Arm / Control</a></li></ul></li><li class="nav"><a href="#" id="n-mcu.252Ffpga" class="dropdown-toggle" data-toggle="dropdown">MCU/FPGA <b class="caret"></b></a><ul class="dropdown-menu " role="menu"><li id="n-main_page.2523arduino-main-boards"><a href="/wiki/Main_Page#Arduino-main-boards" tabindex="-1">Arduino</a></li><li id="n-main_page.2523micro.253Abit"><a href="/wiki/Main_Page#micro:bit" tabindex="-1">micro:bit</a></li><li id="n-main_page.2523mcu.2farm" class="LPC"><a href="/wiki/Main_Page#MCU.2FARM" tabindex="-1">STM32</a></li><li id="n-main_page.2523fpga"><a href="/wiki/Main_Page#FPGA" tabindex="-1">FPGA</a></li></ul></li><li class="nav"><a href="https://service.waveshare.com" id="n-https.253A.252F.252Fservice.waveshare.com" rel="nofollow" target="_blank">Support</a></li>							</ul>
+						
+													<ul class="nav navbar-nav navbar-right">
+							</ul>
+				<form class="navbar-form navbar-right" action="/w/index.php" id="searchform">
+					<div class="form-group"><input type="search" name="search" placeholder="Product name search" title="Search Waveshare Wiki [f]" accesskey="f" id="searchInput" class="search-query form-control"/><input type="submit" name="go" value="Go" title="Go to a page with this exact name if it exists" id="mw-searchButton" class="searchButton btn hidden"/>
+					</div>
+				</form><ul class="nav navbar-nav navbar-right">							</ul>
+						</div>
+						
+					</div>
+				</div>
+			</div>
+			<!-- /navbar -->
+					<div id="mw-page-base"></div>
+			<div id="mw-head-base"></div>
+			<a id="top"></a>
+
+			<!-- content -->
+			<div id="contentwrapper" class="user-loggedout not-editable container with-navbar with-navbar-fixed">
+
+				
+				<div class="row">
+					<div class="col-md-offset-2 col-md-10" role="main">
+								<div class="mw-body" id="content">
+			<div id="mw-js-message" style="display:none;"></div>
+									<h1 id="firstHeading" class="firstHeading page-header" lang="en"><span dir="auto">10 DOF IMU Sensor (D)</span></h1>
+									<!-- bodyContent -->
+			<div id="bodyContent">
+								<div id="siteSub">From Waveshare Wiki</div>
+								<div id="contentSub"></div>
+												<div id="jump-to-nav" class="mw-jump">
+					Jump to:					<a href="#mw-navigation">navigation</a>, 					<a href="#p-search">search</a>
+				</div>
+				<div id="mw-content-text" lang="en" dir="ltr" class="mw-content-ltr"><div class="mw-parser-output"><div class="wiki-pages jet-green-color">
+<table id="infotable" class="a-r at-c roundy bgd-green bl-white" style="margin-left: 5px; margin-bottom: 5px; width: 30%;">
+
+<tbody><tr>
+<td>
+<table class="at-c roundy" style="background: transparent;width:100%;">
+
+<tbody><tr>
+<td class="at-c textwhite"><b>10 DOF IMU Sensor (D)</b><br /><small><b>Low Power</b></small>
+</td></tr>
+<tr>
+<td class="at-c bgwhite" style="margin:5px;"><a href="https://www.waveshare.com/10-dof-imu-sensor-d.htm?amazon" title="10 DOF IMU Sensor (D)" target="_blank" rel="nofollow noreferrer noopener"><img alt="10 DOF IMU Sensor (D)" src="/w/upload/thumb/3/3b/10-DOF-IMU-Sensor-D-1.jpg/300px-10-DOF-IMU-Sensor-D-1.jpg" decoding="async" loading="lazy" width="300" height="225" srcset="/w/upload/thumb/3/3b/10-DOF-IMU-Sensor-D-1.jpg/450px-10-DOF-IMU-Sensor-D-1.jpg 1.5x, /w/upload/thumb/3/3b/10-DOF-IMU-Sensor-D-1.jpg/600px-10-DOF-IMU-Sensor-D-1.jpg 2x" /></a><br /><br /><small>10 DOF IMU Sensor (D), ICM20948 Onboard, Lower Power Consumption</small>
+</td></tr></tbody></table>
+</td></tr>
+<tr style="display:none;">
+<td>
+<table class="roundy" style="background: transparent;width:100%;">
+
+<tbody><tr>
+<td class="at-c textwhite"><b>{{{name2}}}</b>
+</td></tr>
+<tr>
+<td class="at-c bgwhite" style="margin:5px;"><br />
+</td></tr></tbody></table>
+</td></tr>
+<tr style="display:none;">
+<td>
+<table class="roundy" style="background: transparent;width:100%;">
+
+<tbody><tr>
+<td class="at-c textwhite"><b>{{{name3}}}</b>
+</td></tr>
+<tr>
+<td class="at-c bgwhite" style="margin:5px;"><br />
+</td></tr></tbody></table>
+</td></tr>
+<tr style="display:none;">
+<td>
+<table class="roundy" style="background: transparent;width:100%;">
+
+<tbody><tr>
+<td class="at-c textwhite"><b>{{{name4}}}</b>
+</td></tr>
+<tr>
+<td class="at-c bgwhite" style="margin:5px;"><br />
+</td></tr></tbody></table>
+</td></tr>
+<tr style="display:none;">
+<td>
+<table class="roundy" style="background: transparent;width:100%;">
+
+<tbody><tr>
+<td class="at-c textwhite"><b>{{{name5}}}</b>
+</td></tr>
+<tr>
+<td class="at-c bgwhite" style="margin:5px;"><br />
+</td></tr></tbody></table>
+</td></tr>
+<tr style="display:none;">
+<td>
+<table class="roundy" style="background: transparent;width:100%;">
+
+<tbody><tr>
+<td class="at-c textwhite"><b>{{{name6}}}</b>
+</td></tr>
+<tr>
+<td class="at-c bgwhite" style="margin:5px;"><br />
+</td></tr></tbody></table>
+</td></tr>
+<tr>
+<td>
+<table class="roundy" style="display:none;">
+<tbody><tr>
+<td style="width:2%;">
+</td>
+<td style="width:3%;">
+</td>
+<th colspan="2" width="90%" class="at-c roundytop bgl-white">Primary Attribute
+</th>
+<td style="width:3%;">
+</td>
+<td style="width:2%;">
+</td></tr>
+<tr>
+<td colspan="6" width="90px" class="at-c roundytl roundytr bgwhite b-green" style="border-width: 0 0 1px 0;"><b>Category:</b> <a href="/wiki/Category:Modules" title="Category:Modules">Modules</a>
+</td></tr>
+<tr style="display:none;">
+<th colspan="3" width="90px" class="at-r bgwhite b-green" style="border-width: 0 0 1px 0;">{{{userDefinedInfo}}}:
+</th>
+<td colspan="3" class="at-l b-green bgwhite" style="border-width: 0 0 1px 0;">{{{userdefinedvalue}}}
+</td></tr>
+<tr style="display:none;">
+<td colspan="6" width="90px" class="at-c roundybl roundybr bgwhite"><b>Brand:</b> Waveshare
+</td></tr></tbody></table>
+</td></tr>
+<tr>
+<td>
+<table class="a-r roundy" style="display:none;">
+<tbody><tr>
+<td style="width:2%;">
+</td>
+<td style="width:3%;">
+</td>
+<th colspan="2" width="90%" class="at-c roundytop bgl-white">Website
+</th>
+<td style="width:3%;">
+</td>
+<td style="width:2%;">
+</td></tr>
+<tr>
+<td colspan="6" width="90px" class="at-c roundytl roundytr bgwhite b-green" style="border-width: 0 0 1px 0;"><b>International:</b> <a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://www.waveshare.com/10-dof-imu-sensor-d.htm">Website</a>
+</td></tr>
+<tr>
+<td colspan="6" width="90px" class="at-c roundybl roundybr bgwhite"><b>Chinese:</b> <a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://www.waveshare.net/wiki/10_DOF_IMU_Sensor_(D)">Website</a>
+</td></tr></tbody></table>
+</td></tr>
+<tr>
+<td>
+<table class="a-r roundy" style="background: transparent; border-collapse:collapse;width:100%;display:none;">
+<tbody><tr>
+<td style="width:2%;">
+</td>
+<td style="width:3%;">
+</td>
+<th colspan="2" width="90%" class="at-c roundytop bgl-white">Onboard Interfaces
+</th>
+<td style="width:3%;">
+</td>
+<td style="width:2%;">
+</td></tr>
+<tr>
+<td colspan="6" width="90px" class="at-l roundy bgwhite b-green" style="border-width: 0 0 1px 0;">
+<table class="roundy bgwhite fulltable" style="text-align:center;">
+
+<tbody><tr>
+<td class="roundy bl-gray bw-1" style="width:25%;;"><small><b><a href="/wiki/Category:I2C_interface" title="Category:I2C interface">I2C</a></b></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td></tr>
+<tr>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td></tr>
+<tr>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td></tr>
+<tr>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td></tr>
+<tr>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td>
+<td class="roundy bl-gray bw-1" style="width:25%;display:none;"><small></small>
+</td></tr></tbody></table>
+</td></tr></tbody></table>
+</td></tr>
+<tr>
+<td>
+<table class="a-r roundy" style="background: transparent; border-collapse:collapse;width:100%;;display:none;">
+<tbody><tr>
+<td style="width:2%;">
+</td>
+<td style="width:3%;">
+</td>
+<th colspan="2" width="90%" class="at-c roundytop bgl-white">Related Products
+</th>
+<td style="width:3%;">
+</td>
+<td style="width:2%;">
+</td></tr>
+<tr>
+<td colspan="6" width="90px" class="at-l roundy bgwhite b-green" style="border-width: 0 0 1px 0;">
+<ul><li><a href="/wiki/10_DOF_IMU_Sensor_(C)" title="10 DOF IMU Sensor (C)">10 DOF IMU Sensor (C)</a></li>
+<li><a class="mw-selflink selflink">10 DOF IMU Sensor (D)</a></li></ul>
+</td></tr></tbody></table>
+</td></tr></tbody></table>
+<div id="toc" class="toc" role="navigation" aria-labelledby="mw-toc-heading"><input type="checkbox" role="button" id="toctogglecheckbox" class="toctogglecheckbox" style="display:none" /><div class="toctitle" lang="en" dir="ltr"><h2 id="mw-toc-heading">Contents</h2><span class="toctogglespan"><label class="toctogglelabel" for="toctogglecheckbox"></label></span></div>
+<ul>
+<li class="toclevel-1"><a href="#Overview"><span class="tocnumber">1</span> <span class="toctext">Overview</span></a>
+<ul>
+<li class="toclevel-2"><a href="#Features"><span class="tocnumber">1.1</span> <span class="toctext">Features</span></a></li>
+<li class="toclevel-2"><a href="#Pinouts"><span class="tocnumber">1.2</span> <span class="toctext">Pinouts</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1"><a href="#Sensor_introduction"><span class="tocnumber">2</span> <span class="toctext">Sensor introduction</span></a>
+<ul>
+<li class="toclevel-2"><a href="#Introduction"><span class="tocnumber">2.1</span> <span class="toctext">Introduction</span></a></li>
+<li class="toclevel-2"><a href="#Basic_settings"><span class="tocnumber">2.2</span> <span class="toctext">Basic settings</span></a>
+<ul>
+<li class="toclevel-3"><a href="#Accelerometer"><span class="tocnumber">2.2.1</span> <span class="toctext"><b>Accelerometer</b></span></a></li>
+<li class="toclevel-3"><a href="#ICM20948_Acceleration_range_setting"><span class="tocnumber">2.2.2</span> <span class="toctext"><b>ICM20948 Acceleration range setting</b></span></a></li>
+<li class="toclevel-3"><a href="#Angular_velocity_sensor"><span class="tocnumber">2.2.3</span> <span class="toctext"><b>Angular velocity sensor</b></span></a></li>
+<li class="toclevel-3"><a href="#ICM20948_Acceleration_unit_conversion"><span class="tocnumber">2.2.4</span> <span class="toctext"><b>ICM20948 Acceleration unit conversion</b></span></a></li>
+<li class="toclevel-3"><a href="#ICM20948_Angular_Velocity_Range_Setting"><span class="tocnumber">2.2.5</span> <span class="toctext"><b>ICM20948 Angular Velocity Range Setting</b></span></a></li>
+<li class="toclevel-3"><a href="#ICM20948_Angular_Velocity_Unit_Conversion"><span class="tocnumber">2.2.6</span> <span class="toctext"><b>ICM20948 Angular Velocity Unit Conversion</b></span></a></li>
+<li class="toclevel-3"><a href="#Magnetometer_sensor"><span class="tocnumber">2.2.7</span> <span class="toctext"><b>Magnetometer sensor</b></span></a></li>
+<li class="toclevel-3"><a href="#ICM20948_Magnetometer"><span class="tocnumber">2.2.8</span> <span class="toctext"><b>ICM20948 Magnetometer</b></span></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toclevel-1"><a href="#User_Guides_of_RPI"><span class="tocnumber">3</span> <span class="toctext">User Guides of RPI</span></a>
+<ul>
+<li class="toclevel-2"><a href="#Enable_I2C_interfaces"><span class="tocnumber">3.1</span> <span class="toctext">Enable I2C interfaces</span></a>
+<ul>
+<li class="toclevel-3"><a href="#BCM2835"><span class="tocnumber">3.1.1</span> <span class="toctext">BCM2835</span></a></li>
+<li class="toclevel-3"><a href="#wiringPi"><span class="tocnumber">3.1.2</span> <span class="toctext">wiringPi</span></a></li>
+<li class="toclevel-3"><a href="#lgpio"><span class="tocnumber">3.1.3</span> <span class="toctext">lgpio</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2"><a href="#Download_examples"><span class="tocnumber">3.2</span> <span class="toctext">Download examples</span></a></li>
+<li class="toclevel-2"><a href="#Hardware_connection"><span class="tocnumber">3.3</span> <span class="toctext">Hardware connection</span></a></li>
+<li class="toclevel-2"><a href="#Run_examples"><span class="tocnumber">3.4</span> <span class="toctext">Run examples</span></a>
+<ul>
+<li class="toclevel-3"><a href="#C_examples"><span class="tocnumber">3.4.1</span> <span class="toctext">C examples</span></a>
+<ul>
+<li class="toclevel-4"><a href="#BCM2835_2"><span class="tocnumber">3.4.1.1</span> <span class="toctext">BCM2835</span></a></li>
+</ul>
+</li>
+<li class="toclevel-3"><a href="#wiringPi_2"><span class="tocnumber">3.4.2</span> <span class="toctext">wiringPi</span></a></li>
+<li class="toclevel-3"><a href="#Expected_result"><span class="tocnumber">3.4.3</span> <span class="toctext">Expected result</span></a></li>
+<li class="toclevel-3"><a href="#About_the_output_data"><span class="tocnumber">3.4.4</span> <span class="toctext">About the output data</span></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toclevel-1"><a href="#User_Guides_of_STM32"><span class="tocnumber">4</span> <span class="toctext">User Guides of STM32</span></a>
+<ul>
+<li class="toclevel-2"><a href="#Hardware_connection_2"><span class="tocnumber">4.1</span> <span class="toctext">Hardware connection</span></a></li>
+<li class="toclevel-2"><a href="#Software_Description"><span class="tocnumber">4.2</span> <span class="toctext">Software Description</span></a></li>
+<li class="toclevel-2"><a href="#Serial_output_data_meaning"><span class="tocnumber">4.3</span> <span class="toctext">Serial output data meaning</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1"><a href="#User_Guides_of_Arduino"><span class="tocnumber">5</span> <span class="toctext">User Guides of Arduino</span></a>
+<ul>
+<li class="toclevel-2"><a href="#Hardware_connection_3"><span class="tocnumber">5.1</span> <span class="toctext">Hardware connection</span></a></li>
+<li class="toclevel-2"><a href="#Examples"><span class="tocnumber">5.2</span> <span class="toctext">Examples</span></a></li>
+<li class="toclevel-2"><a href="#Serial_output_data_meaning_2"><span class="tocnumber">5.3</span> <span class="toctext">Serial output data meaning</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-1"><a href="#Resources"><span class="tocnumber">6</span> <span class="toctext">Resources</span></a>
+<ul>
+<li class="toclevel-2 tocsection-2"><a href="#Document"><span class="tocnumber">6.1</span> <span class="toctext">Document</span></a></li>
+<li class="toclevel-2 tocsection-3"><a href="#Program"><span class="tocnumber">6.2</span> <span class="toctext">Program</span></a></li>
+<li class="toclevel-2 tocsection-4"><a href="#Datasheet"><span class="tocnumber">6.3</span> <span class="toctext">Datasheet</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-5"><a href="#FAQ"><span class="tocnumber">7</span> <span class="toctext">FAQ</span></a></li>
+<li class="toclevel-1 tocsection-6"><a href="#Support"><span class="tocnumber">8</span> <span class="toctext">Support</span></a></li>
+</ul>
+</div>
+
+<h1><span class="mw-headline" id="Overview">Overview</span></h1>
+<p>This is a 10-axis sensor with onboard low-power ICM20948 (low-power 3-axis gyroscope, 3-axis accelerometer, and 3-axis compass/magnetometer), Internal Digital Motion Processing™ (DMP™) engine, offloads complicate fusion calculation, sensor synchronization, gesture recognition, etc. Compared with MPU9250, it has higher precision, lower power consumption, and is more suitable for wearable devices. The onboard BMP280 (barometric altimeter), a built-in temperature sensor, can perform temperature compensation and has stronger performance and lower power consumption than BMP180. You can get the 10 DOF data through the I2C interface.<br />
+</p>
+<h2><span class="mw-headline" id="Features">Features</span></h2>
+<ul><li>Power supply: 3.3V~5V (internal voltage regulation with low dropout)</li>
+<li>Accelerometer Features:
+<ul><li>Resolution: 16 bit</li>
+<li>Measurement range (configurable): ±2, ±4, ±8, ±16g</li>
+<li>Operating current: 68.9uA</li></ul></li></ul>
+<ul><li>Gyroscope Features:
+<ul><li>Resolution: 16 bit</li>
+<li>Measurement range (configurable): ±250, ±500, ±1000, ±2000°/sec</li>
+<li>Operating current:  1.23mA</li></ul></li></ul>
+<ul><li>Compass/Magnetometer Features:
+<ul><li>Resolution: 16 bit</li>
+<li>Measurement range: ±4900µT</li>
+<li>Operating current: 90uA</li></ul></li></ul>
+<ul><li>Barometric pressure sensor Features:
+<ul><li>Barometric resolution: 0.0016hPa</li>
+<li>Temperature Resolution: 0.01°C</li>
+<li>Measurement range: 300~1100hPa (Altitude: +9000m ~ -500m)</li>
+<li>Barometric relative accuracy (700hPa~900hPa, 25°C~40°C): ±0.12hPa (±1m)</li>
+<li>Operating current (1Hz update rate, ultra-low power mode): 2.8uA</li></ul></li></ul>
+<h2><span class="mw-headline" id="Pinouts">Pinouts</span></h2>
+<table border="2;" style="width:700px;">
+
+<tbody><tr style="background:#ddf; color:black;" align="center">
+<td>PIN</td>
+<td>Symbol</td>
+<td>Description
+</td></tr>
+<tr align="center">
+<td>1</td>
+<td>VCC</td>
+<td>3.3V~5.5V power supply
+</td></tr>
+<tr align="center">
+<td>2</td>
+<td>GND</td>
+<td>Power ground
+</td></tr>
+<tr align="center">
+<td>3</td>
+<td>SDA</td>
+<td>I2C data input
+</td></tr>
+<tr align="center">
+<td>4</td>
+<td>SCL</td>
+<td>I2C clock pin
+</td></tr>
+<tr align="center">
+<td>5</td>
+<td>INT</td>
+<td>ICM20948 digital interrupt output
+</td></tr>
+<tr align="center">
+<td>6</td>
+<td>FSYNC</td>
+<td>ICM20948 frame sync signal
+</td></tr></tbody></table>
+<h1><span class="mw-headline" id="Sensor_introduction">Sensor introduction</span></h1>
+<h2><span class="mw-headline" id="Introduction">Introduction</span></h2>
+<p>The onboard ICM20948 chip includes a 3-axis gyroscope, a 3-axis accelerometer, and a 3-axis compass/magnetometer. The following figure shows the coordinate axis definition of the sensor:<br />
+<a href="/wiki/File:10_DOF_IMU_Sensor_coordinate_axis.png" class="image"><img alt="10 DOF IMU Sensor coordinate axis.png" src="/w/upload/9/99/10_DOF_IMU_Sensor_coordinate_axis.png" decoding="async" loading="lazy" width="800" height="830" /></a>
+</p>
+<h2><span class="mw-headline" id="Basic_settings">Basic settings</span></h2>
+<h3><span class="mw-headline" id="Accelerometer"><b>Accelerometer</b></span></h3>
+<ul><li>The data output by the acceleration sensor is the composite value of the motion acceleration and the gravitational acceleration.</li>
+<li>When the sensor is placed at rest, the motion acceleration is 0, and the 3-axis value output by the sensor is the component of the gravitational acceleration on each coordinate axis.</li>
+<li>If it is placed horizontally, the theoretical output value is 0g for the X axis, 0g for the Y axis, and -1g for the Z axis. The negative value of the Z-axis output is because the direction of the gravitational acceleration is downward, and the direction of the sensor Z-axis is upward, so it is a negative value. Positive and negative only indicate the relationship between the acceleration direction and the coordinate axis direction.</li>
+<li>It should be noted here that even if the sensor is placed absolutely horizontally, the output value of the acceleration sensor will not be equal to the theoretical value (0g, 0g, -1g), because each sensor has its own unique zero offsets. In the actual use process, the zero bias error can be appropriately removed according to the situation. Generally, the data can be removed by data fitting and other methods.</li></ul>
+<h3><span class="mw-headline" id="ICM20948_Acceleration_range_setting"><b>ICM20948 Acceleration range setting</b></span></h3>
+<ul><li>The ICM20948 supports a variety of ranges, including ±2g, ±4g, ±8g, and ±16g. The sample program uses ±2g. If you need to change the range, you can modify the &lt;ACCEL_CONFIG&gt; register. The following figure shows the correspondence between the value of the &lt;ACCEL_CONFIG&gt; register and the range in the datasheet relation:<br /></li></ul>
+<p><a href="/wiki/File:10_DOF_IMU_Sensor_Range.png" class="image"><img alt="10 DOF IMU Sensor Range.png" src="/w/upload/9/9c/10_DOF_IMU_Sensor_Range.png" decoding="async" loading="lazy" width="657" height="279" /></a><br />
+</p>
+<ul><li>Taking the STM32 sample code as an example, the setting method of ±2g in the code is as follows:<br /></li></ul>
+<pre>I2C_WriteOneByte( I2C_ADD_ICM20948, REG_ADD_ACCEL_CONFIG,
+                  REG_VAL_BIT_ACCEL_DLPCFG_6 | REG_VAL_BIT_ACCEL_FS_2g | REG_VAL_BIT_ACCEL_DLPF);
+</pre>
+<ul><li>If you need to modify it to ±8g, make the following modifications:<br /></li></ul>
+<pre> I2C_WriteOneByte( I2C_ADD_ICM20948, REG_ADD_ACCEL_CONFIG,
+                  REG_VAL_BIT_ACCEL_DLPCFG_6 | REG_VAL_BIT_ACCEL_FS_8g | REG_VAL_BIT_ACCEL_DLPF);
+</pre>
+<h3><span class="mw-headline" id="Angular_velocity_sensor"><b>Angular velocity sensor</b></span></h3>
+<ul><li>The value obtained by the angular velocity sensor is the angular velocity of rotation around each coordinate axis. When the rotation direction is the same as the coordinate axis marked direction, it is positive, and when the rotation direction is opposite to the coordinate axis marked direction, it is negative. There is also a zero bias error in the angular velocity, which can generally be removed by static placement and averaging.</li></ul>
+<p><br />
+</p>
+<h3><span class="mw-headline" id="ICM20948_Acceleration_unit_conversion"><b>ICM20948 Acceleration unit conversion</b></span></h3>
+<ul><li>For different ranges, the original value read from the sensor register needs to be divided by the corresponding conversion coefficient, which can be converted into acceleration in g. The coefficient values corresponding to each range are in the following table:<br /></li></ul>
+<p><a href="/wiki/File:10_DOF_IMU_Unit_conversion.png" class="image"><img alt="10 DOF IMU Unit conversion.png" src="/w/upload/b/bd/10_DOF_IMU_Unit_conversion.png" decoding="async" loading="lazy" width="715" height="184" /></a><br />
+</p>
+<ul><li>When the range is ±2g, the original value of the sensor/16384 can get the acceleration value in g.</li></ul>
+<h3><span class="mw-headline" id="ICM20948_Angular_Velocity_Range_Setting"><b>ICM20948 Angular Velocity Range Setting</b></span></h3>
+<ul><li>ICM20948 supports a variety of ranges, including ±250, ±500, ±1000, ±2000°/sec, and ±1000°/sec is used in the sample program. If you need to change the range, you can modify the &lt;GYRO_CONFIG_1&gt; register, as shown in the figure below The corresponding relationship between the value of the &lt;GYRO_CONFIG_1&gt; register and the range in the datasheet:<br /></li></ul>
+<p><a href="/wiki/File:10_DOF_IMU_Angular_velocity_range.png" class="image"><img alt="10 DOF IMU Angular velocity range.png" src="/w/upload/3/31/10_DOF_IMU_Angular_velocity_range.png" decoding="async" loading="lazy" width="647" height="279" /></a><br />
+</p>
+<ul><li>Taking the STM32 sample code as an example, the setting method of ±1000°/sec in the code is as follows:</li></ul>
+<pre>I2C_WriteOneByte( I2C_ADD_ICM20948, REG_ADD_GYRO_CONFIG_1,   
+                  REG_VAL_BIT_GYRO_DLPCFG_6 | REG_VAL_BIT_GYRO_FS_1000DPS | REG_VAL_BIT_GYRO_DLPF);
+</pre>
+<ul><li>If you need to modify it to ±2000°/sec, do the following modifications:<br /></li></ul>
+<pre>I2C_WriteOneByte( I2C_ADD_ICM20948, REG_ADD_GYRO_CONFIG_1,   
+                  REG_VAL_BIT_GYRO_DLPCFG_6 | REG_VAL_BIT_GYRO_FS_2000DPS | REG_VAL_BIT_GYRO_DLPF);
+</pre>
+<h3><span class="mw-headline" id="ICM20948_Angular_Velocity_Unit_Conversion"><b>ICM20948 Angular Velocity Unit Conversion</b></span></h3>
+<ul><li>For different ranges, the original value read from the sensor register needs to be divided by the corresponding conversion coefficient, which can be converted into angular velocity in °/sec. The following table shows the coefficient values corresponding to each range:<br /></li></ul>
+<p><a href="/wiki/File:10_DOF_IMU_Angular_velocity_unit_conversion.png" class="image"><img alt="10 DOF IMU Angular velocity unit conversion.png" src="/w/upload/4/42/10_DOF_IMU_Angular_velocity_unit_conversion.png" decoding="async" loading="lazy" width="725" height="187" /></a><br />
+</p>
+<ul><li>When the range is ±1000°/sec, the original value of the sensor/32.8 can get the angular velocity in °/sec.</li></ul>
+<h3><span class="mw-headline" id="Magnetometer_sensor"><b>Magnetometer sensor</b></span></h3>
+<ul><li>The magnetometer sensor measures the magnetic field around the sensor. When there is no strong magnetic field (motor, etc.) nearby, the output value of the magnetometer sensor is the component of the earth's magnetic field in the three coordinate axes.</li></ul>
+<h3><span class="mw-headline" id="ICM20948_Magnetometer"><b>ICM20948 Magnetometer</b></span></h3>
+<ul><li>The original value read from the sensor register needs to multiply with the conversion factor to convert to the magnetic field strength in μT ($10^-6$Tesla). The following table shows the conversion factor of the magnetometer in ICM20948:<br /></li></ul>
+<p><a href="/wiki/File:10_DOF_IMU_Magnetometer_conversion_coefficient.png" class="image"><img alt="10 DOF IMU Magnetometer conversion coefficient.png" src="/w/upload/b/be/10_DOF_IMU_Magnetometer_conversion_coefficient.png" decoding="async" loading="lazy" width="696" height="98" /></a><br />
+That is, the original value of the sensor * 0.15 can get the magnetic field strength in μT.
+</p>
+<h1><span class="mw-headline" id="User_Guides_of_RPI">User Guides of RPI</span></h1>
+<h2><span class="mw-headline" id="Enable_I2C_interfaces">Enable I2C interfaces</span></h2>
+<ul><li>Open the terminal, and use the command to enter the configuration page:<br /></li></ul>
+<pre>sudo raspi-config
+Choose Interfacing Options -&gt; I2C -&gt; Yes to enable I2C interface.
+</pre>
+<p><a href="/wiki/File:RPI_open_i2c.png" class="image"><img alt="RPI open i2c.png" src="/w/upload/5/5c/RPI_open_i2c.png" decoding="async" loading="lazy" width="800" height="1021" /></a><br />
+Reboot Raspberry Pi: <br />
+</p>
+<pre>sudo reboot
+</pre>
+<p><span style="color:#FF0000;"><b> <big>If you use bookworm system, only the lgpio library is available, bcm2835 and wiringPi libarary cannot be installed or used. Please note that the python library does not need to be installed, you can directly run the demo.</big></b></span>
+</p>
+<h3><span class="mw-headline" id="BCM2835">BCM2835</span></h3>
+<pre>#Open the Raspberry Pi terminal and run the following commands:
+sudo wget http://www.airspayce.com/mikem/bcm2835/bcm2835-1.71.tar.gz
+sudo tar zxvf bcm2835-1.71.tar.gz 
+cd bcm2835-1.71/
+sudo ./configure &amp;&amp; sudo make &amp;&amp; sudo make check &amp;&amp; sudo make install
+# For more information, please refer to the official website: http://www.airspayce.com/mikem/bcm2835/
+</pre>
+<h3><span class="mw-headline" id="wiringPi">wiringPi</span></h3>
+<pre>#Open the Raspberry Pi terminal and run the following commands:
+cd
+sudo apt-get install wiringpi
+#For Raspberry Pi systems after May 2019 (those earlier may not require execution), an upgrade may be necessary:
+wget https://files.waveshare.com/wiki/common/wiringpi-latest.deb
+sudo dpkg -i wiringpi-latest.deb
+gpio -v
+# Run gpio -v and version 2.52 will appear. If it does not appear, there is an installation error
+
+#Bullseye branch system uses the following command:
+sudo git clone https://github.com/WiringPi/WiringPi
+cd WiringPi
+sudo ./build
+gpio -v
+# Run gpio -v and version 2.70 will appear. If it does not appear, there is an installation error
+</pre>
+<h3><span class="mw-headline" id="lgpio">lgpio</span></h3>
+<pre>sudo su
+wget https://github.com/joan2937/lg/archive/master.zip
+unzip master.zip
+cd lg-master
+sudo make install 
+# For more information, please refer to the official website: https://github.com/gpiozero/lg
+</pre>
+<h2><span class="mw-headline" id="Download_examples">Download examples</span></h2>
+<p>Open a terminal of the Raspberry Pi:
+</p>
+<pre>sudo apt-get install p7zip-full -y
+sudo wget https://files.waveshare.com/upload/c/c1/10_DOF_IMU_Sensor_D_Code.7z
+7z x 10_DOF_IMU_Sensor_D_Code.7z -O./10_DOF_IMU_Sensor_D_Code
+cd 10_DOF_IMU_Sensor_D_Code/RaspberryPi/
+</pre>
+<h2><span class="mw-headline" id="Hardware_connection">Hardware connection</span></h2>
+<table border="1;" style="width:100%; max-width:700px;" align="center">
+
+<tbody><tr style="background:green; color:white;" align="center">
+<td rowspan="2">Sensor
+</td>
+<td colspan="1">Raspberry Pi
+</td>
+<td rowspan="2">Description
+</td></tr>
+<tr style="background:green; color:white;" align="center">
+<td>Board order
+</td></tr>
+<tr align="center">
+<td>VCC</td>
+<td>5V</td>
+<td>Power input
+</td></tr>
+<tr align="center">
+<td>GND</td>
+<td>GND</td>
+<td>Power ground
+</td></tr>
+<tr align="center">
+<td>SDA</td>
+<td>3</td>
+<td>I2C data input
+</td></tr>
+<tr align="center">
+<td>SCL</td>
+<td>5</td>
+<td>I2C clock pin
+</td></tr></tbody></table>
+<p><a href="/wiki/File:10_DOF_IMU_RPI_C_2.jpg" class="image"><img alt="10 DOF IMU RPI C 2.jpg" src="/w/upload/thumb/3/31/10_DOF_IMU_RPI_C_2.jpg/500px-10_DOF_IMU_RPI_C_2.jpg" decoding="async" loading="lazy" width="500" height="429" srcset="/w/upload/thumb/3/31/10_DOF_IMU_RPI_C_2.jpg/750px-10_DOF_IMU_RPI_C_2.jpg 1.5x, /w/upload/thumb/3/31/10_DOF_IMU_RPI_C_2.jpg/1000px-10_DOF_IMU_RPI_C_2.jpg 2x" /></a>
+</p>
+<h2><span class="mw-headline" id="Run_examples">Run examples</span></h2>
+<p>Please execute the following commands under RaspberryPi, otherwise, the directory will not be indexed.
+</p>
+<h3><span class="mw-headline" id="C_examples">C examples</span></h3>
+<ul><li>Recompile, the compilation process may take a few seconds.</li></ul>
+<h4><span class="mw-headline" id="BCM2835_2">BCM2835</span></h4>
+<pre>cd BCM2853
+sudo make clean
+sudo make 
+sudo ./10Dof-D_Demo
+</pre>
+<h3><span class="mw-headline" id="wiringPi_2">wiringPi</span></h3>
+<pre>cd wiringPi
+sudo make clean
+sudo make 
+sudo ./10Dof-D_Demo
+</pre>
+<p>Note: If you have run BCM2835, please restart wiringPi before running.
+</p>
+<h3><span class="mw-headline" id="Expected_result">Expected result</span></h3>
+<p>After running the demo on the Raspberry Pi, it will output the following data:
+</p>
+<dl><dd><a href="/wiki/File:10_DOF_IMU_RPI_C_1.jpg" class="image"><img alt="10 DOF IMU RPI C 1.jpg" src="/w/upload/thumb/8/87/10_DOF_IMU_RPI_C_1.jpg/500px-10_DOF_IMU_RPI_C_1.jpg" decoding="async" loading="lazy" width="500" height="228" srcset="/w/upload/8/87/10_DOF_IMU_RPI_C_1.jpg 1.5x" /></a></dd></dl>
+<h3><span class="mw-headline" id="About_the_output_data">About the output data</span></h3>
+<table border="2;" style="width:700px; background:#eee;">
+
+<tbody><tr align="center">
+<td>Roll, Pitch, Yaw</td>
+<td>Roll (°), Pitch (°), Yaw (°)
+</td></tr>
+<tr align="center">
+<td>Acceleration</td>
+<td>LSB, can be transferred to g<sup>①</sup>
+</td></tr>
+<tr align="center">
+<td>Gyroscope</td>
+<td>GLSB, can be transferred to °/s<sup>②</sup>
+</td></tr>
+<tr align="center">
+<td>Magnetic</td>
+<td>LSB, can be transferred μT<sup>③</sup>）
+</td></tr>
+<tr align="center">
+<td>Angle</td>
+<td>Direction (°), it is equal to  Yaw degree
+</td></tr>
+<tr align="center">
+<td>Pressure</td>
+<td>hPa
+</td></tr>
+<tr align="center">
+<td>Altitude</td>
+<td>m
+</td></tr>
+<tr align="center">
+<td>Temperature</td>
+<td>℃
+</td></tr></tbody></table>
+<p>Note：<br />
+①: The acceleration output by the serial port of the sample demo is the original value of the register (the value of the register). After this value is divided by 16384, it can be converted into a value in g (gravitational acceleration constant). <br />
+②: The angular velocity output by the serial port of the sample demo is the original value of the register (the value of the register). After this value is divided by 32.8, it can be converted into a value in DPS (angle/second). <br />
+③: The value of the magnetic sensor output by the serial port of the sample demo is the original value of the register (the value of the register). This value is multiplied by 0.15 to convert it into a value in μT (10-6 Tesla). <br />
+</p><p>The example we provide is based on STM32F103RBT6, and the connection method provided is the corresponding pin of STM32F103RBT6 as an example. If you need to use other STM32, please connect according to the actual pin.
+</p>
+<h1><span class="mw-headline" id="User_Guides_of_STM32">User Guides of STM32</span></h1>
+<h2><span class="mw-headline" id="Hardware_connection_2">Hardware connection</span></h2>
+<table border="1;" style="width:100%; max-width:700px;" align="center">
+
+<tbody><tr style="background:green; color:white;" align="center">
+<th>Sensor</th>
+<th>STM32</th>
+<th>Description
+</th></tr>
+<tr>
+<td>VCC</td>
+<td>3.3V</td>
+<td>Power input
+</td></tr>
+<tr>
+<td>GMD</td>
+<td>GND</td>
+<td>Power ground
+</td></tr>
+<tr>
+<td>SDA</td>
+<td>SDA/PB9</td>
+<td>I2C data input
+</td></tr>
+<tr>
+<td>SCL</td>
+<td>SCL/PB8</td>
+<td>I2C clock pin
+</td></tr></tbody></table>
+<p><a href="/wiki/File:10_DOF_IMU_STM32_2.jpg" class="image"><img alt="10 DOF IMU STM32 2.jpg" src="/w/upload/thumb/e/e2/10_DOF_IMU_STM32_2.jpg/600px-10_DOF_IMU_STM32_2.jpg" decoding="async" loading="lazy" width="600" height="382" srcset="/w/upload/thumb/e/e2/10_DOF_IMU_STM32_2.jpg/900px-10_DOF_IMU_STM32_2.jpg 1.5x, /w/upload/thumb/e/e2/10_DOF_IMU_STM32_2.jpg/1200px-10_DOF_IMU_STM32_2.jpg 2x" /></a>
+</p>
+<h2><span class="mw-headline" id="Software_Description">Software Description</span></h2>
+<p>The examples are developed based on the HAL library. Please download the program in the <a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://files.waveshare.com/upload/1/17/PCF8591-Code.7z">data</a>, find the STM32 program file directory, and open 
+PCF8591-Code\STM32\STM32F103RB\MDK-ARM.<br />
+PCF8591 AD DA Board.uvprojx in the directory, then you can see the demo.<br />
+<a href="/wiki/File:MQ5_STM3201.png" class="image"><img alt="MQ5 STM3201.png" src="/w/upload/thumb/8/86/MQ5_STM3201.png/600px-MQ5_STM3201.png" decoding="async" loading="lazy" width="600" height="361" srcset="/w/upload/thumb/8/86/MQ5_STM3201.png/900px-MQ5_STM3201.png 1.5x, /w/upload/8/86/MQ5_STM3201.png 2x" /></a><br />
+Open main.c, recompile and download.<br />
+<a href="/wiki/File:1200px-MQ5_STM32_201.png" class="image"><img alt="1200px-MQ5 STM32 201.png" src="/w/upload/thumb/f/fd/1200px-MQ5_STM32_201.png/600px-1200px-MQ5_STM32_201.png" decoding="async" loading="lazy" width="600" height="328" srcset="/w/upload/thumb/f/fd/1200px-MQ5_STM32_201.png/900px-1200px-MQ5_STM32_201.png 1.5x, /w/upload/thumb/f/fd/1200px-MQ5_STM32_201.png/1200px-1200px-MQ5_STM32_201.png 2x" /></a><br />
+After the download is successful, run SSCOM to view the real-time status of the sensor.<br />
+<a href="/wiki/File:10_DOF_IMU_STM32_1.jpg" class="image"><img alt="10 DOF IMU STM32 1.jpg" src="/w/upload/thumb/1/17/10_DOF_IMU_STM32_1.jpg/600px-10_DOF_IMU_STM32_1.jpg" decoding="async" loading="lazy" width="600" height="447" srcset="/w/upload/1/17/10_DOF_IMU_STM32_1.jpg 1.5x" /></a><br />
+</p>
+<h2><span class="mw-headline" id="Serial_output_data_meaning">Serial output data meaning</span></h2>
+<table border="2;" style="width:700px; background:#eee;">
+
+<tbody><tr align="center">
+<td>Roll, Pitch, Yaw</td>
+<td>Roll (°), Pitch (°), Yaw (°)
+</td></tr>
+<tr align="center">
+<td>Acceleration</td>
+<td>LSB, can be transferred to g<sup>①</sup>
+</td></tr>
+<tr align="center">
+<td>Gyroscope</td>
+<td>GLSB, can be transferred to °/s<sup>②</sup>
+</td></tr>
+<tr align="center">
+<td>Magnetic</td>
+<td>LSB, can be transferred μT<sup>③</sup>）
+</td></tr>
+<tr align="center">
+<td>Angle</td>
+<td>Direction (°), it is equal to  Yaw degree
+</td></tr>
+<tr align="center">
+<td>Pressure</td>
+<td>hPa
+</td></tr>
+<tr align="center">
+<td>Altitude</td>
+<td>m
+</td></tr>
+<tr align="center">
+<td>Temperature</td>
+<td>℃
+</td></tr></tbody></table>
+<p>Note：<br />
+①: The acceleration output by the serial port of the sample demo is the original value of the register (the value of the register). After this value is divided by 16384, it can be converted into a value in g (gravitational acceleration constant). <br />
+②: The angular velocity output by the serial port of the sample demo is the original value of the register (the value of the register). After this value is divided by 32.8, it can be converted into a value in dps (angle/second). <br />
+③: The value of the magnetic sensor output by the serial port of the sample demo is the original value of the register (that is, the value of the register). This value is multiplied by 0.15 to convert it into a value in μT (10-6 Tesla). <br />
+</p><p>The Arduino example is written for the Arduino UNO. If you want to connect it to other Arduino boards, you may need to change the connection.<br />
+</p>
+<h1><span class="mw-headline" id="User_Guides_of_Arduino">User Guides of Arduino</span></h1>
+<h2><span class="mw-headline" id="Hardware_connection_3">Hardware connection</span></h2>
+<table class="wikitable">
+<tbody><tr>
+<th>Sensor</th>
+<th>Arduino</th>
+<th>Description
+</th></tr>
+<tr>
+<td>VCC</td>
+<td>5V</td>
+<td>Power input
+</td></tr>
+<tr>
+<td>GND</td>
+<td>GND</td>
+<td>Power ground
+</td></tr>
+<tr>
+<td>SDA</td>
+<td>SDA</td>
+<td>I2C data inpu
+</td></tr>
+<tr>
+<td>SCL</td>
+<td>SCL</td>
+<td>I2C clock pin
+</td></tr></tbody></table>
+<p><a href="/wiki/File:10_DOF_IMU_Arduino_2.jpg" class="image"><img alt="10 DOF IMU Arduino 2.jpg" src="/w/upload/thumb/7/77/10_DOF_IMU_Arduino_2.jpg/500px-10_DOF_IMU_Arduino_2.jpg" decoding="async" loading="lazy" width="500" height="346" srcset="/w/upload/thumb/7/77/10_DOF_IMU_Arduino_2.jpg/750px-10_DOF_IMU_Arduino_2.jpg 1.5x, /w/upload/thumb/7/77/10_DOF_IMU_Arduino_2.jpg/1000px-10_DOF_IMU_Arduino_2.jpg 2x" /></a>
+</p>
+<h2><span class="mw-headline" id="Examples">Examples</span></h2>
+<ul><li><a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://www.waveshare.com/wiki/Template:Arduino_IDE_Installation_Steps">Arduino_IDE_Installation_Steps.</a></li>
+<li>Download the <a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://files.waveshare.com/upload/c/c1/10_DOF_IMU_Sensor_D_Code.7z">Demo Code</a> to your PC and unzip.</li>
+<li>Install the <a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://www.arduino.cc/en/Main/Software">Arduino IDE</a> on your PC.</li>
+<li>Go into 10_DOF_IMU_Sensor_D_Code/Arduino/10Dof-D_Demo.</li>
+<li>Run the 10Dof-D_Demo.ino file.</li>
+<li>Select the correct Board and the Port.</li></ul>
+<dl><dd><a href="/wiki/File:MQ5_Arduino_1.jpg" class="image"><img alt="MQ5 Arduino 1.jpg" src="/w/upload/thumb/a/a9/MQ5_Arduino_1.jpg/500px-MQ5_Arduino_1.jpg" decoding="async" loading="lazy" width="500" height="299" srcset="/w/upload/a/a9/MQ5_Arduino_1.jpg 1.5x" /></a></dd></dl>
+<ul><li>Build the project and upload it to the board.</li>
+<li>Open the serial monitor of the Arduino IDE or the SSCOM software and check the serial data.</li></ul>
+<dl><dd><a href="/wiki/File:10_DOF_IMU_Arduino_1.jpg" class="image"><img alt="10 DOF IMU Arduino 1.jpg" src="/w/upload/thumb/5/52/10_DOF_IMU_Arduino_1.jpg/500px-10_DOF_IMU_Arduino_1.jpg" decoding="async" loading="lazy" width="500" height="372" srcset="/w/upload/thumb/5/52/10_DOF_IMU_Arduino_1.jpg/750px-10_DOF_IMU_Arduino_1.jpg 1.5x, /w/upload/5/52/10_DOF_IMU_Arduino_1.jpg 2x" /></a></dd></dl>
+<h2><span class="mw-headline" id="Serial_output_data_meaning_2">Serial output data meaning</span></h2>
+<table border="2;" style="width:700px; background:#eee;">
+
+<tbody><tr align="center">
+<td>Roll, Pitch, Yaw</td>
+<td>Roll (°), Pitch (°), Yaw (°)
+</td></tr>
+<tr align="center">
+<td>Acceleration</td>
+<td>LSB, can be transferred to g<sup>①</sup>
+</td></tr>
+<tr align="center">
+<td>Gyroscope</td>
+<td>GLSB, can be transferred to °/s<sup>②</sup>
+</td></tr>
+<tr align="center">
+<td>Magnetic</td>
+<td>LSB, can be transferred μT<sup>③</sup>）
+</td></tr>
+<tr align="center">
+<td>Angle</td>
+<td>Direction (°), it is equal to Yaw degree
+</td></tr>
+<tr align="center">
+<td>Pressure</td>
+<td>hPa
+</td></tr>
+<tr align="center">
+<td>Altitude</td>
+<td>m
+</td></tr>
+<tr align="center">
+<td>Temperature</td>
+<td>℃
+</td></tr></tbody></table>
+<p>Note: <br />
+①: The acceleration output by the serial port of the sample program is the original value of the register (the value of the register). After this value is divided by 16384, it can be converted into a value in g (gravitational acceleration constant). <br />
+②: The angular velocity output by the serial port of the sample program is the original value of the register (the value of the register). After this value is divided by 32.8, it can be converted into a value in dps (angle/second). <br />
+③: The value of the magnetic sensor output by the serial port of the sample program is the original value of the register (that is, the value of the register). This value is multiplied by 0.15 to convert it into a value in μT (10-6 Tesla). <br />
+</p>
+<h1><span class="mw-headline" id="Resources">Resources</span></h1>
+<h2><span class="mw-headline" id="Document">Document</span></h2>
+<ul><li><a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://files.waveshare.com/upload/7/79/10_DOF_IMU_Sensor_D_User_Manual_EN.pdf">User Manual</a></li>
+<li><a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://files.waveshare.com/upload/a/a4/10_DOF_IMU_Sensor_D_Schematic.pdf">Schematic</a></li></ul>
+<h2><span class="mw-headline" id="Program">Program</span></h2>
+<ul><li><a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://files.waveshare.com/upload/c/c1/10_DOF_IMU_Sensor_D_Code.7z">Demo Code</a></li></ul>
+<h2><span class="mw-headline" id="Datasheet">Datasheet</span></h2>
+<ul><li><a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://files.waveshare.com/upload/1/18/DS-000189-ICM-20948-v1.3.pdf">ICM20948</a></li>
+<li><a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://files.waveshare.com/upload/a/af/BST-BMP280-DS001-09-371189.pdf">BME280</a></li>
+<li><a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://files.waveshare.com/upload/f/f6/NDC7002N.pdf">NDC7002N</a></li>
+<li><a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://files.waveshare.com/upload/f/f6/RT9193.pdf">RT9193</a></li></ul>
+<h1><span class="mw-headline" id="FAQ">FAQ</span></h1>
+<div class="panel-group">
+				<div class="panel panel-default">
+					<div class="panel-heading">
+						<h4 class="panel-title">
+							<a data-toggle="collapse" data-parent="#accordion" href="#accordion1">
+								Question:  What are the output frequency of Acceleration and Angular velocity?
+							</a>
+						</h4>
+					</div>
+					<div id="accordion1" class="panel-collapse collapse in">
+						<div class="panel-body">
+<div>&#160;<b>Answer:</b></div>
+<div>
+<p>Acceleration: 0-4000Hz
+</p><p>Angular velocity: 0-8000Hz
+</p>
+</div>
+<div style="display:none;"></div>
+<div style="display:none;"></div>
+<p><font color="red" style="display:none;"></font>
+</p>
+						</div>
+					</div>
+				</div>
+</div>
+<p><br />
+</p>
+<div class="panel-group">
+				<div class="panel panel-default">
+					<div class="panel-heading">
+						<h4 class="panel-title">
+							<a data-toggle="collapse" data-parent="#accordion" href="#accordion2">
+								Question: How to calibrate the accelerometer?
+
+							</a>
+						</h4>
+					</div>
+					<div id="accordion2" class="panel-collapse collapse in">
+						<div class="panel-body">
+<div>&#160;<b>Answer:</b></div>
+<div>
+<p>Generally, the accelerometer does not need to be calibrated. Do you want to do a temperature drift? It can be simply placed in the incubator for segmented and zero drift collection of each temperature. If the ambient temperature does not change much, calibration is not necessary. 
+</p>
+</div>
+<div style="display:none;">{{{3}}}</div>
+<div style="display:none;">{{{4}}}</div>
+<p><font color="red" style="display:none;">{{{5}}}</font>
+</p>
+						</div>
+					</div>
+				</div>
+</div>
+<p><br />
+</p>
+<div class="panel-group">
+				<div class="panel panel-default">
+					<div class="panel-heading">
+						<h4 class="panel-title">
+							<a data-toggle="collapse" data-parent="#accordion" href="#accordion3">
+								Question: Why is the altitude value measured by this module very different in the morning and afternoon? 
+
+							</a>
+						</h4>
+					</div>
+					<div id="accordion3" class="panel-collapse collapse in">
+						<div class="panel-body">
+<div>&#160;<b>Answer:</b></div>
+<div>
+<p>The barometer can only be used to measure relative altitude, and the measured value is not repeatable (unless it is a specific laboratory environment). Therefore, barometers are generally used to measure short-term altitude differences. 
+</p>
+</div>
+<div style="display:none;">{{{3}}}</div>
+<div style="display:none;">{{{4}}}</div>
+<p><font color="red" style="display:none;">{{{5}}}</font>
+</p>
+						</div>
+					</div>
+				</div>
+</div>
+<p><br />
+</p>
+<h1><span class="mw-headline" id="Support">Support</span></h1>
+<p><br />
+<br />
+</p>
+<div style="background:linear-gradient(to bottom right,#91C942,#7DB036); border-radius:15px; width:100%;min-width:750px;">
+<div style="display:flex;flex-direction: row;align-items: flex-start;">
+<div style="flex:l; font-size:15px; width:70%; margin-top:20px; margin-bottom:20px; margin-right:40px;padding-left:40px;">
+<p style="font-size:20px; font-weight:bold;">
+Technical Support
+</p>
+<p>
+If you need technical support or have any feedback/review, please click the <b>Submit Now</b> button to submit a ticket, Our support team will check and reply to you within 1 to 2 working days. Please be patient as we make every effort to help you to resolve the issue. 
+<br /> 
+Working Time: 9 AM - 6 PM GMT+8 (Monday to Friday)
+</p>
+</div>
+<div style="margin-top:94px;">
+<div id="service" style="display:flex; flex:r; background-color:#393939; color:white; text-align:center; font-size:20px; border-radius:20px;">
+<p><a target="_blank" rel="nofollow noreferrer noopener" class="external text" href="https://service.waveshare.com/">Submit Now</a>
+</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 
+NewPP limit report
+Cached time: 20260619011935
+Cache expiry: 0
+Dynamic content: true
+Complications: []
+CPU time usage: 0.147 seconds
+Real time usage: 0.280 seconds
+Preprocessor visited node count: 733/1000000
+Post‐expand include size: 23944/2097152 bytes
+Template argument size: 2065/2097152 bytes
+Highest expansion depth: 8/40
+Expensive parser function count: 0/100
+Unstrip recursion depth: 0/20
+Unstrip post‐expand size: 4834/5000000 bytes
+-->
+<!--
+Transclusion expansion time report (%,ms,calls,template)
+100.00%  145.638      1 -total
+ 31.97%   46.565      1 Template:Infobox_item
+ 16.51%   24.046      1 Template:10_DOF_IMU_Sensor_D_RPi_Guide
+ 13.41%   19.533      1 Template:10_DOF_IMU_Sensor_D_Spec
+ 11.14%   16.220      3 Template:FAQ
+ 10.51%   15.305      1 Template:Product_List
+  8.92%   12.995      1 Template:Servicebox1
+  8.64%   12.586      1 Template:10_DOF_IMU_Sensor_D_STM32_Guide
+  8.62%   12.551      1 Template:10_DOF_IMU_Sensor_D_Arduino_Guide
+  8.19%   11.928      1 Template:RPI_C_lib
+-->
+</div></div>								<div class="printfooter">
+				Retrieved from "<a dir="ltr" href="https://www.waveshare.com/w/index.php?title=10_DOF_IMU_Sensor_(D)&amp;oldid=72506">https://www.waveshare.com/w/index.php?title=10_DOF_IMU_Sensor_(D)&amp;oldid=72506</a>"				</div>
+												<div id="catlinks" class="catlinks catlinks-allhidden" data-mw="interface"><div id="mw-hidden-catlinks" class="mw-hidden-catlinks mw-hidden-cats-hidden">Hidden category: <ul><li><a href="/wiki/Category:I2C_interface" title="Category:I2C interface">I2C interface</a></li></ul></div></div>												<div class="visualClear"></div>
+							</div>
+			<!-- /bodyContent -->
+		</div>
+						</div>
+				</div>
+			</div>
+			<!-- /content -->
+
+			<!-- sidebar-left -->
+			<div class="sidebar-wrapper sidebar-left-wrapper">
+				<div class="sidebar-container container">
+					<div class="row">
+						<div id="sidebar-left" class="col-md-2 col-md-offset-0">
+							<div id="tweekiTOC"></div>						</div>
+					</div>
+				</div>
+			</div>
+			<!-- /sidebar-left -->
+					<!-- footer -->
+			<div id="footer" role="contentinfo" class="footer container footer-sticky bg-light">
+			<ul id="footer-custom"><li class="dropup"><a href="/w/index.php?title=Special:UserLogin&amp;returnto=10+DOF+IMU+Sensor+%28D%29&amp;returntoquery=srsltid%3DAfmBOoo3H2pl_gMglGPeUjXoUbnGmrQ8mIgaWx-2p_L9NH4cMRINdrEC" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Login / Create Account</a></li></ul><div style="clear:both"></div>			</div>
+			<!-- /footer -->
+		
+<script>
+var fbtFancyBoxOptions = {};
+</script>
+
+<script>(RLQ=window.RLQ||[]).push(function(){mw.config.set({"wgPageParseReport":{"limitreport":{"cputime":"0.147","walltime":"0.280","ppvisitednodes":{"value":733,"limit":1000000},"postexpandincludesize":{"value":23944,"limit":2097152},"templateargumentsize":{"value":2065,"limit":2097152},"expansiondepth":{"value":8,"limit":40},"expensivefunctioncount":{"value":0,"limit":100},"unstrip-depth":{"value":0,"limit":20},"unstrip-size":{"value":4834,"limit":5000000},"timingprofile":["100.00%  145.638      1 -total"," 31.97%   46.565      1 Template:Infobox_item"," 16.51%   24.046      1 Template:10_DOF_IMU_Sensor_D_RPi_Guide"," 13.41%   19.533      1 Template:10_DOF_IMU_Sensor_D_Spec"," 11.14%   16.220      3 Template:FAQ"," 10.51%   15.305      1 Template:Product_List","  8.92%   12.995      1 Template:Servicebox1","  8.64%   12.586      1 Template:10_DOF_IMU_Sensor_D_STM32_Guide","  8.62%   12.551      1 Template:10_DOF_IMU_Sensor_D_Arduino_Guide","  8.19%   11.928      1 Template:RPI_C_lib"]},"cachereport":{"timestamp":"20260619011935","ttl":0,"transientcontent":true}}});mw.config.set({"wgBackendResponseTime":697});});</script>	</body>
+</html>

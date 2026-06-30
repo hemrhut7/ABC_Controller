@@ -51,6 +51,18 @@ typedef struct {
     float temp;
 } imu_data_t;
 
+typedef struct {
+    uint64_t timestamp;
+    float mag[3]; // in uT
+} mag_data_t;
+
+typedef struct {
+    uint64_t timestamp;
+    float pressure;    // hPa
+    float temperature; // C
+    float altitude;    // m
+} baro_data_t;
+
 typedef struct {   
     imu_data_t imu_data;
     imu_data_t imu_data_calibrated;
@@ -99,6 +111,8 @@ typedef struct {
     uint32_t delay_count;
     PID_target_t pid_target;
     float battery_v;
+    mag_data_t mag_data;
+    baro_data_t baro_data;
 } system_state_t;
 
 enum AHRS_STATE {
