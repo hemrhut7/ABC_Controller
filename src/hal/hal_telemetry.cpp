@@ -272,8 +272,8 @@ void Telemetry::process_serial_outgoing() {
           offset = 0;
           
           // 1. Payload: default_payload
-          memcpy(tx_chunk + offset, payload, sizeof(payload));
-          offset += sizeof(payload);
+          memcpy(tx_chunk + offset, send_buffer, sizeof(send_buffer));
+          offset += sizeof(send_buffer);
           
           size_t lidar_payload_start = offset;  // mark start of lidar sub-packet
           
