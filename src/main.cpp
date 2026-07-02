@@ -171,33 +171,38 @@ void UART1_Task(void *pvParameters) {
 void Comm_Task(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
+  uint8_t display_counter = 0;
+
   for (;;) {
     uart_telemetry.process_serial_outgoing();
     app_script.check_serial(Serial, &uart_telemetry);
 
-    // system display: Monitor
-    HAL_Display::WiFiStatus wifi_s;
+    uint32_t now = millis();
+    if (display_counter++ % 32) { // 200/32=6.25 Hz update rate
+      // system display: Monitor
+      HAL_Display::WiFiStatus wifi_s;
 #if HAS_WIFI_SERIAL
-    wifi_s.is_ap = (WiFi.getMode() & WIFI_AP);
-    wifi_s.connected = (WiFi.status() == WL_CONNECTED) || wifi_s.is_ap;
-    if (wifi_s.is_ap) {
-        strncpy(wifi_s.ip, WiFi.softAPIP().toString().c_str(), 16);
-    } else {
-        strncpy(wifi_s.ip, WiFi.localIP().toString().c_str(), 16);
-    }
-    wifi_s.data_active = udp_telemetry.connected();
+      wifi_s.is_ap = (WiFi.getMode() & WIFI_AP);
+      wifi_s.connected = (WiFi.status() == WL_CONNECTED) || wifi_s.is_ap;
+      if (wifi_s.is_ap) {
+          strncpy(wifi_s.ip, WiFi.softAPIP().toString().c_str(), 16);
+      } else {
+          strncpy(wifi_s.ip, WiFi.localIP().toString().c_str(), 16);
+      }
+      wifi_s.data_active = udp_telemetry.connected();
 #else
-    wifi_s.connected = false;
-    wifi_s.data_active = false;
-    strcpy(wifi_s.ip, "OFF");
+      wifi_s.connected = false;
+      wifi_s.data_active = false;
+      strcpy(wifi_s.ip, "OFF");
 #endif
 
-    bool joy_connected = false;
+      bool joy_connected = false;
 #if HAS_BLUEPAD32
-    joy_connected = joystick.is_connected();
+      joy_connected = joystick.is_connected();
 #endif
 
-    system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_error_state(), &wifi_s, joy_connected);
+      system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_error_state(), &wifi_s, joy_connected);
+    }
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
@@ -226,7 +231,7 @@ void WiFi_Task(void *pvParameters) {
 
 #ifndef UNIT_TEST
 void setup() {
-  Serial.begin(230400);
+  Serial.begin(921600);
   // Serial1 (Telemetry/Script)
   Serial1.begin(2000000, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
   // Serial2 (Sensor RX only)
