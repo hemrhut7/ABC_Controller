@@ -16,6 +16,7 @@
 #include <sensor_msgs/msg/temperature.h>
 #include <std_msgs/msg/int32.h>
 #include <std_msgs/msg/float32_multi_array.h>
+#include <geometry_msgs/msg/twist.h>
 
 class HAL_MicroROS {
 public:
@@ -52,6 +53,11 @@ private:
     rcl_publisher_t uros_mode_publisher;
     rcl_publisher_t uros_delay_publisher;
     rcl_publisher_t uros_pid_target_publisher;
+
+    rcl_subscription_t uros_cmd_vel_subscriber;
+    geometry_msgs__msg__Twist uros_cmd_vel_msg;
+    rcl_subscription_t uros_cmd_mode_subscriber;
+    std_msgs__msg__Int32 uros_cmd_mode_msg;
 
     sensor_msgs__msg__Imu uros_imu_msg;
     sensor_msgs__msg__JointState uros_joint_state_msg;

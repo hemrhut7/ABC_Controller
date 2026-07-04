@@ -1,5 +1,20 @@
 #include "hal_microros.h"
 #include "app/app_lidar.h"
+#include "app/app_mode.h"
+
+extern AppMode app_mode;
+
+static void cmd_vel_callback(const void *msgin) {
+  const geometry_msgs__msg__Twist *msg = (const geometry_msgs__msg__Twist *)msgin;
+  // Safely enqueue target velocity and steer to app_mode
+  app_mode.enqueue_target(msg->linear.x, msg->angular.z);
+}
+
+static void cmd_mode_callback(const void *msgin) {
+  const std_msgs__msg__Int32 *msg = (const std_msgs__msg__Int32 *)msgin;
+  // Safely enqueue system mode to app_mode
+  app_mode.enqueue_mode(static_cast<Mode_t>(msg->data));
+}
 
 #define FORCE_UNUSED(expr) do { rcl_ret_t _res = (expr); (void)_res; } while(0)
 
@@ -44,6 +59,10 @@ HAL_MicroROS::HAL_MicroROS() :
     memset(&uros_mode_publisher, 0, sizeof(uros_mode_publisher));
     memset(&uros_delay_publisher, 0, sizeof(uros_delay_publisher));
     memset(&uros_pid_target_publisher, 0, sizeof(uros_pid_target_publisher));
+    memset(&uros_cmd_vel_subscriber, 0, sizeof(uros_cmd_vel_subscriber));
+    memset(&uros_cmd_vel_msg, 0, sizeof(uros_cmd_vel_msg));
+    memset(&uros_cmd_mode_subscriber, 0, sizeof(uros_cmd_mode_subscriber));
+    memset(&uros_cmd_mode_msg, 0, sizeof(uros_cmd_mode_msg));
 
     memset(&uros_battery_msg, 0, sizeof(uros_battery_msg));
     memset(&uros_scan_msg, 0, sizeof(uros_scan_msg));
@@ -196,8 +215,50 @@ bool HAL_MicroROS::init_node_and_publishers() {
     return false;
   }
 
-  // Create executor
-  if (rclc_executor_init(&uros_executor, &uros_support.context, 0, &uros_allocator) != RCL_RET_OK) {
+  // Initialize cmd_vel subscriber
+  if (rclc_subscription_init_default(
+      &uros_cmd_vel_subscriber,
+      &uros_node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+      "/cmd_vel") != RCL_RET_OK) {
+    destroy_node_and_publishers();
+    return false;
+  }
+
+  // Initialize cmd_mode subscriber
+  if (rclc_subscription_init_default(
+      &uros_cmd_mode_subscriber,
+      &uros_node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
+      "/cmd_mode") != RCL_RET_OK) {
+    destroy_node_and_publishers();
+    return false;
+  }
+
+  // Create executor with 2 handles (for the 2 subscriptions)
+  if (rclc_executor_init(&uros_executor, &uros_support.context, 2, &uros_allocator) != RCL_RET_OK) {
+    destroy_node_and_publishers();
+    return false;
+  }
+
+  // Add cmd_vel subscription to executor
+  if (rclc_executor_add_subscription(
+      &uros_executor,
+      &uros_cmd_vel_subscriber,
+      &uros_cmd_vel_msg,
+      &cmd_vel_callback,
+      ON_NEW_DATA) != RCL_RET_OK) {
+    destroy_node_and_publishers();
+    return false;
+  }
+
+  // Add cmd_mode subscription to executor
+  if (rclc_executor_add_subscription(
+      &uros_executor,
+      &uros_cmd_mode_subscriber,
+      &uros_cmd_mode_msg,
+      &cmd_mode_callback,
+      ON_NEW_DATA) != RCL_RET_OK) {
     destroy_node_and_publishers();
     return false;
   }
@@ -267,6 +328,8 @@ bool HAL_MicroROS::init_node_and_publishers() {
 
 void HAL_MicroROS::destroy_node_and_publishers() {
   FORCE_UNUSED(rclc_executor_fini(&uros_executor));
+  FORCE_UNUSED(rcl_subscription_fini(&uros_cmd_vel_subscriber, &uros_node));
+  FORCE_UNUSED(rcl_subscription_fini(&uros_cmd_mode_subscriber, &uros_node));
   FORCE_UNUSED(rcl_publisher_fini(&uros_pid_target_publisher, &uros_node));
   FORCE_UNUSED(rcl_publisher_fini(&uros_delay_publisher, &uros_node));
   FORCE_UNUSED(rcl_publisher_fini(&uros_mode_publisher, &uros_node));
