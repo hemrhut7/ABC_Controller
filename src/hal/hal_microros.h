@@ -11,6 +11,11 @@
 #include <sensor_msgs/msg/joint_state.h>
 #include <sensor_msgs/msg/magnetic_field.h>
 #include <sensor_msgs/msg/fluid_pressure.h>
+#include <sensor_msgs/msg/laser_scan.h>
+#include <sensor_msgs/msg/battery_state.h>
+#include <sensor_msgs/msg/temperature.h>
+#include <std_msgs/msg/int32.h>
+#include <std_msgs/msg/float32_multi_array.h>
 
 class HAL_MicroROS {
 public:
@@ -18,7 +23,7 @@ public:
     ~HAL_MicroROS();
 
     void init();
-    void update(float rpm_L, float rpm_R, const ahrs_data_t &ahrs_data, const mag_data_t &mag_data, const baro_data_t &baro_data);
+    void update(const system_state_t &state);
 
 private:
     enum States {
@@ -41,11 +46,23 @@ private:
     rcl_publisher_t uros_joint_state_publisher;
     rcl_publisher_t uros_mag_publisher;
     rcl_publisher_t uros_baro_publisher;
+    rcl_publisher_t uros_battery_publisher;
+    rcl_publisher_t uros_scan_publisher;
+    rcl_publisher_t uros_temp_publisher;
+    rcl_publisher_t uros_mode_publisher;
+    rcl_publisher_t uros_delay_publisher;
+    rcl_publisher_t uros_pid_target_publisher;
 
     sensor_msgs__msg__Imu uros_imu_msg;
     sensor_msgs__msg__JointState uros_joint_state_msg;
     sensor_msgs__msg__MagneticField uros_mag_msg;
     sensor_msgs__msg__FluidPressure uros_baro_msg;
+    sensor_msgs__msg__BatteryState uros_battery_msg;
+    sensor_msgs__msg__LaserScan uros_scan_msg;
+    sensor_msgs__msg__Temperature uros_temp_msg;
+    std_msgs__msg__Int32 uros_mode_msg;
+    std_msgs__msg__Int32 uros_delay_msg;
+    std_msgs__msg__Float32MultiArray uros_pid_target_msg;
 
     double left_joint_pos;
     double right_joint_pos;
@@ -56,4 +73,9 @@ private:
     rosidl_runtime_c__String joint_names[2];
     double joint_positions[2];
     double joint_velocities[2];
+    double joint_efforts[2];
+    float scan_ranges[MAX_LIDAR_POINTS];
+    float scan_intensities[MAX_LIDAR_POINTS];
+    float pid_target_data[6];
+    lidar_scan_t _temp_scan;
 };

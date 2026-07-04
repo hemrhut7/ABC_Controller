@@ -26,6 +26,7 @@ public:
     void set_pending_mode(Mode_t mode) { pending_mode = mode; }
     float get_velocity() const { return current_velocity; }
     PID_target_t get_pid_target () const { return _pid_target; }
+    UserCommand_t get_user_command() const { return _cmd; }
     
     // 用於 Tuning 的接口
     void set_pid_gains(PID_id_t pid_id, float kp, float ki, float kd);

@@ -134,7 +134,7 @@ void Control_Task(void *pvParameters) {
     system_battery.update(dt);
     current_sys_state.battery_v = system_battery.get_voltage();
     current_sys_state.delay_count = failsafe.get_delay_count();
-    current_sys_state.cmd.mode = app_mode.get_mode();
+    current_sys_state.cmd = app_mode.get_user_command();
     current_sys_state.abc_state.velocity = app_mode.get_velocity();
     current_sys_state.pid_target = app_mode.get_pid_target();
     
@@ -156,17 +156,17 @@ void UART1_Task(void *pvParameters) {
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
 
   for (;;) {
-    ahrs_data_t ahrs_data;
-    ahrs.get_ahrs_data(&ahrs_data);
+    system_state_t state;
+    ahrs.get_ahrs_data(&state.abc_state.ahrs_data);
+    motor.get_motor_state(&state.abc_state.motor_state);
+    state.abc_state.velocity = app_mode.get_velocity();
+    state.cmd = app_mode.get_user_command();
+    state.delay_count = failsafe.get_delay_count();
+    state.pid_target = app_mode.get_pid_target();
+    state.battery_v = system_battery.get_voltage();
+    i2c_sensor.get_sensor_data(&state.mag_data, &state.baro_data);
 
-    motor_state_t motor_state;
-    motor.get_motor_state(&motor_state);
-
-    mag_data_t mag_data;
-    baro_data_t baro_data;
-    i2c_sensor.get_sensor_data(&mag_data, &baro_data);
-
-    uros_telemetry.update(motor_state.rpm_L, motor_state.rpm_R, ahrs_data, mag_data, baro_data);
+    uros_telemetry.update(state);
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
