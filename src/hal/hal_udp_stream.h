@@ -17,6 +17,7 @@ private:
     
     uint8_t _tx_buffer[256];  // Buffer to accumulate data before sending as a UDP packet
     size_t _tx_idx = 0;
+    const size_t MAX_UDP_PAYLOAD = 1000;
 
 public:
     UDPStream(uint16_t port) : _localPort(port), _remotePort(0) {}
@@ -88,9 +89,19 @@ public:
      */
     size_t write(const uint8_t *buffer, size_t size) override {
         if (_remotePort == 0) return 0;
-        _udp.beginPacket(_remoteIP, _remotePort);
-        _udp.write(buffer, size);
-        _udp.endPacket();
+        size_t passed_bytes = 0;
+        while (passed_bytes < size) {
+            size_t chunk_size = std::min(size - passed_bytes, MAX_UDP_PAYLOAD);
+            _udp.beginPacket(_remoteIP, _remotePort);
+            _udp.write(buffer + passed_bytes, chunk_size);
+            if (_udp.endPacket()) {
+                passed_bytes += chunk_size;
+            } else {
+                return passed_bytes;
+            }
+            vTaskDelay(pdMS_TO_TICKS(1));
+            break;
+        }
         return size;
     }
 
