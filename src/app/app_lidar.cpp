@@ -1,4 +1,5 @@
 #include "app_lidar.h"
+#include "hal/hal_telemetry.h"
 
 AppLidar::AppLidar(Stream &serial) : _lidar(serial) {
     _mutex = xSemaphoreCreateMutex();
@@ -7,7 +8,6 @@ AppLidar::AppLidar(Stream &serial) : _lidar(serial) {
         _latest_scan->count = 0;
     }
     _current_scan = nullptr;
-    _last_diag_ms = 0;
     _scan_count = 0;
     _last_data_ms = 0;
 }
@@ -37,11 +37,7 @@ void AppLidar::get_latest_scan(lidar_scan_t &scan) {
     }
 }
 
-void AppLidar::register_telemetry(Telemetry *telemetry) {
-    if (telemetry) {
-        _telemetry_list.push_back(telemetry);
-    }
-}
+
 
 void AppLidar::update_step() {
     if (!_current_scan) {
@@ -51,7 +47,6 @@ void AppLidar::update_step() {
             return;
         }
         _current_scan->count = 0;
-        _last_diag_ms = millis();
         _scan_count = 0;
         _last_data_ms = millis();
     }
@@ -66,21 +61,7 @@ void AppLidar::update_step() {
             xSemaphoreGive(_mutex);
 
             // Notify telemetry
-            for (auto tele : _telemetry_list) {
-                tele->update_lidar_data(*_current_scan);
-            }
+            Telemetry::getInstance().update_lidar_data(*_current_scan);
         }
-    }
-    
-    // --- Diagnostic Print (1Hz) ---
-    uint32_t now = millis();
-    if (now - _last_diag_ms >= 1000) {
-        if (_scan_count > 0) {
-            Serial.printf("[LIDAR DIAG] Scans/sec: %d, Last Pts: %d\n", _scan_count, _current_scan->count);
-        } else if (now - _last_data_ms > 2000) {
-            Serial.println("[LIDAR DIAG] WARNING: No data received for 2 seconds!");
-        }
-        _scan_count = 0;
-        _last_diag_ms = now;
     }
 }

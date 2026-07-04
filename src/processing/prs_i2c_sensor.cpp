@@ -33,7 +33,7 @@ void Processing_I2CSensor::update() {
             mag_updated = true;
         }
     }
-    if (_loop_cnt % _baro_interval == 0) {
+    if ((_loop_cnt + 1) % _baro_interval == 0) {
         if (hal_baro_read(&temp_baro)) {
             baro_updated = true;
         }

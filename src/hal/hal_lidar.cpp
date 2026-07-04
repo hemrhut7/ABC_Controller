@@ -72,9 +72,6 @@ bool HAL_Lidar::update(lidar_scan_t &scan) {
                 const uint8_t points_in_packet = 16;
                 for (int i = 0; i < points_in_packet; i++) {
                     if (!_current_scan || _current_scan->count >= MAX_LIDAR_POINTS) {
-                        // if (_overflow_count % 100 == 0) {
-                        //     Serial.printf("[Lidar] Warning: Point overflow! count: %d, overflow: %d\n", _current_scan ? _current_scan->count : -1, _overflow_count);
-                        // }
                         _overflow_count++;
                         break;
                     }

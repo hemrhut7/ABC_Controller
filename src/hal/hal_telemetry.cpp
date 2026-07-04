@@ -3,12 +3,49 @@
 #include <cstring>
 #include <math.h>
 
-// VOFA+ frame tail
-const uint8_t vofa_tail[4] = {0x00, 0x00, 0x80, 0x7f};
+// Telemetry packet protocol constants
+static const uint8_t packet_header[2] = {0xAA, 0x55};
+static const uint8_t packet_tail[4]   = {0x00, 0x00, 0x80, 0x7f}; // Keep original tail bytes for compatibility
+static const float ANGLE_SCALE = 65535.0f / 360.0f; // Scale factor for angle conversion to uint16_t
+
+enum MSG_ID {
+    MSG_ID_DEFAULT = 0x01,
+    MSG_ID_PID     = 0x02,
+    MSG_ID_LIDAR   = 0x03,
+};
+
+// Helper function to calculate CRC-16 CCITT
+static uint16_t calculate_crc16(const uint8_t *data, size_t len) {
+    uint16_t crc = 0xFFFF;
+    for (size_t i = 0; i < len; i++) {
+        crc ^= (uint16_t)data[i] << 8;
+        for (uint8_t bit = 0; bit < 8; bit++) {
+            if (crc & 0x8000) {
+                crc = (crc << 1) ^ 0x1021;
+            } else {
+                crc = crc << 1;
+            }
+        }
+    }
+    return crc;
+}
 
 #define TELEMETRY_QUEUE_LENGTH 5
+#define LEN_PAYLOAD_DEFAULT 23
+#define LEN_PAYLOAD_PID 15
 
-Telemetry::Telemetry(Stream &stream, TelemetryPort_t port_id) : port(stream), port_id(port_id) {}
+
+Telemetry& Telemetry::getInstance() {
+  static Telemetry instance;
+  return instance;
+}
+
+Telemetry::Telemetry() : port(nullptr), port_id(PORT_USB) {}
+
+void Telemetry::set_port(Stream &stream, TelemetryPort_t port_id) {
+  this->port = &stream;
+  this->port_id = port_id;
+}
  
 Telemetry::~Telemetry() {
   if (_lidar_scan) {
@@ -76,163 +113,161 @@ void Telemetry::process_serial_outgoing() {
     _packet_counter++;
     if (_packet_counter % _divider != 0) return;
 
-    if (_format == FORMAT_DEFAULT) {
-      // A packet was successfully received.
-      // Now, manually flatten the nested struct into a float array for VOFA+.
-      float data_packet[24];
-      data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
-      data_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
-      data_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
-      data_packet[3] = pkt.abc_state.ahrs_data.euler[2] * RAD_TO_DEG;
-      data_packet[4] = (float)pkt.abc_state.motor_state.rpm_L;
-      data_packet[5] = (float)pkt.abc_state.motor_state.rpm_R;
-      data_packet[6] = (float)pkt.abc_state.motor_state.pwm_out_L / (float)MAX_PWM_DUTY;
-      data_packet[7] = (float)pkt.abc_state.motor_state.pwm_out_R / (float)MAX_PWM_DUTY;
-      data_packet[8] = pkt.abc_state.velocity;
-      data_packet[9] = pkt.abc_state.ahrs_data.imu_data.gyro[0] * RAD_TO_DEG;
-      data_packet[10] = pkt.abc_state.ahrs_data.imu_data.gyro[1] * RAD_TO_DEG;
-      data_packet[11] = pkt.abc_state.ahrs_data.imu_data.gyro[2] * RAD_TO_DEG;
-      data_packet[12] = pkt.abc_state.ahrs_data.imu_data.accl[0];
-      data_packet[13] = pkt.abc_state.ahrs_data.imu_data.accl[1];
-      data_packet[14] = pkt.abc_state.ahrs_data.imu_data.accl[2];
-      data_packet[15] = (float)pkt.cmd.mode;
-      data_packet[16] = (float)pkt.delay_count;
-      data_packet[17] = pkt.battery_v;
-      data_packet[18] = pkt.mag_data.mag[0];
-      data_packet[19] = pkt.mag_data.mag[1];
-      data_packet[20] = pkt.mag_data.mag[2];
-      data_packet[21] = pkt.baro_data.pressure;
-      data_packet[22] = pkt.baro_data.temperature;
+    if (_format == FORMAT_DEFAULT || _format == FORMAT_LIDAR) {
+      float payload[LEN_PAYLOAD_DEFAULT];
+      payload[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
+      payload[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
+      payload[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
+      payload[3] = pkt.abc_state.ahrs_data.euler[2] * RAD_TO_DEG;
+      payload[4] = (float)pkt.abc_state.motor_state.rpm_L;
+      payload[5] = (float)pkt.abc_state.motor_state.rpm_R;
+      payload[6] = (float)pkt.abc_state.motor_state.pwm_out_L / (float)MAX_PWM_DUTY;
+      payload[7] = (float)pkt.abc_state.motor_state.pwm_out_R / (float)MAX_PWM_DUTY;
+      payload[8] = pkt.abc_state.velocity;
+      payload[9] = pkt.abc_state.ahrs_data.imu_data.gyro[0] * RAD_TO_DEG;
+      payload[10] = pkt.abc_state.ahrs_data.imu_data.gyro[1] * RAD_TO_DEG;
+      payload[11] = pkt.abc_state.ahrs_data.imu_data.gyro[2] * RAD_TO_DEG;
+      payload[12] = pkt.abc_state.ahrs_data.imu_data.accl[0];
+      payload[13] = pkt.abc_state.ahrs_data.imu_data.accl[1];
+      payload[14] = pkt.abc_state.ahrs_data.imu_data.accl[2];
+      payload[15] = (float)pkt.cmd.mode;
+      payload[16] = (float)pkt.delay_count;
+      payload[17] = pkt.battery_v;
+      payload[18] = pkt.mag_data.mag[0];
+      payload[19] = pkt.mag_data.mag[1];
+      payload[20] = pkt.mag_data.mag[2];
+      payload[21] = pkt.baro_data.pressure;
+      payload[22] = pkt.baro_data.temperature;
 
-      // Add byte-wise checksum in index 23
-      uint32_t checksum = 0;
-      uint8_t *byte_ptr = (uint8_t*)data_packet;
-      for (size_t i = 0; i < 23 * sizeof(float); i++) {
-          checksum += byte_ptr[i];
+      // Calculate CRC-16 over payload
+      uint16_t crc = calculate_crc16((const uint8_t*)payload, sizeof(payload));
+
+      // Construct and send packet: Header + ID + Payload + CRC + Tail
+      uint8_t send_buffer[sizeof(packet_header) + 1 + sizeof(payload) + sizeof(crc) + sizeof(packet_tail)];
+      size_t offset = 0;
+      
+      memcpy(send_buffer + offset, packet_header, sizeof(packet_header));
+      offset += sizeof(packet_header);
+
+      send_buffer[offset++] = MSG_ID_DEFAULT;
+      
+      memcpy(send_buffer + offset, payload, sizeof(payload));
+      offset += sizeof(payload);
+      
+      memcpy(send_buffer + offset, &crc, sizeof(crc));
+      offset += sizeof(crc);
+      
+      memcpy(send_buffer + offset, packet_tail, sizeof(packet_tail));
+      offset += sizeof(packet_tail);
+
+      if (port) {
+        port->write(send_buffer, sizeof(send_buffer));
       }
-      data_packet[23] = (float)checksum;
-
-      // Write the data packet and the tail to the serial port.
-      uint8_t send_buffer[sizeof(data_packet) + sizeof(vofa_tail)];
-      memcpy(send_buffer, data_packet, sizeof(data_packet));
-      memcpy(send_buffer + sizeof(data_packet), vofa_tail, sizeof(vofa_tail));
-      port.write(send_buffer, sizeof(send_buffer));
     } 
     else if (_format == FORMAT_PID) {
-      float data_packet[16];
-      data_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
-      data_packet[1] = pkt.cmd.target_value;
-      data_packet[2] = pkt.pid_target.rpm_L;
-      data_packet[3] = pkt.pid_target.rpm_R;
-      data_packet[4] = pkt.pid_target.pitch * RAD_TO_DEG;
-      data_packet[5] = pkt.pid_target.velocity;
-      data_packet[6] = pkt.pid_target.steer_rpm;
-      data_packet[7] = (float)pkt.abc_state.motor_state.pwm_out_L;
-      data_packet[8] = (float)pkt.abc_state.motor_state.pwm_out_R;
-      data_packet[9] = (float)pkt.abc_state.motor_state.rpm_L;
-      data_packet[10] = (float)pkt.abc_state.motor_state.rpm_R;
-      data_packet[11] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
-      data_packet[12] = pkt.abc_state.velocity;
-      data_packet[13] = pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[2] * RAD_TO_DEG;
-      data_packet[14] = pkt.battery_v;
+      float payload[LEN_PAYLOAD_PID];
+      payload[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
+      payload[1] = pkt.cmd.target_value;
+      payload[2] = pkt.pid_target.rpm_L;
+      payload[3] = pkt.pid_target.rpm_R;
+      payload[4] = pkt.pid_target.pitch * RAD_TO_DEG;
+      payload[5] = pkt.pid_target.velocity;
+      payload[6] = pkt.pid_target.steer_rpm;
+      payload[7] = (float)pkt.abc_state.motor_state.pwm_out_L;
+      payload[8] = (float)pkt.abc_state.motor_state.pwm_out_R;
+      payload[9] = (float)pkt.abc_state.motor_state.rpm_L;
+      payload[10] = (float)pkt.abc_state.motor_state.rpm_R;
+      payload[11] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
+      payload[12] = pkt.abc_state.velocity;
+      payload[13] = pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[2] * RAD_TO_DEG;
+      payload[14] = pkt.battery_v;
 
-      // Add byte-wise checksum in index 15
-      uint32_t checksum = 0;
-      uint8_t *byte_ptr = (uint8_t*)data_packet;
-      for (size_t i = 0; i < 15 * sizeof(float); i++) {
-          checksum += byte_ptr[i];
+      // Calculate CRC-16 over payload
+      uint16_t crc = calculate_crc16((const uint8_t*)payload, sizeof(payload));
+
+      // Construct and send packet: Header + ID + Payload + CRC + Tail
+      uint8_t send_buffer[sizeof(packet_header) + 1 + sizeof(payload) + sizeof(crc) + sizeof(packet_tail)];
+      size_t offset = 0;
+      
+      memcpy(send_buffer + offset, packet_header, sizeof(packet_header));
+      offset += sizeof(packet_header);
+      
+      send_buffer[offset++] = MSG_ID_PID;
+
+      memcpy(send_buffer + offset, payload, sizeof(payload));
+      offset += sizeof(payload);
+      
+      memcpy(send_buffer + offset, &crc, sizeof(crc));
+      offset += sizeof(crc);
+      
+      memcpy(send_buffer + offset, packet_tail, sizeof(packet_tail));
+      offset += sizeof(packet_tail);
+
+      if (port) {
+        port->write(send_buffer, sizeof(send_buffer));
       }
-      data_packet[15] = (float)checksum;
-
-      // Write the data packet and the tail to the serial port.
-      uint8_t send_buffer[sizeof(data_packet) + sizeof(vofa_tail)];
-      memcpy(send_buffer, data_packet, sizeof(data_packet));
-      memcpy(send_buffer + sizeof(data_packet), vofa_tail, sizeof(vofa_tail));
-      port.write(send_buffer, sizeof(send_buffer));
     }
-    else if (_format == FORMAT_LIDAR) {
-      bool has_lidar = (_lidar_updated && _lidar_mutex && _lidar_scan);
-      
-      uint16_t pt_count = 0;
-      if (has_lidar) {
-          if (xSemaphoreTake(_lidar_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
-              pt_count = _lidar_scan->count;
-          } else {
-              has_lidar = false; 
-          }
-      }
-
-      // Preparation of base status data
-      float status_packet[24];
-      status_packet[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
-      status_packet[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
-      status_packet[2] = pkt.abc_state.ahrs_data.euler[1] * RAD_TO_DEG;
-      status_packet[3] = pkt.abc_state.ahrs_data.euler[2] * RAD_TO_DEG;
-      status_packet[4] = (float)pkt.abc_state.motor_state.rpm_L;
-      status_packet[5] = (float)pkt.abc_state.motor_state.rpm_R;
-      status_packet[6] = (float)pkt.abc_state.motor_state.pwm_out_L / (float)MAX_PWM_DUTY;
-      status_packet[7] = (float)pkt.abc_state.motor_state.pwm_out_R / (float)MAX_PWM_DUTY;
-      status_packet[8] = pkt.abc_state.velocity;
-      status_packet[9] = pkt.abc_state.ahrs_data.imu_data.gyro[0] * RAD_TO_DEG;
-      status_packet[10] = pkt.abc_state.ahrs_data.imu_data.gyro[1] * RAD_TO_DEG;
-      status_packet[11] = pkt.abc_state.ahrs_data.imu_data.gyro[2] * RAD_TO_DEG;
-      status_packet[12] = pkt.abc_state.ahrs_data.imu_data.accl[0];
-      status_packet[13] = pkt.abc_state.ahrs_data.imu_data.accl[1];
-      status_packet[14] = pkt.abc_state.ahrs_data.imu_data.accl[2];
-      status_packet[15] = (float)pkt.cmd.mode;
-      status_packet[16] = (float)pkt.delay_count;
-      status_packet[17] = pkt.battery_v;
-      status_packet[18] = pkt.mag_data.mag[0];
-      status_packet[19] = pkt.mag_data.mag[1];
-      status_packet[20] = pkt.mag_data.mag[2];
-      status_packet[21] = pkt.baro_data.pressure;
-      status_packet[22] = pkt.baro_data.temperature;
-
-      // Add byte-wise checksum in index 23
-      uint32_t checksum = 0;
-      uint8_t *byte_ptr = (uint8_t*)status_packet;
-      for (size_t i = 0; i < 23 * sizeof(float); i++) {
-          checksum += byte_ptr[i];
-      }
-      status_packet[23] = (float)checksum;
-
-      // LwIP Automatic IP Fragmentation: Allocate a single buffer large enough for a full scan (approx 4.7 KB)
+  
+    if (_format == FORMAT_LIDAR) {
       static uint8_t* tx_chunk = nullptr;
-      const size_t max_buf_size = sizeof(status_packet) + 2 + MAX_LIDAR_POINTS * sizeof(lidar_point_packed_t) + sizeof(vofa_tail);
-      if (!tx_chunk) {
-          tx_chunk = (uint8_t*)heap_caps_malloc(max_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-          if (!tx_chunk) {
-              Serial.println("[TELE] Failed to allocate large PSRAM buffer for Lidar UDP!");
-          }
-      }
-      
-      if (tx_chunk) {
-          size_t offset = 0;
-          uint16_t pt_count_u16 = (uint16_t)pt_count;
-          
-          // Copy Status Packet (88 bytes) + Point Count (2 bytes)
-          memcpy(tx_chunk + offset, status_packet, sizeof(status_packet)); offset += sizeof(status_packet);
-          memcpy(tx_chunk + offset, &pt_count_u16, 2);  offset += 2;
+      const size_t max_buf_size = sizeof(packet_header) + 1 + 4 + 2 + MAX_LIDAR_POINTS * sizeof(lidar_point_packed_t) + 2 + sizeof(packet_tail);
 
-          if (has_lidar) {
-              for (int i = 0; i < pt_count; i++) {
-                  lidar_point_packed_t packed_pt;
-                  packed_pt.x = (int16_t)(_lidar_scan->points[i].x * 1000.0f);
-                  packed_pt.y = (int16_t)(_lidar_scan->points[i].y * 1000.0f);
-                  packed_pt.distance = (uint16_t)(_lidar_scan->points[i].distance * 1000.0f);
-                  packed_pt.angle = (uint16_t)(_lidar_scan->points[i].angle * (65535.0f / 360.0f));
-                  packed_pt.intensity = _lidar_scan->points[i].intensity;
-                  
-                  memcpy(tx_chunk + offset, &packed_pt, sizeof(lidar_point_packed_t)); 
-                  offset += sizeof(lidar_point_packed_t);
-              }
-              _lidar_updated = false;
-              xSemaphoreGive(_lidar_mutex);
+      if (!tx_chunk) {
+        tx_chunk = (uint8_t*)heap_caps_malloc(max_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!tx_chunk) {
+            Serial.println("[TELE] Failed to allocate large PSRAM buffer for Lidar UDP!");
+        }
+      }
+
+      if (!(_lidar_updated && _lidar_mutex && _lidar_scan) || !tx_chunk) {
+        return;
+      }
+
+      if (xSemaphoreTake(_lidar_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
+          uint16_t pt_count = _lidar_scan->count;
+          size_t offset = 0;
+
+          if (pt_count > MAX_LIDAR_POINTS) {
+            pt_count = MAX_LIDAR_POINTS;
           }
-          
-          // Final: Append tail and send as a single UDP datagram, letting LwIP handle IP fragmentation automatically
-          memcpy(tx_chunk + offset, vofa_tail, sizeof(vofa_tail)); offset += sizeof(vofa_tail);
-          port.write(tx_chunk, offset);
+
+          // 1. Lidar Header + ID + Point Count
+          memcpy(tx_chunk + offset, packet_header, sizeof(packet_header));
+          offset += sizeof(packet_header);
+
+          tx_chunk[offset++] = MSG_ID_LIDAR;
+
+          uint32_t time_stampe_ms = (uint32_t)(_lidar_scan->timestamp * 1e-3f);
+          memcpy(tx_chunk + offset, &time_stampe_ms, sizeof(time_stampe_ms));
+          offset += sizeof(time_stampe_ms);
+
+          memcpy(tx_chunk + offset, &pt_count, sizeof(pt_count));
+          offset += sizeof(pt_count);
+
+          // 2. Lidar Points
+          lidar_point_packed_t* packed_pts = (lidar_point_packed_t*)(tx_chunk + offset);
+          for (int i = 0; i < pt_count; i++) {
+            packed_pts[i].x = (int16_t)(_lidar_scan->points[i].x * 1000.0f);
+            packed_pts[i].y = (int16_t)(_lidar_scan->points[i].y * 1000.0f);
+            packed_pts[i].distance = (uint16_t)(_lidar_scan->points[i].distance * 1000.0f);
+            packed_pts[i].angle = (uint16_t)(_lidar_scan->points[i].angle * ANGLE_SCALE);
+            packed_pts[i].intensity = _lidar_scan->points[i].intensity;
+          }
+          _lidar_updated = false;
+          xSemaphoreGive(_lidar_mutex);
+          offset += pt_count * sizeof(lidar_point_packed_t);
+
+          // 3. CRC-16 (over lidar_payload)
+          uint16_t crc = calculate_crc16(tx_chunk + sizeof(packet_header) + 1, offset - (sizeof(packet_header) + 1));
+          memcpy(tx_chunk + offset, &crc, sizeof(crc));
+          offset += sizeof(crc);
+
+          // 4. Tail
+          memcpy(tx_chunk + offset, packet_tail, sizeof(packet_tail));
+          offset += sizeof(packet_tail);
+          if (port) {
+            port->write(tx_chunk, offset);
+          }
       }
     }
   }
@@ -253,7 +288,9 @@ void Telemetry::queue_string(const char *str) {
     return;
   // This function is called from a communication task, so direct writing is
   // safe and won't interfere with the Control_Task.
-  port.print(str);
+  if (port) {
+    port->print(str);
+  }
 }
 
 void Telemetry::queue_string(const String &str) { queue_string(str.c_str()); }

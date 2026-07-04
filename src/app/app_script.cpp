@@ -1,4 +1,7 @@
 #include "app_script.h"
+#if HAS_WIFI_SERIAL
+#include "hal/hal_udp_stream.h"
+#endif
 
 AppScript::AppScript(AppMode *app_mode) : _app_mode(app_mode) {}
 
@@ -7,12 +10,12 @@ void AppScript::check_serial(Stream &stream, Telemetry *telemetry) {
     String rx_line = stream.readStringUntil('\n');
     rx_line.trim(); // 去除換行符號
     if (rx_line.length() > 0) {
-      parse_packet(rx_line, telemetry);
+      parse_packet(rx_line, stream, telemetry);
     }
   }
 }
 
-void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
+void AppScript::parse_packet(const String &packet, Stream &response_stream, Telemetry *telemetry) {
   if (!_app_mode || !telemetry)
     return;
 
@@ -33,7 +36,7 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
       _app_mode->save_pid_gains();
       snprintf(tx_buffer, sizeof(tx_buffer),
                "[OK] PID Config Saved to EEPROM\n");
-      telemetry->queue_string(tx_buffer);
+      response_stream.print(tx_buffer);
       return;
     }
 
@@ -48,20 +51,20 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
             isnan(kd) || isinf(kd) || kd < 0.0f) {
           snprintf(tx_buffer, sizeof(tx_buffer),
                    "[ERR] Rejected PID %d: Values must be finite and non-negative\n", id);
-          telemetry->queue_string(tx_buffer);
+          response_stream.print(tx_buffer);
           return;
         }
         _app_mode->set_pid_gains((PID_id_t)id, kp, ki, kd);
         snprintf(tx_buffer, sizeof(tx_buffer),
                  "[OK] PID %d Updated: P=%.3f I=%.3f D=%.3f\n", id, kp, ki, kd);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       } else {
         snprintf(tx_buffer, sizeof(tx_buffer),
                  "[ERR] PID ID out of range (0-%d)\n", PID_ID_COUNT - 1);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       }
     } else {
-      telemetry->queue_string(
+      response_stream.print(
           "[ERR] Invalid PID format. Usage: PID <id> <kp> <ki> <kd>\n");
     }
   }
@@ -77,14 +80,14 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
           snprintf(tx_buffer, sizeof(tx_buffer),
                    "[ERR] Command queue full (MODE)\n");
         }
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       } else {
         snprintf(tx_buffer, sizeof(tx_buffer), "[ERR] Invalid Mode (0-%d)\n",
                  MODE_REMOTE);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       }
     } else {
-      telemetry->queue_string("[ERR] Invalid MODE format. Usage: MODE <id>\n");
+      response_stream.print("[ERR] Invalid MODE format. Usage: MODE <id>\n");
     }
   }
   // 3. 控制指令: "VAL <val> <steer>"
@@ -92,7 +95,7 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
     float val, steer;
     if (sscanf(cmd_line.c_str(), "VAL %f %f", &val, &steer) == 2) {
       if (!_app_mode->enqueue_target(val, steer)) {
-        telemetry->queue_string("[ERR] Command queue full (VAL)\n");
+        response_stream.print("[ERR] Command queue full (VAL)\n");
       }
     }
   }
@@ -106,11 +109,11 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
         PID_Params p = _app_mode->get_pid_gains((PID_id_t)id);
         snprintf(tx_buffer, sizeof(tx_buffer),
                  "[OK] PID %d: P=%.3f, I=%.3f, D=%.3f\n", id, p.p, p.i, p.d);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       } else {
         snprintf(tx_buffer, sizeof(tx_buffer),
                  "[ERR] PID ID out of range (0-%d)\n", PID_ID_COUNT - 1);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       }
     } else {
       // 獲取所有 PID
@@ -120,7 +123,7 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
         snprintf(tx_buffer, sizeof(tx_buffer),
                  "[OK] PID %d (%s): P=%.3f, I=%.3f, D=%.3f\n", i, pid_names[i],
                  p.p, p.i, p.d);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       }
     }
   }
@@ -129,16 +132,32 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
     int enabled, port_id, format, freq_hz;
     if (sscanf(cmd_line.c_str(), "TELE %d %d %d %d", &enabled, &port_id, &format,
                &freq_hz) == 4) {
-      if (port_id != telemetry->get_port_id()) return;
+      Stream *new_stream = nullptr;
+      if (port_id == PORT_USB) {
+        new_stream = &Serial;
+      } else if (port_id == PORT_UART1) {
+        new_stream = &Serial1;
+      } else if (port_id == PORT_WIFI) {
+#if HAS_WIFI_SERIAL
+        extern UDPStream udp_stream;
+        new_stream = &udp_stream;
+#endif
+      }
 
-      telemetry->set_config(enabled != 0, (uint8_t)format, (uint16_t)freq_hz);
-      snprintf(tx_buffer, sizeof(tx_buffer),
-               "[OK] Telemetry: En=%d, Fmt=%d, Freq=%dHz\n", enabled, format,
-               freq_hz);
-      telemetry->queue_string(tx_buffer);
+      if (new_stream != nullptr) {
+        telemetry->set_port(*new_stream, (TelemetryPort_t)port_id);
+        telemetry->set_config(enabled != 0, (uint8_t)format, (uint16_t)freq_hz);
+        snprintf(tx_buffer, sizeof(tx_buffer),
+                 "[OK] Telemetry switched to port %d: En=%d, Fmt=%d, Freq=%dHz\n", port_id, enabled, format,
+                 freq_hz);
+        response_stream.print(tx_buffer);
+      } else {
+        snprintf(tx_buffer, sizeof(tx_buffer),
+                 "[ERR] Port %d not available or unsupported\n", port_id);
+        response_stream.print(tx_buffer);
+      }
     } else {
-      telemetry->queue_string("[ERR] Invalid TELE format. Usage: TELE "
-                              "<enabled> <divider> <format>\n");
+      response_stream.print("[ERR] Invalid TELE format. Usage: TELE <enabled> <port_id> <format> <freq_hz>\n");
     }
   }
   // 6. LPF 設定指令: "LPF <id> <freq>"
@@ -150,14 +169,14 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
         _app_mode->set_cut_off_freq((LPF_id_t)id, freq);
         snprintf(tx_buffer, sizeof(tx_buffer),
                  "[OK] LPF %d Updated: Freq=%.2f Hz\n", id, freq);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       } else {
         snprintf(tx_buffer, sizeof(tx_buffer),
                  "[ERR] LPF ID out of range (0-%d)\n", LPF_ID_COUNT - 1);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       }
     } else {
-      telemetry->queue_string(
+      response_stream.print(
           "[ERR] Invalid LPF format. Usage: LPF <id> <freq>\n");
     }
   }
@@ -169,11 +188,11 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
         float f = _app_mode->get_lpf_freq((LPF_id_t)id);
         snprintf(tx_buffer, sizeof(tx_buffer),
                  "[OK] LPF %d: Freq=%.2f Hz\n", id, f);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       } else {
         snprintf(tx_buffer, sizeof(tx_buffer),
                  "[ERR] LPF ID out of range (0-%d)\n", LPF_ID_COUNT - 1);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       }
     } else {
         const char *lpf_names[] = {"VELOCITY", "STEER", "GYRO_Z", "CURR_VEL"};
@@ -181,7 +200,7 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
             float f = _app_mode->get_lpf_freq((LPF_id_t)i);
             snprintf(tx_buffer, sizeof(tx_buffer),
                      "[OK] LPF %d (%s): Freq=%.2f Hz\n", i, lpf_names[i], f);
-            telemetry->queue_string(tx_buffer);
+            response_stream.print(tx_buffer);
         }
     }
   }
@@ -201,14 +220,14 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
         _app_mode->set_ramp((PARAM_RAMP_id_t)id, internal_val);
         snprintf(tx_buffer, sizeof(tx_buffer), "[OK] Ramp %d Updated: %.3f%s\n",
                  id, val, unit);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       } else {
         snprintf(tx_buffer, sizeof(tx_buffer),
                  "[ERR] Ramp ID out of range (0-%d)\n", PARAM_RAMP_ID_COUNT - 1);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       }
     } else {
-      telemetry->queue_string(
+      response_stream.print(
           "[ERR] Invalid RAMP format. Usage: RAMP <id> <val>\n");
     }
   }
@@ -225,11 +244,11 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
         }
         snprintf(tx_buffer, sizeof(tx_buffer), "[OK] Ramp %d: %.3f%s\n", id, val,
                  unit);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       } else {
         snprintf(tx_buffer, sizeof(tx_buffer),
                  "[ERR] Ramp ID out of range (0-%d)\n", PARAM_RAMP_ID_COUNT - 1);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       }
     } else {
       const char *ramp_names[] = {"PITCH", "VELOCITY"};
@@ -242,7 +261,7 @@ void AppScript::parse_packet(const String &packet, Telemetry *telemetry) {
         }
         snprintf(tx_buffer, sizeof(tx_buffer), "[OK] Ramp %d (%s): %.3f%s\n", i,
                  ramp_names[i], val, unit);
-        telemetry->queue_string(tx_buffer);
+        response_stream.print(tx_buffer);
       }
     }
   }

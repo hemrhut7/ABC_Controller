@@ -24,11 +24,11 @@
 #endif
 
 #define PRIORITY_CONTROL 24
-#define PRIORITY_AHRS 15
 #define PRIORITY_UART1 12
+#define PRIORITY_WIFI 12
 #define PRIORITY_COMM 10
 #define PRIORITY_GAMEPAD 8
-#define PRIORITY_LIDAR 10
+#define PRIORITY_LIDAR 11
 
 #define MAIN_LOOP_RATE_HZ  200.0f
 #define PERIOD_CONTROLL    1000.0f/MAIN_LOOP_RATE_HZ
@@ -80,9 +80,7 @@ void set_app_pending_mode(Mode_t mode) {
 HAL_Display system_display;
 HAL_Battery system_battery;
 Failsafe failsafe(PERIOD_CONTROLL, &motor, set_app_pending_mode);
-
-Telemetry uart_telemetry(Serial, PORT_USB);
-
+AppLidar app_lidar(Serial2);
 HAL_MicroROS uros_telemetry;
 
 #if HAS_BLUEPAD32
@@ -91,13 +89,7 @@ HAL_Joystick joystick(&app_mode, PERIOD_GAMEPAD);
 
 #if HAS_WIFI_SERIAL
 UDPStream udp_stream(UDP_PORT);
-Telemetry udp_telemetry(udp_stream, PORT_WIFI);
 #endif
-
-AppLidar app_lidar(Serial2);
-
-
-
 
 void Control_Task(void *pvParameters) {
   unsigned long last_micros = micros();
@@ -149,11 +141,7 @@ void Control_Task(void *pvParameters) {
     // Copy cached sensor data into current telemetry packet
     i2c_sensor.get_sensor_data(&current_sys_state.mag_data, &current_sys_state.baro_data);
 
-    uart_telemetry.push_data(current_sys_state);
-
-#if HAS_WIFI_SERIAL
-    udp_telemetry.push_data(current_sys_state);
-#endif
+    Telemetry::getInstance().push_data(current_sys_state);
   }
 }
 
@@ -189,33 +177,40 @@ void UART1_Task(void *pvParameters) {
 void Comm_Task(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
+  uint8_t display_counter = 0;
+
   for (;;) {
-    uart_telemetry.process_serial_outgoing();
-    app_script.check_serial(Serial, &uart_telemetry);
-
-    // system display: Monitor
-    HAL_Display::WiFiStatus wifi_s;
-#if HAS_WIFI_SERIAL
-    wifi_s.is_ap = (WiFi.getMode() & WIFI_AP);
-    wifi_s.connected = (WiFi.status() == WL_CONNECTED) || wifi_s.is_ap;
-    if (wifi_s.is_ap) {
-        strncpy(wifi_s.ip, WiFi.softAPIP().toString().c_str(), 16);
-    } else {
-        strncpy(wifi_s.ip, WiFi.localIP().toString().c_str(), 16);
+    if (Telemetry::getInstance().get_port_id() == PORT_USB) {
+      Telemetry::getInstance().process_serial_outgoing();
     }
-    wifi_s.data_active = udp_telemetry.connected();
+    app_script.check_serial(Serial, &Telemetry::getInstance());
+
+    uint32_t now = millis();
+    if (display_counter++ % 32) { // 200/32=6.25 Hz update rate
+      // system display: Monitor
+      HAL_Display::WiFiStatus wifi_s;
+#if HAS_WIFI_SERIAL
+      wifi_s.is_ap = (WiFi.getMode() & WIFI_AP);
+      wifi_s.connected = (WiFi.status() == WL_CONNECTED) || wifi_s.is_ap;
+      if (wifi_s.is_ap) {
+          strncpy(wifi_s.ip, WiFi.softAPIP().toString().c_str(), 16);
+      } else {
+          strncpy(wifi_s.ip, WiFi.localIP().toString().c_str(), 16);
+      }
+      wifi_s.data_active = Telemetry::getInstance().connected() && (Telemetry::getInstance().get_port_id() == PORT_WIFI);
 #else
-    wifi_s.connected = false;
-    wifi_s.data_active = false;
-    strcpy(wifi_s.ip, "OFF");
+      wifi_s.connected = false;
+      wifi_s.data_active = false;
+      strcpy(wifi_s.ip, "OFF");
 #endif
 
-    bool joy_connected = false;
+      bool joy_connected = false;
 #if HAS_BLUEPAD32
-    joy_connected = joystick.is_connected();
+      joy_connected = joystick.is_connected();
 #endif
 
-    system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_error_state(), &wifi_s, joy_connected);
+      system_display.update(app_mode.get_mode(), app_mode.get_pending_mode(), system_battery.get_voltage(), failsafe.get_error_state(), &wifi_s, joy_connected);
+    }
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
@@ -231,9 +226,11 @@ void WiFi_Task(void *pvParameters) {
     int len = udp_stream.available();
 
     if (udp_stream.connected()) {
-      udp_telemetry.process_serial_outgoing();
+      if (Telemetry::getInstance().get_port_id() == PORT_WIFI) {
+        Telemetry::getInstance().process_serial_outgoing();
+      }
       if (len > 0) {
-        app_script.check_serial(udp_stream, &udp_telemetry);
+        app_script.check_serial(udp_stream, &Telemetry::getInstance());
       }
     }
 
@@ -244,8 +241,10 @@ void WiFi_Task(void *pvParameters) {
 
 #ifndef UNIT_TEST
 void setup() {
-  Serial.begin(230400);
+  Serial.setTxBufferSize(4096);
+  Serial.begin(921600);
   // Serial1 (Telemetry/Script)
+  Serial1.setTxBufferSize(4096);
   Serial1.begin(2000000, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
   // Serial2 (Sensor RX only)
   Serial2.setRxBufferSize(1024);
@@ -258,10 +257,9 @@ void setup() {
   i2c_sensor.init();
   motor.init();
   app_lidar.init();
-  uart_telemetry.init(1000 / PERIOD_COMM);
+  Telemetry::getInstance().set_port(Serial, PORT_USB);
+  Telemetry::getInstance().init(1000 / PERIOD_COMM);
 #if HAS_WIFI_SERIAL
-  udp_telemetry.init(1000 / PERIOD_COMM);
-
   // WiFi Initialization
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print("Connecting to WiFi");
@@ -284,11 +282,7 @@ void setup() {
   }
   udp_stream.begin();
 #endif
-  
-  app_lidar.register_telemetry(&uart_telemetry);
-#if HAS_WIFI_SERIAL
-  app_lidar.register_telemetry(&udp_telemetry);
-#endif
+
 
   app_mode.init();
   system_display.init();
@@ -309,20 +303,20 @@ void setup() {
   xTaskCreatePinnedToCore(Control_Task, "ControlTask", 12288, NULL,
                           PRIORITY_CONTROL, &ControlTaskHandle, 1);
 
-  xTaskCreatePinnedToCore(UART1_Task, "UART1Task", 4096, NULL, PRIORITY_UART1,
+  xTaskCreatePinnedToCore(UART1_Task, "UART1Task", 8192, NULL, PRIORITY_UART1,
                           &UART1TaskHandle, 0);
 
   xTaskCreatePinnedToCore(Comm_Task, "CommTask", 8192, NULL, PRIORITY_COMM,
                           &CommTaskHandle, 0);
 
 #if HAS_BLUEPAD32
-  xTaskCreatePinnedToCore(HAL_Joystick::task_entry, "Gamepad_Task", 8192,
+  xTaskCreatePinnedToCore(HAL_Joystick::task_entry, "Gamepad_Task", 1024,
                           &joystick,
                           PRIORITY_GAMEPAD, &GamepadTaskHandle, 0);
 #endif
 
 #if HAS_WIFI_SERIAL
-  xTaskCreatePinnedToCore(WiFi_Task, "WiFi_Task", 4096, NULL, PRIORITY_COMM,
+  xTaskCreatePinnedToCore(WiFi_Task, "WiFi_Task", 8192, NULL, PRIORITY_WIFI,
                           &WiFiTaskHandle, 0);
 #endif
 

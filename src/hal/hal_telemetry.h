@@ -33,8 +33,15 @@ typedef enum TelemetryPort {
 
 class Telemetry {
 public:
-  Telemetry(Stream &stream, TelemetryPort_t port_id);
-  ~Telemetry();
+  static Telemetry& getInstance();
+
+  // Disable copy constructor and assignment operator to enforce Singleton pattern
+  Telemetry(const Telemetry&) = delete;
+  Telemetry& operator=(const Telemetry&) = delete;
+
+  // Dynamically switch/set the output stream and port ID
+  void set_port(Stream &stream, TelemetryPort_t port_id);
+
   void init(uint16_t base_freq = 200);
 
   // Called by Control_Task to push data into the queue (non-blocking).
@@ -58,8 +65,12 @@ public:
   TelemetryPort_t get_port_id() const { return port_id; };
 
 private:
-  QueueHandle_t data_queue;
-  Stream &port;
+  // Private constructor and destructor to ensure single instance
+  Telemetry();
+  ~Telemetry();
+
+  QueueHandle_t data_queue = nullptr;
+  Stream *port = nullptr;
   TelemetryPort_t port_id = PORT_USB;
 
   // Config
