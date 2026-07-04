@@ -10,7 +10,7 @@ public:
     
     // 通用解析函數，可供 Serial, Bluetooth, WiFi 等不同來源調用
     // 傳入一行完整的指令字串 (例如 "CMD 3 0.0 0.0")
-    void parse_packet(const String& packet, Telemetry *telemetry);
+    void parse_packet(const String& packet, Stream &response_stream, Telemetry *telemetry);
 
     // 針對 Stream (如 Serial, BluetoothSerial) 的輔助函數
     void check_serial(Stream& stream, Telemetry *telemetry);

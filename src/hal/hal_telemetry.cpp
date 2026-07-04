@@ -35,7 +35,17 @@ static uint16_t calculate_crc16(const uint8_t *data, size_t len) {
 #define LEN_PAYLOAD_PID 15
 
 
-Telemetry::Telemetry(Stream &stream, TelemetryPort_t port_id) : port(stream), port_id(port_id) {}
+Telemetry& Telemetry::getInstance() {
+  static Telemetry instance;
+  return instance;
+}
+
+Telemetry::Telemetry() : port(nullptr), port_id(PORT_USB) {}
+
+void Telemetry::set_port(Stream &stream, TelemetryPort_t port_id) {
+  this->port = &stream;
+  this->port_id = port_id;
+}
  
 Telemetry::~Telemetry() {
   if (_lidar_scan) {
@@ -150,7 +160,9 @@ void Telemetry::process_serial_outgoing() {
       memcpy(send_buffer + offset, packet_tail, sizeof(packet_tail));
       offset += sizeof(packet_tail);
 
-      port.write(send_buffer, sizeof(send_buffer));
+      if (port) {
+        port->write(send_buffer, sizeof(send_buffer));
+      }
     } 
     else if (_format == FORMAT_PID) {
       float payload[LEN_PAYLOAD_PID];
@@ -191,7 +203,9 @@ void Telemetry::process_serial_outgoing() {
       memcpy(send_buffer + offset, packet_tail, sizeof(packet_tail));
       offset += sizeof(packet_tail);
 
-      port.write(send_buffer, sizeof(send_buffer));
+      if (port) {
+        port->write(send_buffer, sizeof(send_buffer));
+      }
     }
   
     if (_format == FORMAT_LIDAR) {
@@ -251,7 +265,9 @@ void Telemetry::process_serial_outgoing() {
           // 4. Tail
           memcpy(tx_chunk + offset, packet_tail, sizeof(packet_tail));
           offset += sizeof(packet_tail);
-          port.write(tx_chunk, offset);
+          if (port) {
+            port->write(tx_chunk, offset);
+          }
       }
     }
   }
@@ -272,7 +288,9 @@ void Telemetry::queue_string(const char *str) {
     return;
   // This function is called from a communication task, so direct writing is
   // safe and won't interfere with the Control_Task.
-  port.print(str);
+  if (port) {
+    port->print(str);
+  }
 }
 
 void Telemetry::queue_string(const String &str) { queue_string(str.c_str()); }
