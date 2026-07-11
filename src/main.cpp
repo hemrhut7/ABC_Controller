@@ -262,6 +262,7 @@ void setup() {
 #if HAS_WIFI_SERIAL
   // WiFi Initialization
   WiFi.begin(WIFI_SSID, WIFI_PASS);
+  WiFi.setTxPower(WIFI_POWER_15dBm);
   Serial.print("Connecting to WiFi");
   uint8_t timeout = 0;
   while (WiFi.status() != WL_CONNECTED && timeout < 20) {
@@ -277,6 +278,7 @@ void setup() {
   } else {
     Serial.println("\nWiFi connection failed. Starting AP mode...");
     WiFi.softAP(AP_SSID, AP_PASS);
+    WiFi.setTxPower(WIFI_POWER_15dBm);
     Serial.print("AP IP: ");
     Serial.println(WiFi.softAPIP());
   }

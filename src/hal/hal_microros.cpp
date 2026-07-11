@@ -1,6 +1,7 @@
 #include "hal_microros.h"
 #include "app/app_lidar.h"
 #include "app/app_mode.h"
+#include "config.h"
 
 extern AppMode app_mode;
 
@@ -89,8 +90,8 @@ HAL_MicroROS::~HAL_MicroROS() {
 }
 
 void HAL_MicroROS::init() {
-    // Initialize micro-ROS transport
-    set_microros_transports();
+    // Initialize micro-ROS WiFi UDP transport pointing to Jetson agent
+    set_microros_wifi_transports((char*)WIFI_SSID, (char*)WIFI_PASS, (char*)UROS_AGENT_IP, UROS_AGENT_PORT);
 }
 
 bool HAL_MicroROS::init_node_and_publishers() {

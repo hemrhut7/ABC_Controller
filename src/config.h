@@ -60,6 +60,8 @@
 #define AP_SSID "ABC_Controller_AP"
 #define AP_PASS "ssssssss"
 #define UDP_PORT 8000
+#define UROS_AGENT_IP   "192.168.1.147"
+#define UROS_AGENT_PORT 8888
 
 
 // 物理參數定義
