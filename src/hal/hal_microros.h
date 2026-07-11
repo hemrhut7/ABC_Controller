@@ -76,6 +76,18 @@ private:
     uint32_t last_ping_check;
     uint32_t last_sync_time;
 
+    // Tracking variables for new data publication
+    uint64_t last_imu_timestamp;
+    uint64_t last_joint_timestamp;
+    uint64_t last_mag_timestamp;
+    uint64_t last_baro_timestamp;
+    uint64_t last_temp_timestamp;
+    uint32_t last_battery_pub_ms;
+    float last_battery_v;
+    int last_mode;
+    uint32_t last_delay_count;
+    float last_pid_target[6];
+
     rosidl_runtime_c__String joint_names[2];
     double joint_positions[2];
     double joint_velocities[2];
