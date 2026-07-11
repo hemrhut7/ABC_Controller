@@ -46,7 +46,16 @@ HAL_MicroROS::HAL_MicroROS() :
     right_joint_pos(0.0),
     last_pub_time(0),
     last_ping_check(0),
-    last_sync_time(0) {
+    last_sync_time(0),
+    last_imu_timestamp(0),
+    last_joint_timestamp(0),
+    last_mag_timestamp(0),
+    last_baro_timestamp(0),
+    last_temp_timestamp(0),
+    last_battery_pub_ms(0),
+    last_battery_v(-1.0f),
+    last_mode(-1),
+    last_delay_count(999999) {
     memset(&uros_support, 0, sizeof(uros_support));
     memset(&uros_executor, 0, sizeof(uros_executor));
     memset(&uros_imu_publisher, 0, sizeof(uros_imu_publisher));
@@ -80,6 +89,9 @@ HAL_MicroROS::HAL_MicroROS() :
     memset(scan_ranges, 0, sizeof(scan_ranges));
     memset(scan_intensities, 0, sizeof(scan_intensities));
     memset(pid_target_data, 0, sizeof(pid_target_data));
+    for (int i = 0; i < 6; ++i) {
+        last_pid_target[i] = -999999.0f;
+    }
 }
 
 HAL_MicroROS::~HAL_MicroROS() {
@@ -114,7 +126,7 @@ bool HAL_MicroROS::init_node_and_publishers() {
   }
 
   // Create publishers
-  if (rclc_publisher_init_default(
+  if (rclc_publisher_init_best_effort(
       &uros_imu_publisher,
       &uros_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
@@ -124,7 +136,7 @@ bool HAL_MicroROS::init_node_and_publishers() {
     return false;
   }
 
-  if (rclc_publisher_init_default(
+  if (rclc_publisher_init_best_effort(
       &uros_joint_state_publisher,
       &uros_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, JointState),
@@ -135,7 +147,7 @@ bool HAL_MicroROS::init_node_and_publishers() {
     return false;
   }
 
-  if (rclc_publisher_init_default(
+  if (rclc_publisher_init_best_effort(
       &uros_mag_publisher,
       &uros_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, MagneticField),
@@ -147,7 +159,7 @@ bool HAL_MicroROS::init_node_and_publishers() {
     return false;
   }
 
-  if (rclc_publisher_init_default(
+  if (rclc_publisher_init_best_effort(
       &uros_baro_publisher,
       &uros_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, FluidPressure),
@@ -161,7 +173,7 @@ bool HAL_MicroROS::init_node_and_publishers() {
   }
 
   // Create publishers for battery, scan, temp, mode, delay, pid_target
-  if (rclc_publisher_init_default(
+  if (rclc_publisher_init_best_effort(
       &uros_battery_publisher,
       &uros_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, BatteryState),
@@ -170,7 +182,7 @@ bool HAL_MicroROS::init_node_and_publishers() {
     return false;
   }
 
-  if (rclc_publisher_init_default(
+  if (rclc_publisher_init_best_effort(
       &uros_scan_publisher,
       &uros_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, LaserScan),
@@ -179,7 +191,7 @@ bool HAL_MicroROS::init_node_and_publishers() {
     return false;
   }
 
-  if (rclc_publisher_init_default(
+  if (rclc_publisher_init_best_effort(
       &uros_temp_publisher,
       &uros_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Temperature),
@@ -188,7 +200,7 @@ bool HAL_MicroROS::init_node_and_publishers() {
     return false;
   }
 
-  if (rclc_publisher_init_default(
+  if (rclc_publisher_init_best_effort(
       &uros_mode_publisher,
       &uros_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
@@ -197,7 +209,7 @@ bool HAL_MicroROS::init_node_and_publishers() {
     return false;
   }
 
-  if (rclc_publisher_init_default(
+  if (rclc_publisher_init_best_effort(
       &uros_delay_publisher,
       &uros_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
@@ -206,7 +218,7 @@ bool HAL_MicroROS::init_node_and_publishers() {
     return false;
   }
 
-  if (rclc_publisher_init_default(
+  if (rclc_publisher_init_best_effort(
       &uros_pid_target_publisher,
       &uros_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32MultiArray),
@@ -402,106 +414,199 @@ void HAL_MicroROS::update(const system_state_t &state_data) {
 
         // Get dt for joint position accumulation
         uint32_t current_time_us = micros();
-        double dt = (last_pub_time > 0) ? (current_time_us - last_pub_time) * 1e-6 : 0.01;
-        last_pub_time = current_time_us;
 
-        // Convert RPM to joint velocities (rad/s)
-        double left_vel = state_data.abc_state.motor_state.rpm_L * (2.0 * M_PI / 60.0);
-        double right_vel = state_data.abc_state.motor_state.rpm_R * (2.0 * M_PI / 60.0);
+        // 1. Publish IMU & JointState if IMU data is new
+        bool new_imu = (state_data.abc_state.ahrs_data.imu_data.timestamp != last_imu_timestamp);
+        if (new_imu) {
+          last_imu_timestamp = state_data.abc_state.ahrs_data.imu_data.timestamp;
 
-        // Accumulate joint positions (rad)
-        left_joint_pos += left_vel * dt;
-        right_joint_pos += right_vel * dt;
+          if (rmw_uros_epoch_synchronized()) {
+            int64_t time_ns = rmw_uros_epoch_nanos();
+            
+            // Compensate for scheduling/sampling delay since data->timestamp was captured
+            uint32_t delay_imu_us = current_time_us - (uint32_t)state_data.abc_state.ahrs_data.imu_data.timestamp;
+            int64_t imu_time_ns = time_ns - (int64_t)delay_imu_us * 1000;
+            uros_imu_msg.header.stamp.sec = imu_time_ns / 1000000000LL;
+            uros_imu_msg.header.stamp.nanosec = imu_time_ns % 1000000000LL;
+          } else {
+            uros_imu_msg.header.stamp.sec = state_data.abc_state.ahrs_data.imu_data.timestamp / 1000000;
+            uros_imu_msg.header.stamp.nanosec = (state_data.abc_state.ahrs_data.imu_data.timestamp % 1000000) * 1000;
+          }
 
-        // Populate Stamp Headers
-        if (rmw_uros_epoch_synchronized()) {
-          int64_t time_ns = rmw_uros_epoch_nanos();
-          
-          // Compensate for scheduling/sampling delay since data->timestamp was captured
-          uint32_t delay_imu_us = current_time_us - (uint32_t)state_data.abc_state.ahrs_data.imu_data.timestamp;
-          int64_t imu_time_ns = time_ns - (int64_t)delay_imu_us * 1000;
-          uros_imu_msg.header.stamp.sec = imu_time_ns / 1000000000LL;
-          uros_imu_msg.header.stamp.nanosec = imu_time_ns % 1000000000LL;
+          // Gyroscope is in rad/s in calibrated imu_data
+          uros_imu_msg.angular_velocity.x = state_data.abc_state.ahrs_data.imu_data.gyro[0];
+          uros_imu_msg.angular_velocity.y = state_data.abc_state.ahrs_data.imu_data.gyro[1];
+          uros_imu_msg.angular_velocity.z = state_data.abc_state.ahrs_data.imu_data.gyro[2];
 
-          uint32_t delay_mag_us = current_time_us - (uint32_t)state_data.mag_data.timestamp;
-          int64_t mag_time_ns = time_ns - (int64_t)delay_mag_us * 1000;
-          uros_mag_msg.header.stamp.sec = mag_time_ns / 1000000000LL;
-          uros_mag_msg.header.stamp.nanosec = mag_time_ns % 1000000000LL;
+          // Accelerometer is in m/s^2 in calibrated imu_data
+          uros_imu_msg.linear_acceleration.x = state_data.abc_state.ahrs_data.imu_data.accl[0];
+          uros_imu_msg.linear_acceleration.y = state_data.abc_state.ahrs_data.imu_data.accl[1];
+          uros_imu_msg.linear_acceleration.z = state_data.abc_state.ahrs_data.imu_data.accl[2];
 
-          uint32_t delay_baro_us = current_time_us - (uint32_t)state_data.baro_data.timestamp;
-          int64_t baro_time_ns = time_ns - (int64_t)delay_baro_us * 1000;
-          uros_baro_msg.header.stamp.sec = baro_time_ns / 1000000000LL;
-          uros_baro_msg.header.stamp.nanosec = baro_time_ns % 1000000000LL;
-        } else {
-          uros_imu_msg.header.stamp.sec = state_data.abc_state.ahrs_data.imu_data.timestamp / 1000000;
-          uros_imu_msg.header.stamp.nanosec = (state_data.abc_state.ahrs_data.imu_data.timestamp % 1000000) * 1000;
+          // Populate orientation quaternion from Euler angles
+          euler_to_quaternion(state_data.abc_state.ahrs_data.euler[0], state_data.abc_state.ahrs_data.euler[1], state_data.abc_state.ahrs_data.euler[2], uros_imu_msg.orientation);
 
-          uros_mag_msg.header.stamp.sec = state_data.mag_data.timestamp / 1000000;
-          uros_mag_msg.header.stamp.nanosec = (state_data.mag_data.timestamp % 1000000) * 1000;
+          FORCE_UNUSED(rcl_publish(&uros_imu_publisher, &uros_imu_msg, NULL));
 
-          uros_baro_msg.header.stamp.sec = state_data.baro_data.timestamp / 1000000;
-          uros_baro_msg.header.stamp.nanosec = (state_data.baro_data.timestamp % 1000000) * 1000;
+          // Get dt for joint position accumulation
+          double dt = (last_pub_time > 0) ? (current_time_us - last_pub_time) * 1e-6 : 0.01;
+          last_pub_time = current_time_us;
+
+          // Convert RPM to joint velocities (rad/s)
+          double left_vel = state_data.abc_state.motor_state.rpm_L * (2.0 * M_PI / 60.0);
+          double right_vel = state_data.abc_state.motor_state.rpm_R * (2.0 * M_PI / 60.0);
+
+          // Accumulate joint positions (rad)
+          left_joint_pos += left_vel * dt;
+          right_joint_pos += right_vel * dt;
+
+          // Populate JointState Message
+          uros_joint_state_msg.header.stamp.sec = uros_imu_msg.header.stamp.sec;
+          uros_joint_state_msg.header.stamp.nanosec = uros_imu_msg.header.stamp.nanosec;
+
+          uros_joint_state_msg.position.data[0] = left_joint_pos;
+          uros_joint_state_msg.position.data[1] = right_joint_pos;
+
+          uros_joint_state_msg.velocity.data[0] = left_vel;
+          uros_joint_state_msg.velocity.data[1] = right_vel;
+
+          uros_joint_state_msg.effort.data[0] = state_data.abc_state.motor_state.pwm_out_L;
+          uros_joint_state_msg.effort.data[1] = state_data.abc_state.motor_state.pwm_out_R;
+
+          FORCE_UNUSED(rcl_publish(&uros_joint_state_publisher, &uros_joint_state_msg, NULL));
         }
 
-        // Gyroscope is in rad/s in calibrated imu_data
-        uros_imu_msg.angular_velocity.x = state_data.abc_state.ahrs_data.imu_data.gyro[0];
-        uros_imu_msg.angular_velocity.y = state_data.abc_state.ahrs_data.imu_data.gyro[1];
-        uros_imu_msg.angular_velocity.z = state_data.abc_state.ahrs_data.imu_data.gyro[2];
+        // 2. Publish Magnetometer if data is new
+        bool new_mag = (state_data.mag_data.timestamp != last_mag_timestamp);
+        if (new_mag) {
+          last_mag_timestamp = state_data.mag_data.timestamp;
 
-        // Accelerometer is in m/s^2 in calibrated imu_data
-        uros_imu_msg.linear_acceleration.x = state_data.abc_state.ahrs_data.imu_data.accl[0];
-        uros_imu_msg.linear_acceleration.y = state_data.abc_state.ahrs_data.imu_data.accl[1];
-        uros_imu_msg.linear_acceleration.z = state_data.abc_state.ahrs_data.imu_data.accl[2];
+          if (rmw_uros_epoch_synchronized()) {
+            int64_t time_ns = rmw_uros_epoch_nanos();
+            uint32_t delay_mag_us = current_time_us - (uint32_t)state_data.mag_data.timestamp;
+            int64_t mag_time_ns = time_ns - (int64_t)delay_mag_us * 1000;
+            uros_mag_msg.header.stamp.sec = mag_time_ns / 1000000000LL;
+            uros_mag_msg.header.stamp.nanosec = mag_time_ns % 1000000000LL;
+          } else {
+            uros_mag_msg.header.stamp.sec = state_data.mag_data.timestamp / 1000000;
+            uros_mag_msg.header.stamp.nanosec = (state_data.mag_data.timestamp % 1000000) * 1000;
+          }
 
-        // Populate orientation quaternion from Euler angles
-        euler_to_quaternion(state_data.abc_state.ahrs_data.euler[0], state_data.abc_state.ahrs_data.euler[1], state_data.abc_state.ahrs_data.euler[2], uros_imu_msg.orientation);
+          // Populate Magnetometer Message (convert uT to Tesla)
+          uros_mag_msg.magnetic_field.x = state_data.mag_data.mag[0] * 1e-6;
+          uros_mag_msg.magnetic_field.y = state_data.mag_data.mag[1] * 1e-6;
+          uros_mag_msg.magnetic_field.z = state_data.mag_data.mag[2] * 1e-6;
+          memset(uros_mag_msg.magnetic_field_covariance, 0, sizeof(uros_mag_msg.magnetic_field_covariance));
 
-        // Populate Magnetometer Message (convert uT to Tesla)
-        uros_mag_msg.magnetic_field.x = state_data.mag_data.mag[0] * 1e-6;
-        uros_mag_msg.magnetic_field.y = state_data.mag_data.mag[1] * 1e-6;
-        uros_mag_msg.magnetic_field.z = state_data.mag_data.mag[2] * 1e-6;
-        memset(uros_mag_msg.magnetic_field_covariance, 0, sizeof(uros_mag_msg.magnetic_field_covariance));
+          FORCE_UNUSED(rcl_publish(&uros_mag_publisher, &uros_mag_msg, NULL));
+        }
 
-        // Populate Barometer Message (convert hPa to Pascals)
-        uros_baro_msg.fluid_pressure = state_data.baro_data.pressure * 100.0;
-        uros_baro_msg.variance = 0.0; // 0 means variance unknown
+        // 3. Publish Barometer if data is new
+        bool new_baro = (state_data.baro_data.timestamp != last_baro_timestamp);
+        if (new_baro) {
+          last_baro_timestamp = state_data.baro_data.timestamp;
 
-        // Populate JointState Message
-        uros_joint_state_msg.header.stamp.sec = uros_imu_msg.header.stamp.sec;
-        uros_joint_state_msg.header.stamp.nanosec = uros_imu_msg.header.stamp.nanosec;
+          if (rmw_uros_epoch_synchronized()) {
+            int64_t time_ns = rmw_uros_epoch_nanos();
+            uint32_t delay_baro_us = current_time_us - (uint32_t)state_data.baro_data.timestamp;
+            int64_t baro_time_ns = time_ns - (int64_t)delay_baro_us * 1000;
+            uros_baro_msg.header.stamp.sec = baro_time_ns / 1000000000LL;
+            uros_baro_msg.header.stamp.nanosec = baro_time_ns % 1000000000LL;
+          } else {
+            uros_baro_msg.header.stamp.sec = state_data.baro_data.timestamp / 1000000;
+            uros_baro_msg.header.stamp.nanosec = (state_data.baro_data.timestamp % 1000000) * 1000;
+          }
 
-        uros_joint_state_msg.position.data[0] = left_joint_pos;
-        uros_joint_state_msg.position.data[1] = right_joint_pos;
+          // Populate Barometer Message (convert hPa to Pascals)
+          uros_baro_msg.fluid_pressure = state_data.baro_data.pressure * 100.0;
+          uros_baro_msg.variance = 0.0; // 0 means variance unknown
 
-        uros_joint_state_msg.velocity.data[0] = left_vel;
-        uros_joint_state_msg.velocity.data[1] = right_vel;
+          FORCE_UNUSED(rcl_publish(&uros_baro_publisher, &uros_baro_msg, NULL));
+        }
 
-        uros_joint_state_msg.effort.data[0] = state_data.abc_state.motor_state.pwm_out_L;
-        uros_joint_state_msg.effort.data[1] = state_data.abc_state.motor_state.pwm_out_R;
+        // 4. Publish Temperature if data is new
+        bool new_temp = (state_data.baro_data.timestamp != last_temp_timestamp);
+        if (new_temp) {
+          last_temp_timestamp = state_data.baro_data.timestamp;
 
-        // Populate Battery State Message
-        uros_battery_msg.header.stamp = uros_imu_msg.header.stamp;
-        uros_battery_msg.voltage = state_data.battery_v;
+          if (rmw_uros_epoch_synchronized()) {
+            int64_t time_ns = rmw_uros_epoch_nanos();
+            uint32_t delay_baro_us = current_time_us - (uint32_t)state_data.baro_data.timestamp;
+            int64_t baro_time_ns = time_ns - (int64_t)delay_baro_us * 1000;
+            uros_temp_msg.header.stamp.sec = baro_time_ns / 1000000000LL;
+            uros_temp_msg.header.stamp.nanosec = baro_time_ns % 1000000000LL;
+          } else {
+            uros_temp_msg.header.stamp.sec = state_data.baro_data.timestamp / 1000000;
+            uros_temp_msg.header.stamp.nanosec = (state_data.baro_data.timestamp % 1000000) * 1000;
+          }
 
-        // Populate Temperature Message
-        uros_temp_msg.header.stamp = uros_imu_msg.header.stamp;
-        uros_temp_msg.temperature = state_data.baro_data.temperature;
+          // Populate Temperature Message
+          uros_temp_msg.temperature = state_data.baro_data.temperature;
 
-        // Populate System Mode Message
-        uros_mode_msg.data = state_data.cmd.mode;
+          FORCE_UNUSED(rcl_publish(&uros_temp_publisher, &uros_temp_msg, NULL));
+        }
 
-        // Populate Delay Count Message
-        uros_delay_msg.data = state_data.delay_count;
+        // 5. Publish Battery State if voltage changed >= 0.05V or 1s elapsed
+        bool new_battery = (fabs(state_data.battery_v - last_battery_v) >= 0.05f) || (now_ms - last_battery_pub_ms >= 1000);
+        if (new_battery) {
+          last_battery_v = state_data.battery_v;
+          last_battery_pub_ms = now_ms;
 
-        // Populate PID Target Message
-        pid_target_data[0] = state_data.cmd.target_value;
-        pid_target_data[1] = state_data.pid_target.rpm_L;
-        pid_target_data[2] = state_data.pid_target.rpm_R;
-        pid_target_data[3] = state_data.pid_target.pitch;
-        pid_target_data[4] = state_data.pid_target.velocity;
-        pid_target_data[5] = state_data.pid_target.steer_rpm;
+          if (rmw_uros_epoch_synchronized()) {
+            int64_t time_ns = rmw_uros_epoch_nanos();
+            uros_battery_msg.header.stamp.sec = time_ns / 1000000000LL;
+            uros_battery_msg.header.stamp.nanosec = time_ns % 1000000000LL;
+          } else {
+            uros_battery_msg.header.stamp.sec = now_ms / 1000;
+            uros_battery_msg.header.stamp.nanosec = (now_ms % 1000) * 1000000LL;
+          }
 
-        // Publish Lidar Scan (if available and new)
+          uros_battery_msg.voltage = state_data.battery_v;
+
+          FORCE_UNUSED(rcl_publish(&uros_battery_publisher, &uros_battery_msg, NULL));
+        }
+
+        // 6. Publish System Mode if changed
+        bool new_mode = (state_data.cmd.mode != last_mode);
+        if (new_mode) {
+          last_mode = state_data.cmd.mode;
+          uros_mode_msg.data = state_data.cmd.mode;
+          FORCE_UNUSED(rcl_publish(&uros_mode_publisher, &uros_mode_msg, NULL));
+        }
+
+        // 7. Publish Delay Count if changed
+        bool new_delay = (state_data.delay_count != last_delay_count);
+        if (new_delay) {
+          last_delay_count = state_data.delay_count;
+          uros_delay_msg.data = state_data.delay_count;
+          FORCE_UNUSED(rcl_publish(&uros_delay_publisher, &uros_delay_msg, NULL));
+        }
+
+        // 8. Publish PID Target if any target value changed
+        float current_pid_target[6] = {
+          state_data.cmd.target_value,
+          state_data.pid_target.rpm_L,
+          state_data.pid_target.rpm_R,
+          state_data.pid_target.pitch,
+          state_data.pid_target.velocity,
+          state_data.pid_target.steer_rpm
+        };
+        bool new_pid_target = false;
+        for (int i = 0; i < 6; ++i) {
+          if (current_pid_target[i] != last_pid_target[i]) {
+            new_pid_target = true;
+            break;
+          }
+        }
+        if (new_pid_target) {
+          for (int i = 0; i < 6; ++i) {
+            last_pid_target[i] = current_pid_target[i];
+            pid_target_data[i] = current_pid_target[i];
+          }
+          FORCE_UNUSED(rcl_publish(&uros_pid_target_publisher, &uros_pid_target_msg, NULL));
+        }
+
+        // 9. Publish Lidar Scan (if available and new)
         app_lidar.get_latest_scan(_temp_scan);
         static uint64_t last_published_scan_ts = 0;
         if (_temp_scan.count > 0 && _temp_scan.timestamp != last_published_scan_ts) {
@@ -528,19 +633,8 @@ void HAL_MicroROS::update(const system_state_t &state_data) {
             FORCE_UNUSED(rcl_publish(&uros_scan_publisher, &uros_scan_msg, NULL));
         }
 
-        // Publish all messages
-        FORCE_UNUSED(rcl_publish(&uros_imu_publisher, &uros_imu_msg, NULL));
-        FORCE_UNUSED(rcl_publish(&uros_joint_state_publisher, &uros_joint_state_msg, NULL));
-        FORCE_UNUSED(rcl_publish(&uros_mag_publisher, &uros_mag_msg, NULL));
-        FORCE_UNUSED(rcl_publish(&uros_baro_publisher, &uros_baro_msg, NULL));
-        FORCE_UNUSED(rcl_publish(&uros_battery_publisher, &uros_battery_msg, NULL));
-        FORCE_UNUSED(rcl_publish(&uros_temp_publisher, &uros_temp_msg, NULL));
-        FORCE_UNUSED(rcl_publish(&uros_mode_publisher, &uros_mode_msg, NULL));
-        FORCE_UNUSED(rcl_publish(&uros_delay_publisher, &uros_delay_msg, NULL));
-        FORCE_UNUSED(rcl_publish(&uros_pid_target_publisher, &uros_pid_target_msg, NULL));
-
-        // Spin executor
-        rclc_executor_spin_some(&uros_executor, RCL_MS_TO_NS(10));
+        // Spin executor with 0 timeout for best effort
+        rclc_executor_spin_some(&uros_executor, RCL_MS_TO_NS(0));
         break;
       }
 
@@ -548,6 +642,20 @@ void HAL_MicroROS::update(const system_state_t &state_data) {
         destroy_node_and_publishers();
         state = WAITING_AGENT;
         last_pub_time = 0;
+
+        // Reset tracking variables on disconnect
+        last_imu_timestamp = 0;
+        last_joint_timestamp = 0;
+        last_mag_timestamp = 0;
+        last_baro_timestamp = 0;
+        last_temp_timestamp = 0;
+        last_battery_pub_ms = 0;
+        last_battery_v = -1.0f;
+        last_mode = -1;
+        last_delay_count = 999999;
+        for (int i = 0; i < 6; ++i) {
+          last_pid_target[i] = -999999.0f;
+        }
         break;
     }
 }
