@@ -247,8 +247,6 @@ void Telemetry::process_serial_outgoing() {
           // 2. Lidar Points
           lidar_point_packed_t* packed_pts = (lidar_point_packed_t*)(tx_chunk + offset);
           for (int i = 0; i < pt_count; i++) {
-            packed_pts[i].x = (int16_t)(_lidar_scan->points[i].x * 1000.0f);
-            packed_pts[i].y = (int16_t)(_lidar_scan->points[i].y * 1000.0f);
             packed_pts[i].distance = (uint16_t)(_lidar_scan->points[i].distance * 1000.0f);
             packed_pts[i].angle = (uint16_t)(_lidar_scan->points[i].angle * ANGLE_SCALE);
             packed_pts[i].intensity = _lidar_scan->points[i].intensity;

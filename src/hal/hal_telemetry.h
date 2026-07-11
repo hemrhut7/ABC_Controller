@@ -7,8 +7,6 @@
 
 #pragma pack(push, 1)
 typedef struct {
-    int16_t x;         // mm
-    int16_t y;         // mm
     uint16_t distance; // mm
     uint16_t angle;    // 0-65535 for 0-360 deg
     uint8_t intensity;

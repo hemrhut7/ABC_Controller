@@ -92,7 +92,6 @@ typedef struct {
 
 
 typedef struct {
-    float x, y;
     float distance;
     float angle;
     uint8_t intensity;

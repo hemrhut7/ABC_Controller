@@ -86,15 +86,7 @@ bool HAL_Lidar::update(lidar_scan_t &scan) {
                     float angle = start_angle + (angle_diff / (float)(points_in_packet - 1)) * i;
                     if (angle >= 360.0f) angle -= 360.0f;
 
-                    // Polar to Cartesian (Matching Python logic)
-                    // Python: angle_rad = -np.deg2rad(angle)
-                    float angle_rad = -(angle * M_PI / 180.0f);
-                    float x = distance * cosf(angle_rad);
-                    float y = distance * sinf(angle_rad);
-
                     lidar_point_t &p = _current_scan->points[_current_scan->count++];
-                    p.x = x;
-                    p.y = y;
                     p.distance = distance;
                     p.angle = angle;
                     p.intensity = intensity;
