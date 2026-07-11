@@ -7,15 +7,15 @@
 // │  P1 (Left Row)              P2 (Right Row)        │
 // │  Pin 1:  IO2  ← L_ENC_B     3V3                   │
 // │  Pin 2:  IO4  ← L_ENC_A     GND                   │
-// │  Pin 3:  IO6  ← ADC_BAT     IO43 ← UART1_TX       │
-// │  Pin 4:  IO16 ← R_PWM       IO44 ← UART1_RX       │
-// │  Pin 5:  IO17 ← R_DIR2      IO47 ← IMU_SCL        │
-// │  Pin 6:  IO18 ← R_DIR1      IO48 ← IMU_SDA        │
-// │  Pin 7:  IO21 ← STBY        IO15 ← R_ENC_B        │
-// │  Pin 8:  IO8  ← L_DIR1      IO13 ← R_ENC_A        │
-// │  Pin 9:  IO7  ← L_DIR2      IO11 ← UART2_TX       │
-// │  Pin 10: IO10 ← L_PWM       IO12 ← UART2_RX       │
-// │  Pin 11: IO20 (USB_P!)      IO14 ← (free)         │
+// │  Pin 3:  IO6  ← ADC_BAT     IO43 ← R_ENC_B        │
+// │  Pin 4:  IO16 ← R_PWM       IO44 ← R_ENC_A        │
+// │  Pin 5:  IO17 ← R_DIR2      IO47 ← UART2_RX       │
+// │  Pin 6:  IO18 ← R_DIR1      IO48 ← UART2_TX       │
+// │  Pin 7:  IO21 ← STBY        IO15 ← UART1_TX       │
+// │  Pin 8:  IO8  ← L_DIR1      IO13 ← UART1_RX       │
+// │  Pin 9:  IO7  ← L_DIR2      IO11 ← IMU_SCL        │
+// │  Pin 10: IO10 ← L_PWM       IO12 ← IMU_SDA        │
+// │  Pin 11: IO20 (USB_P!)      IO14 ← IMU_INT1       │
 // │  Pin 12: IO19 (USB_N!)      IO9  ← (free)         │
 // │  Pin 13: GND                GND                   │
 // │  Pin 14: 5V                 VBAT                  │
@@ -29,10 +29,10 @@
 #define LCD_MISO_PIN    40
 #define LCD_DC_PIN      42
 #define LCD_CS_PIN      45
-#define IMU_SCL_PIN     11
-#define IMU_SDA_PIN     12
-#define IMU_INT1_PIN    14
-#define BAT_ADC_PIN     6
+#define IMU_SCL_PIN     11     // P2 Pin 9
+#define IMU_SDA_PIN     12     // P2 Pin 10
+#define IMU_INT1_PIN    14     // P2 Pin 11
+#define BAT_ADC_PIN     6      // P1 Pin 3
 
 // Motor Control
 #define MOTOR_L_PWM_PIN     10     // P1 Pin 10
@@ -45,14 +45,14 @@
 #define MOTOR_R_PWM_PIN     16     // P1 Pin 4
 #define MOTOR_R_DIR1_PIN    18     // P1 Pin 6
 #define MOTOR_R_DIR2_PIN    17     // P1 Pin 5
-#define MOTOR_R_E2A_PIN     44     // P2 Pin 8
-#define MOTOR_R_E2B_PIN     43     // P2 Pin 7
+#define MOTOR_R_E2A_PIN     44     // P2 Pin 4
+#define MOTOR_R_E2B_PIN     43     // P2 Pin 3
 
 // UART Interfaces
-#define UART1_TX_PIN       15      // P2 Pin 3
-#define UART1_RX_PIN       13      // P2 Pin 4
-#define UART2_TX_PIN       48      // P2 Pin 9
-#define UART2_RX_PIN       47      // P2 Pin 10
+#define UART1_TX_PIN       15      // P2 Pin 7
+#define UART1_RX_PIN       13      // P2 Pin 8
+#define UART2_TX_PIN       48      // P2 Pin 6
+#define UART2_RX_PIN       47      // P2 Pin 5
 // ---------------------------------
 
 #define WIFI_SSID "TP-Link_E428"
