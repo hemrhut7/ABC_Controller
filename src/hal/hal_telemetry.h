@@ -78,9 +78,11 @@ private:
   uint8_t _format = 0;
   uint32_t _packet_counter = 0;
 
-  // Lidar data (dynamically allocated to save RAM when not in use)
-  lidar_scan_t *_lidar_scan = nullptr;
-  uint64_t _last_sent_lidar_ts = 0;
-  bool _lidar_updated = false;
-  SemaphoreHandle_t _lidar_mutex = nullptr;
+
+  static const uint8_t LIDAR_BUF_COUNT = 2;
+  lidar_scan_t *_lidar_buf[LIDAR_BUF_COUNT] = {nullptr, nullptr};   // 兩塊獨立緩衝
+  volatile bool _lidar_updated = false;
+  volatile uint8_t _lidar_ready_idx = 0;
+  portMUX_TYPE _lidar_spinlock = portMUX_INITIALIZER_UNLOCKED;
+  uint8_t* _tx_chunk = nullptr;
 };
