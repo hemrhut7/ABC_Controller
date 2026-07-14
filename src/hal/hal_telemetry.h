@@ -77,6 +77,8 @@ private:
   uint8_t _divider = 1;
   uint8_t _format = 0;
   uint32_t _packet_counter = 0;
+  uint8_t _tx_packet_counter = 0;
+  uint8_t _tx_lidar_packet_counter = 0;
 
 
   static const uint8_t LIDAR_BUF_COUNT = 2;

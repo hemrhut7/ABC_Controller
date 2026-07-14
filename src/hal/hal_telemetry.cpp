@@ -82,8 +82,8 @@ Telemetry::~Telemetry() {
     }
   }
 
-  // Pre-allocate Lidar transmit chunk
-  const size_t max_buf_size = sizeof(packet_header) + 1 + 4 + 2 + MAX_LIDAR_POINTS * sizeof(lidar_point_packed_t) + 2 + sizeof(packet_tail);
+  // Pre-allocate Lidar transmit chunk (including 1 byte for packet counter)
+  const size_t max_buf_size = sizeof(packet_header) + 1 + 1 + 4 + 2 + MAX_LIDAR_POINTS * sizeof(lidar_point_packed_t) + 2 + sizeof(packet_tail);
   if (!_tx_chunk) {
     _tx_chunk = (uint8_t*)heap_caps_malloc(max_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!_tx_chunk) {
@@ -108,6 +108,8 @@ void Telemetry::set_config(bool enabled, uint8_t format, uint16_t freq_hz) {
   _enabled = enabled;
   _format = format;
   _packet_counter = 0; // Reset counter on config change
+  _tx_packet_counter = 0;
+  _tx_lidar_packet_counter = 0;
 
   if (freq_hz == 0) {
     _divider = 1;
@@ -155,21 +157,22 @@ void Telemetry::process_serial_outgoing() {
       payload[21] = pkt.baro_data.pressure;
       payload[22] = pkt.baro_data.temperature;
 
-      // Calculate CRC-16 over payload
-      uint16_t crc = calculate_crc16((const uint8_t*)payload, sizeof(payload));
-
-      // Construct and send packet: Header + ID + Payload + CRC + Tail
-      uint8_t send_buffer[sizeof(packet_header) + 1 + sizeof(payload) + sizeof(crc) + sizeof(packet_tail)];
+      // Construct and send packet: Header + ID + Counter + Payload + CRC + Tail
+      uint8_t send_buffer[sizeof(packet_header) + 1 + 1 + sizeof(payload) + sizeof(uint16_t) + sizeof(packet_tail)];
       size_t offset = 0;
       
       memcpy(send_buffer + offset, packet_header, sizeof(packet_header));
       offset += sizeof(packet_header);
 
       send_buffer[offset++] = MSG_ID_DEFAULT;
+      send_buffer[offset++] = _tx_packet_counter;
       
       memcpy(send_buffer + offset, payload, sizeof(payload));
       offset += sizeof(payload);
       
+      // Calculate CRC-16 over Counter + Payload
+      uint16_t crc = calculate_crc16(send_buffer + sizeof(packet_header) + 1, 1 + sizeof(payload));
+
       memcpy(send_buffer + offset, &crc, sizeof(crc));
       offset += sizeof(crc);
       
@@ -178,6 +181,7 @@ void Telemetry::process_serial_outgoing() {
 
       if (port) {
         port->write(send_buffer, sizeof(send_buffer));
+        _tx_packet_counter++;
       }
     } 
     else if (_format == FORMAT_PID) {
@@ -198,21 +202,22 @@ void Telemetry::process_serial_outgoing() {
       payload[13] = pkt.abc_state.ahrs_data.imu_data_calibrated.gyro[2] * RAD_TO_DEG;
       payload[14] = pkt.battery_v;
 
-      // Calculate CRC-16 over payload
-      uint16_t crc = calculate_crc16((const uint8_t*)payload, sizeof(payload));
-
-      // Construct and send packet: Header + ID + Payload + CRC + Tail
-      uint8_t send_buffer[sizeof(packet_header) + 1 + sizeof(payload) + sizeof(crc) + sizeof(packet_tail)];
+      // Construct and send packet: Header + ID + Counter + Payload + CRC + Tail
+      uint8_t send_buffer[sizeof(packet_header) + 1 + 1 + sizeof(payload) + sizeof(uint16_t) + sizeof(packet_tail)];
       size_t offset = 0;
       
       memcpy(send_buffer + offset, packet_header, sizeof(packet_header));
       offset += sizeof(packet_header);
       
       send_buffer[offset++] = MSG_ID_PID;
+      send_buffer[offset++] = _tx_packet_counter;
 
       memcpy(send_buffer + offset, payload, sizeof(payload));
       offset += sizeof(payload);
       
+      // Calculate CRC-16 over Counter + Payload
+      uint16_t crc = calculate_crc16(send_buffer + sizeof(packet_header) + 1, 1 + sizeof(payload));
+
       memcpy(send_buffer + offset, &crc, sizeof(crc));
       offset += sizeof(crc);
       
@@ -221,6 +226,7 @@ void Telemetry::process_serial_outgoing() {
 
       if (port) {
         port->write(send_buffer, sizeof(send_buffer));
+        _tx_packet_counter++;
       }
     }
   
@@ -248,11 +254,12 @@ void Telemetry::process_serial_outgoing() {
         pt_count = MAX_LIDAR_POINTS;
       }
 
-      // 1. Lidar Header + ID + Point Count
+      // 1. Lidar Header + ID + Counter + Timestamp + Point Count
       memcpy(_tx_chunk + offset, packet_header, sizeof(packet_header));
       offset += sizeof(packet_header);
 
       _tx_chunk[offset++] = MSG_ID_LIDAR;
+      _tx_chunk[offset++] = _tx_lidar_packet_counter;
 
       uint32_t time_stampe_ms = (uint32_t)(_lidar_scan->timestamp * 1e-3f);
       memcpy(_tx_chunk + offset, &time_stampe_ms, sizeof(time_stampe_ms));
@@ -270,7 +277,7 @@ void Telemetry::process_serial_outgoing() {
       }
       offset += pt_count * sizeof(lidar_point_packed_t);
 
-      // 3. CRC-16 (over lidar_payload)
+      // 3. CRC-16 (over Counter + lidar_payload)
       uint16_t crc = calculate_crc16(_tx_chunk + sizeof(packet_header) + 1, offset - (sizeof(packet_header) + 1));
       memcpy(_tx_chunk + offset, &crc, sizeof(crc));
       offset += sizeof(crc);
@@ -280,6 +287,7 @@ void Telemetry::process_serial_outgoing() {
       offset += sizeof(packet_tail);
       if (port) {
         port->write(_tx_chunk, offset);
+        _tx_lidar_packet_counter++;
       }
       
     }
