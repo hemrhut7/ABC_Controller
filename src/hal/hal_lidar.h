@@ -24,13 +24,11 @@ private:
     uint8_t _packet_buffer[58];
     uint8_t _buffer_idx = 0;
     
-    // Scan accumulation
-    lidar_scan_t *_current_scan = nullptr;
     float _last_angle = 0;
     
     uint8_t calculate_crc8(const uint8_t *data, uint8_t len);
-    void parse_packet(const uint8_t *message);
-
+    
+    uint8_t pt_count = 0;
     uint32_t _overflow_count = 0;
 };
 

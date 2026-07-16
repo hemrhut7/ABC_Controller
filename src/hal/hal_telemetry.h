@@ -44,6 +44,8 @@ public:
 
   // Called by Control_Task to push data into the queue (non-blocking).
   void push_data(const system_state_t &packet);
+  // Update lidar data for FORMAT_LIDAR
+  void push_lidar_data(const lidar_scan_t &scan);
 
   // Dynamic configuration
   void set_config(bool enabled, uint8_t format, uint16_t freq_hz);
@@ -56,9 +58,6 @@ public:
   void queue_string(const char *str);
   void queue_string(const String &str);
 
-  // Update lidar data for FORMAT_LIDAR
-  void update_lidar_data(const lidar_scan_t &scan);
-
   bool connected() const {return _enabled;};
   TelemetryPort_t get_port_id() const { return port_id; };
 
@@ -68,6 +67,8 @@ private:
   ~Telemetry();
 
   QueueHandle_t data_queue = nullptr;
+  QueueHandle_t lidar_queue = nullptr;
+
   Stream *port = nullptr;
   TelemetryPort_t port_id = PORT_USB;
 
@@ -79,12 +80,7 @@ private:
   uint32_t _packet_counter = 0;
   uint8_t _tx_packet_counter = 0;
   uint8_t _tx_lidar_packet_counter = 0;
-
-
-  static const uint8_t LIDAR_BUF_COUNT = 2;
-  lidar_scan_t *_lidar_buf[LIDAR_BUF_COUNT] = {nullptr, nullptr};   // 兩塊獨立緩衝
-  volatile bool _lidar_updated = false;
-  volatile uint8_t _lidar_ready_idx = 0;
-  portMUX_TYPE _lidar_spinlock = portMUX_INITIALIZER_UNLOCKED;
-  uint8_t* _tx_chunk = nullptr;
+  uint64_t dt_lpf = 0;
+  uint64_t dt_lpf2 = 0;
+  uint32_t uart_failed_counter = 0;
 };

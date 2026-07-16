@@ -5,7 +5,6 @@
 
 // Telemetry packet protocol constants
 static const uint8_t packet_header[2] = {0xAA, 0x55};
-static const uint8_t packet_tail[4]   = {0x00, 0x00, 0x80, 0x7f}; // Keep original tail bytes for compatibility
 static const float ANGLE_SCALE = 65535.0f / 360.0f; // Scale factor for angle conversion to uint16_t
 
 enum MSG_ID {
@@ -31,8 +30,11 @@ static uint16_t calculate_crc16(const uint8_t *data, size_t len) {
 }
 
 #define TELEMETRY_QUEUE_LENGTH 5
+#define LIDAR_QUEUE_LENGTH 5
+
 #define LEN_PAYLOAD_DEFAULT 23
 #define LEN_PAYLOAD_PID 15
+#define LEN_PAYLOAD_LIDAR (MAX_LIDAR_POINTS * sizeof(lidar_point_packed_t) + sizeof(uint32_t)) // Timestamp + points
 
 
 Telemetry& Telemetry::getInstance() {
@@ -40,11 +42,7 @@ Telemetry& Telemetry::getInstance() {
   return instance;
 }
 
-Telemetry::Telemetry() : port(nullptr), port_id(PORT_USB), _tx_chunk(nullptr) {
-  for (uint8_t i = 0; i < LIDAR_BUF_COUNT; i++) {
-    _lidar_buf[i] = nullptr;
-  }
-}
+Telemetry::Telemetry() : port(nullptr), port_id(PORT_USB) {}
 
 void Telemetry::set_port(Stream &stream, TelemetryPort_t port_id) {
   this->port = &stream;
@@ -52,55 +50,41 @@ void Telemetry::set_port(Stream &stream, TelemetryPort_t port_id) {
 }
  
 Telemetry::~Telemetry() {
-  for (uint8_t i = 0; i < LIDAR_BUF_COUNT; i++) {
-    if (_lidar_buf[i]) {
-      free(_lidar_buf[i]);
-      _lidar_buf[i] = nullptr;
-    }
-  }
-  if (_tx_chunk) {
-    free(_tx_chunk);
-    _tx_chunk = nullptr;
-  }
   if (data_queue) {
     vQueueDelete(data_queue);
     data_queue = nullptr;
+  }
+  if (lidar_queue) {
+    vQueueDelete(lidar_queue);
+    lidar_queue = nullptr;
   }
 }
 
  void Telemetry::init(uint16_t base_freq) {
   _base_freq = base_freq;
   data_queue = xQueueCreate(TELEMETRY_QUEUE_LENGTH, sizeof(system_state_t));
-
-  // Pre-allocate Lidar buffers to avoid runtime allocation/deallocation race conditions and fragmentation
-  for (uint8_t i = 0; i < LIDAR_BUF_COUNT; i++) {
-    if (!_lidar_buf[i]) {
-      _lidar_buf[i] = (lidar_scan_t *)heap_caps_malloc(sizeof(lidar_scan_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-      if (!_lidar_buf[i]) {
-        Serial.printf("[TELE] PSRAM alloc failed for Lidar buffer %u!\n", i);
-      }
-    }
-  }
-
-  // Pre-allocate Lidar transmit chunk (including 1 byte for packet counter)
-  const size_t max_buf_size = sizeof(packet_header) + 1 + 1 + 4 + 2 + MAX_LIDAR_POINTS * sizeof(lidar_point_packed_t) + 2 + sizeof(packet_tail);
-  if (!_tx_chunk) {
-    _tx_chunk = (uint8_t*)heap_caps_malloc(max_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!_tx_chunk) {
-      Serial.println("[TELE] Failed to allocate large PSRAM buffer for Lidar UDP!");
-    }
-  }
+  lidar_queue = xQueueCreate(LIDAR_QUEUE_LENGTH, sizeof(lidar_scan_t));
 }
 
 void Telemetry::push_data(const system_state_t &packet) {
   // If the queue is full, the oldest data will be overwritten.
   // This is crucial to ensure the high-frequency control loop is never blocked.
-  if (data_queue != NULL) {
-    if (xQueueSend(data_queue, &packet, 0) != pdTRUE) {
-      system_state_t dummy;
-      xQueueReceive(data_queue, &dummy, 0);
-      xQueueSend(data_queue, &packet, 0);
-    }
+  if (data_queue == nullptr) return;
+
+  if (xQueueSend(data_queue, &packet, 0) != pdTRUE) {
+    system_state_t dummy;
+    xQueueReceive(data_queue, &dummy, 0);
+    xQueueSend(data_queue, &packet, 0);
+  }
+}
+
+void Telemetry::push_lidar_data(const lidar_scan_t &scan) {
+  if (lidar_queue == nullptr || _format != FORMAT_LIDAR) return;
+
+  if (xQueueSend(lidar_queue, &scan, 0) != pdTRUE) {
+    lidar_scan_t dummy;
+    xQueueReceive(lidar_queue, &dummy, 0);
+    xQueueSend(lidar_queue, &scan, 0);
   }
 }
 
@@ -125,13 +109,12 @@ void Telemetry::set_config(bool enabled, uint8_t format, uint16_t freq_hz) {
 void Telemetry::process_serial_outgoing() {
   system_state_t pkt;
 
-  if (xQueueReceive(data_queue, &pkt, pdMS_TO_TICKS(1)) == pdTRUE) {
+  if (data_queue != nullptr && xQueueReceive(data_queue, &pkt, 0) == pdTRUE) {
     if (!_enabled) return;
-
-    _packet_counter++;
-    if (_packet_counter % _divider != 0) return;
+    if (++_packet_counter % _divider != 0) return;
 
     if (_format == FORMAT_DEFAULT || _format == FORMAT_LIDAR) {
+      uint64_t start = micros();
       float payload[LEN_PAYLOAD_DEFAULT];
       payload[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
       payload[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
@@ -148,8 +131,12 @@ void Telemetry::process_serial_outgoing() {
       payload[12] = pkt.abc_state.ahrs_data.imu_data.accl[0];
       payload[13] = pkt.abc_state.ahrs_data.imu_data.accl[1];
       payload[14] = pkt.abc_state.ahrs_data.imu_data.accl[2];
-      payload[15] = (float)pkt.cmd.mode;
-      payload[16] = (float)pkt.delay_count;
+      // payload[15] = (float)pkt.cmd.mode;
+      payload[15] = (float)dt_lpf / 1000.0f;
+      // payload[16] = (float)pkt.delay_count;
+      // payload[16] = (float)uart_failed_counter;
+      // payload[16] = (float)dt_lpf / 1000.0f + (float)dt_lpf2 / 1000.0f; // Convert to milliseconds
+      payload[16] = (float)dt_lpf2 / 1000.0f; // Convert to milliseconds
       payload[17] = pkt.battery_v;
       payload[18] = pkt.mag_data.mag[0];
       payload[19] = pkt.mag_data.mag[1];
@@ -158,7 +145,7 @@ void Telemetry::process_serial_outgoing() {
       payload[22] = pkt.baro_data.temperature;
 
       // Construct and send packet: Header + ID + Counter + Payload + CRC + Tail
-      uint8_t send_buffer[sizeof(packet_header) + 1 + 1 + sizeof(payload) + sizeof(uint16_t) + sizeof(packet_tail)];
+      uint8_t send_buffer[sizeof(packet_header) + 1 + 1 + sizeof(payload) + sizeof(uint16_t)];
       size_t offset = 0;
       
       memcpy(send_buffer + offset, packet_header, sizeof(packet_header));
@@ -175,14 +162,17 @@ void Telemetry::process_serial_outgoing() {
 
       memcpy(send_buffer + offset, &crc, sizeof(crc));
       offset += sizeof(crc);
-      
-      memcpy(send_buffer + offset, packet_tail, sizeof(packet_tail));
-      offset += sizeof(packet_tail);
 
       if (port) {
-        port->write(send_buffer, sizeof(send_buffer));
+        size_t pass_bytes = port->write(send_buffer, sizeof(send_buffer));
+        if (pass_bytes != sizeof(send_buffer)) {
+          uart_failed_counter++;
+        }
         _tx_packet_counter++;
       }
+      
+      uint64_t dt = micros() - start;
+      dt_lpf = (dt_lpf * 0.9f) + (dt * 0.1f);
     } 
     else if (_format == FORMAT_PID) {
       float payload[LEN_PAYLOAD_PID];
@@ -203,7 +193,7 @@ void Telemetry::process_serial_outgoing() {
       payload[14] = pkt.battery_v;
 
       // Construct and send packet: Header + ID + Counter + Payload + CRC + Tail
-      uint8_t send_buffer[sizeof(packet_header) + 1 + 1 + sizeof(payload) + sizeof(uint16_t) + sizeof(packet_tail)];
+      uint8_t send_buffer[sizeof(packet_header) + 1 + 1 + sizeof(payload) + sizeof(uint16_t)];
       size_t offset = 0;
       
       memcpy(send_buffer + offset, packet_header, sizeof(packet_header));
@@ -220,100 +210,63 @@ void Telemetry::process_serial_outgoing() {
 
       memcpy(send_buffer + offset, &crc, sizeof(crc));
       offset += sizeof(crc);
-      
-      memcpy(send_buffer + offset, packet_tail, sizeof(packet_tail));
-      offset += sizeof(packet_tail);
 
       if (port) {
         port->write(send_buffer, sizeof(send_buffer));
         _tx_packet_counter++;
       }
     }
-  
-    if (_format == FORMAT_LIDAR) {
-      if (!_lidar_updated || !_lidar_buf[0] || !_lidar_buf[1] || !_tx_chunk) {
-        return;
-      }
-
-      uint8_t read_idx; 
-      bool has_data;
-      portENTER_CRITICAL(&_lidar_spinlock);
-      read_idx = _lidar_ready_idx;
-      has_data = _lidar_updated;
-      _lidar_updated = false;
-      portEXIT_CRITICAL(&_lidar_spinlock);
-
-      if (!has_data) return;
-      lidar_scan_t *_lidar_scan = _lidar_buf[read_idx];
-      if (!_lidar_scan) return;
-
-      uint16_t pt_count = _lidar_scan->count;
-      size_t offset = 0;
-
-      if (pt_count > MAX_LIDAR_POINTS) {
-        pt_count = MAX_LIDAR_POINTS;
-      }
-
-      // 1. Lidar Header + ID + Counter + Timestamp + Point Count
-      memcpy(_tx_chunk + offset, packet_header, sizeof(packet_header));
-      offset += sizeof(packet_header);
-
-      _tx_chunk[offset++] = MSG_ID_LIDAR;
-      _tx_chunk[offset++] = _tx_lidar_packet_counter;
-
-      uint32_t time_stampe_ms = (uint32_t)(_lidar_scan->timestamp * 1e-3f);
-      memcpy(_tx_chunk + offset, &time_stampe_ms, sizeof(time_stampe_ms));
-      offset += sizeof(time_stampe_ms);
-
-      memcpy(_tx_chunk + offset, &pt_count, sizeof(pt_count));
-      offset += sizeof(pt_count);
-
-      // 2. Lidar Points
-      lidar_point_packed_t* packed_pts = (lidar_point_packed_t*)(_tx_chunk + offset);
-      for (int i = 0; i < pt_count; i++) {
-        packed_pts[i].distance = (uint16_t)(_lidar_scan->points[i].distance * 1000.0f);
-        packed_pts[i].angle = (uint16_t)(_lidar_scan->points[i].angle * ANGLE_SCALE);
-        packed_pts[i].intensity = _lidar_scan->points[i].intensity;
-      }
-      offset += pt_count * sizeof(lidar_point_packed_t);
-
-      // 3. CRC-16 (over Counter + lidar_payload)
-      uint16_t crc = calculate_crc16(_tx_chunk + sizeof(packet_header) + 1, offset - (sizeof(packet_header) + 1));
-      memcpy(_tx_chunk + offset, &crc, sizeof(crc));
-      offset += sizeof(crc);
-
-      // 4. Tail
-      memcpy(_tx_chunk + offset, packet_tail, sizeof(packet_tail));
-      offset += sizeof(packet_tail);
-      if (port) {
-        port->write(_tx_chunk, offset);
-        _tx_lidar_packet_counter++;
-      }
-      
-    }
   }
-}
 
-void Telemetry::update_lidar_data(const lidar_scan_t &scan) {
-  uint8_t write_idx = 1 - _lidar_ready_idx;
-  if (_lidar_buf[write_idx]) {
-    *_lidar_buf[write_idx] = scan;              // Copy to offline buffer safely
+  lidar_scan_t lidar_pkt;
+  if (_format == FORMAT_LIDAR && lidar_queue != nullptr && xQueueReceive(lidar_queue, &lidar_pkt, 0) == pdTRUE) {
+    uint64_t start = micros();
+    size_t offset = 0;
+    uint8_t send_buffer[sizeof(packet_header) + 1 + 1 + LEN_PAYLOAD_LIDAR + sizeof(uint16_t)];
 
-    portENTER_CRITICAL(&_lidar_spinlock);
-    _lidar_ready_idx = write_idx;
-    _lidar_updated = true;
-    portEXIT_CRITICAL(&_lidar_spinlock);
+    // 1. Lidar Header + ID + Counter + Timestamp
+    memcpy(send_buffer + offset, packet_header, sizeof(packet_header));
+    offset += sizeof(packet_header);
+
+    send_buffer[offset++] = MSG_ID_LIDAR;
+    send_buffer[offset++] = _tx_lidar_packet_counter;
+
+    uint32_t time_stampe_ms = (uint32_t)(lidar_pkt.timestamp * 1e-3f);
+    memcpy(send_buffer + offset, &time_stampe_ms, sizeof(time_stampe_ms));
+    offset += sizeof(time_stampe_ms);
+
+    // 2. Lidar Points
+    lidar_point_packed_t* packed_pts = (lidar_point_packed_t*)(send_buffer + offset);
+    for (int i = 0; i < MAX_LIDAR_POINTS; i++) {
+      packed_pts[i].distance = (uint16_t)(lidar_pkt.points[i].distance * 1000.0f);
+      packed_pts[i].angle = (uint16_t)(lidar_pkt.points[i].angle * ANGLE_SCALE);
+      packed_pts[i].intensity = lidar_pkt.points[i].intensity;
+    }
+    offset += MAX_LIDAR_POINTS * sizeof(lidar_point_packed_t);
+
+    // 3. CRC-16 (over Counter + lidar_payload)
+    uint16_t crc = calculate_crc16(send_buffer + sizeof(packet_header) + 1, offset - (sizeof(packet_header) + 1));
+    memcpy(send_buffer + offset, &crc, sizeof(crc));
+    offset += sizeof(crc);
+
+    if (port) {
+      size_t pass_bytes = port->write(send_buffer, offset);
+      if (pass_bytes != sizeof(send_buffer)) {
+        uart_failed_counter++;
+      }
+      _tx_lidar_packet_counter++;
+    }
+    
+    uint64_t dt = micros() - start;
+    dt_lpf2 = (dt_lpf2 * 0.9f) + (dt * 0.1f);
   }
 }
 
 void Telemetry::queue_string(const char *str) {
-  if (!str)
-    return;
-  // This function is called from a communication task, so direct writing is
-  // safe and won't interfere with the Control_Task.
-  if (port) {
-    port->print(str);
-  }
+  if (!str) return;
+  if (port) port->print(str);
 }
 
-void Telemetry::queue_string(const String &str) { queue_string(str.c_str()); }
+void Telemetry::queue_string(const String &str) { 
+  queue_string(str.c_str()); 
+}

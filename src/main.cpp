@@ -22,15 +22,16 @@
 #endif
 
 #define PRIORITY_CONTROL 24
+
+#define PRIORITY_LIDAR 15
 #define PRIORITY_UART1 12
 #define PRIORITY_WIFI 12
-#define PRIORITY_COMM 10
+#define PRIORITY_COMM 12
 #define PRIORITY_GAMEPAD 8
-#define PRIORITY_LIDAR 11
 
 #define MAIN_LOOP_RATE_HZ  200.0f
 #define PERIOD_CONTROLL    1000.0f/MAIN_LOOP_RATE_HZ
-#define PERIOD_COMM        5  // 200Hz
+#define PERIOD_COMM        2  // 500Hz
 #define PERIOD_GAMEPAD     20 // 50Hz
 
 TaskHandle_t ControlTaskHandle;
@@ -241,7 +242,7 @@ void setup() {
   motor.init();
   app_lidar.init();
   Telemetry::getInstance().set_port(Serial, PORT_USB);
-  Telemetry::getInstance().init(1000 / PERIOD_COMM);
+  Telemetry::getInstance().init(MAIN_LOOP_RATE_HZ);
 #if HAS_WIFI_SERIAL
   // WiFi Initialization
   WiFi.begin(WIFI_SSID, WIFI_PASS);
