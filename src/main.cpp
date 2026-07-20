@@ -225,10 +225,10 @@ void WiFi_Task(void *pvParameters) {
 
 #ifndef UNIT_TEST
 void setup() {
-  Serial.setTxBufferSize(4096);
+  Serial.setTxBufferSize(8192);
   Serial.begin(921600);
   // Serial1 (Telemetry/Script)
-  Serial1.setTxBufferSize(4096);
+  Serial1.setTxBufferSize(8192);
   Serial1.begin(2000000, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
   // Serial2 (Sensor RX only)
   Serial2.setRxBufferSize(1024);
