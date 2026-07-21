@@ -143,6 +143,7 @@ void Control_Task(void *pvParameters) {
     i2c_sensor.get_sensor_data(&current_sys_state.mag_data, &current_sys_state.baro_data);
 
     Telemetry::getInstance().push_data(current_sys_state);
+    uros_telemetry.push_data(current_sys_state);
   }
 }
 
@@ -157,17 +158,7 @@ void UART1_Task(void *pvParameters) {
   const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
 
   for (;;) {
-    system_state_t state;
-    ahrs.get_ahrs_data(&state.abc_state.ahrs_data);
-    motor.get_motor_state(&state.abc_state.motor_state);
-    state.abc_state.velocity = app_mode.get_velocity();
-    state.cmd = app_mode.get_user_command();
-    state.delay_count = failsafe.get_delay_count();
-    state.pid_target = app_mode.get_pid_target();
-    state.battery_v = system_battery.get_voltage();
-    i2c_sensor.get_sensor_data(&state.mag_data, &state.baro_data);
-
-    uros_telemetry.update(state);
+    uros_telemetry.update();
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }

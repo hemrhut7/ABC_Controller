@@ -18,15 +18,23 @@
 #include <std_msgs/msg/float32_multi_array.h>
 #include <geometry_msgs/msg/twist.h>
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+
 class HAL_MicroROS {
 public:
     HAL_MicroROS();
     ~HAL_MicroROS();
 
     void init();
-    void update(const system_state_t &state);
+    void push_data(const system_state_t &packet);
+    void push_lidar_data(const lidar_scan_t &scan);
+    void update();
 
 private:
+    QueueHandle_t data_queue = nullptr;
+    QueueHandle_t lidar_queue = nullptr;
+
     enum States {
         WAITING_AGENT,
         AGENT_AVAILABLE,

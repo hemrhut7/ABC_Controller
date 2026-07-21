@@ -16,7 +16,7 @@ public:
 
 private:
     HAL_Lidar _lidar;
-    lidar_scan_t _current_scan;    
+    lidar_scan_t _current_scan;
     uint32_t _scan_count = 0;
     uint32_t _last_data_ms = 0;
 };

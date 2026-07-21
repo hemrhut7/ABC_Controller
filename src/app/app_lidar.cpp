@@ -1,5 +1,8 @@
 #include "app_lidar.h"
 #include "hal/hal_telemetry.h"
+#include "hal/hal_microros.h"
+
+extern HAL_MicroROS uros_telemetry;
 
 
 AppLidar::AppLidar(Stream &serial) : _lidar(serial) {
@@ -15,7 +18,8 @@ void AppLidar::update_step() {
         _scan_count++;
         _last_data_ms = millis();
 
-        // New scan completed
+        // New scan completed - push directly to queues
         Telemetry::getInstance().push_lidar_data(_current_scan);
+        uros_telemetry.push_lidar_data(_current_scan);
     }
 }
