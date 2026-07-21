@@ -50,6 +50,7 @@ HAL_MicroROS::HAL_MicroROS() :
     last_sync_time(0),
     last_imu_timestamp(0),
     last_joint_timestamp(0),
+    last_joint_pub_ms(0),
     last_mag_timestamp(0),
     last_baro_timestamp(0),
     last_temp_timestamp(0),
@@ -508,7 +509,11 @@ void HAL_MicroROS::update() {
             uros_joint_state_msg.effort.data[0] = state_data.abc_state.motor_state.pwm_out_L;
             uros_joint_state_msg.effort.data[1] = state_data.abc_state.motor_state.pwm_out_R;
 
-            FORCE_UNUSED(rcl_publish(&uros_joint_state_publisher, &uros_joint_state_msg, NULL));
+            // Publish JointState at 20Hz (every 50ms)
+            if (now_ms - last_joint_pub_ms >= 50) {
+              last_joint_pub_ms = now_ms;
+              FORCE_UNUSED(rcl_publish(&uros_joint_state_publisher, &uros_joint_state_msg, NULL));
+            }
           }
 
           // 1.2 Publish Magnetometer if data is new
@@ -687,6 +692,7 @@ void HAL_MicroROS::update() {
         // Reset tracking variables on disconnect
         last_imu_timestamp = 0;
         last_joint_timestamp = 0;
+        last_joint_pub_ms = 0;
         last_mag_timestamp = 0;
         last_baro_timestamp = 0;
         last_temp_timestamp = 0;

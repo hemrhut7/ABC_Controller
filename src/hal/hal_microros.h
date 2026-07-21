@@ -87,6 +87,7 @@ private:
     // Tracking variables for new data publication
     uint64_t last_imu_timestamp;
     uint64_t last_joint_timestamp;
+    uint32_t last_joint_pub_ms;
     uint64_t last_mag_timestamp;
     uint64_t last_baro_timestamp;
     uint64_t last_temp_timestamp;
