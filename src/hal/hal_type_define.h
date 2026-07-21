@@ -97,11 +97,10 @@ typedef struct {
     uint8_t intensity;
 } lidar_point_t;
 
-#define MAX_LIDAR_POINTS 512
+#define MAX_LIDAR_POINTS 32
 typedef struct {
     uint64_t timestamp;
     lidar_point_t points[MAX_LIDAR_POINTS];
-    uint16_t count;
 } lidar_scan_t;
 
 typedef struct {

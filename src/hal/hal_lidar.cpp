@@ -2,17 +2,9 @@
 #include <math.h>
 
 HAL_Lidar::HAL_Lidar(Stream &stream) : _port(stream) {
-    _current_scan = (lidar_scan_t *)malloc(sizeof(lidar_scan_t));
-    if (_current_scan) {
-        _current_scan->count = 0;
-    }
 }
  
 HAL_Lidar::~HAL_Lidar() {
-    if (_current_scan) {
-        free(_current_scan);
-        _current_scan = nullptr;
-    }
 }
  void HAL_Lidar::init() {
     // Port should be initialized externally (e.g. Serial2.begin(230400))
@@ -27,9 +19,6 @@ uint8_t HAL_Lidar::calculate_crc8(const uint8_t *data, uint8_t len) {
 }
 
 bool HAL_Lidar::update(lidar_scan_t &scan) {
-    if (!_current_scan) return false;
-    bool revolution_completed = false;
-
     while (_port.available()) {
         uint8_t b = _port.read();
 
@@ -57,45 +46,41 @@ bool HAL_Lidar::update(lidar_scan_t &scan) {
                     angle_diff = end_angle - start_angle;
                 }
 
-                // Check for revolution completion
-                if (start_angle < _last_angle - 180.0f) {
-                    if (_current_scan && _current_scan->count > 0) {
-                        _current_scan->timestamp = micros();
-                        scan = *_current_scan;
-                        revolution_completed = true;
-                        _current_scan->count = 0; // Reset for next scan
-                    }
-                }
                 _last_angle = start_angle;
+
+                // Update timestamp
+                scan.timestamp = micros();
 
                 // Parse 16 points
                 const uint8_t points_in_packet = 16;
                 for (int i = 0; i < points_in_packet; i++) {
-                    if (!_current_scan || _current_scan->count >= MAX_LIDAR_POINTS) {
-                        _overflow_count++;
-                        break;
-                    }
-
                     uint8_t idx = 7 + i * 3;
                     uint16_t dist_raw = _packet_buffer[idx] * 256 + _packet_buffer[idx + 1];
                     uint8_t intensity = _packet_buffer[idx + 2];
 
-                    if (dist_raw == 0xFFFF) continue; // Invalid point
-
-                    float distance = dist_raw / 1000.0f; // meters
                     float angle = start_angle + (angle_diff / (float)(points_in_packet - 1)) * i;
                     if (angle >= 360.0f) angle -= 360.0f;
 
-                    lidar_point_t &p = _current_scan->points[_current_scan->count++];
-                    p.distance = distance;
-                    p.angle = angle;
-                    p.intensity = intensity;
+                    lidar_point_t &p = scan.points[pt_count + i];
+                    if (dist_raw == 0xFFFF) {
+                        p.distance = 0.0f;
+                        p.angle = angle;
+                        p.intensity = 0;
+                    } else {
+                        p.distance = dist_raw / 1000.0f; // meters
+                        p.angle = angle;
+                        p.intensity = intensity;
+                    }
+                }
+                pt_count += points_in_packet;
+                _buffer_idx = 0; // Reset for next packet
+
+                if (pt_count >= MAX_LIDAR_POINTS) {
+                    pt_count = 0; // Reset for next scan
+                    return true;
                 }
             }
             _buffer_idx = 0; // Reset for next packet
-            
-            // If a revolution was just detected, return true
-            if (revolution_completed) return true;
         }
     }
 

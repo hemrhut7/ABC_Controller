@@ -24,15 +24,16 @@
 #endif
 
 #define PRIORITY_CONTROL 24
+
+#define PRIORITY_LIDAR 15
 #define PRIORITY_UART1 12
 #define PRIORITY_WIFI 12
-#define PRIORITY_COMM 10
+#define PRIORITY_COMM 12
 #define PRIORITY_GAMEPAD 8
-#define PRIORITY_LIDAR 16
 
 #define MAIN_LOOP_RATE_HZ  200.0f
 #define PERIOD_CONTROLL    1000.0f/MAIN_LOOP_RATE_HZ
-#define PERIOD_COMM        5  // 200Hz
+#define PERIOD_COMM        2  // 500Hz
 #define PERIOD_GAMEPAD     20 // 50Hz
 
 TaskHandle_t ControlTaskHandle;
@@ -241,10 +242,10 @@ void WiFi_Task(void *pvParameters) {
 
 #ifndef UNIT_TEST
 void setup() {
-  Serial.setTxBufferSize(4096);
+  Serial.setTxBufferSize(8192);
   Serial.begin(921600);
   // Serial1 (Telemetry/Script)
-  Serial1.setTxBufferSize(4096);
+  Serial1.setTxBufferSize(8192);
   Serial1.begin(2000000, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
   // Serial2 (Sensor RX only)
   Serial2.setRxBufferSize(4096);
@@ -258,7 +259,7 @@ void setup() {
   motor.init();
   app_lidar.init();
   Telemetry::getInstance().set_port(Serial, PORT_USB);
-  Telemetry::getInstance().init(1000 / PERIOD_COMM);
+  Telemetry::getInstance().init(MAIN_LOOP_RATE_HZ);
 #if HAS_WIFI_SERIAL
   // WiFi Initialization
   WiFi.begin(WIFI_SSID, WIFI_PASS);
