@@ -21,8 +21,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
-#define UROS_DATA_QUEUE_DEPTH 10
-#define UROS_LIDAR_QUEUE_DEPTH 10
+#define UROS_DATA_QUEUE_DEPTH 25
+#define UROS_LIDAR_QUEUE_DEPTH 20
 
 class HAL_MicroROS {
 public:
