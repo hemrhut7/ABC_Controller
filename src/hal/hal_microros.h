@@ -21,6 +21,9 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
+#define UROS_DATA_QUEUE_DEPTH 10
+#define UROS_LIDAR_QUEUE_DEPTH 10
+
 class HAL_MicroROS {
 public:
     HAL_MicroROS();
@@ -44,6 +47,8 @@ private:
 
     bool init_node_and_publishers();
     void destroy_node_and_publishers();
+    void process_system_state();
+    void process_lidar_scan();
 
     // micro-ROS variables
     rcl_node_t uros_node;
@@ -86,7 +91,7 @@ private:
 
     // Tracking variables for new data publication
     uint64_t last_imu_timestamp;
-    uint64_t last_joint_timestamp;
+    uint32_t last_joint_pub_ms;
     uint64_t last_mag_timestamp;
     uint64_t last_baro_timestamp;
     uint64_t last_temp_timestamp;
@@ -103,5 +108,4 @@ private:
     float scan_ranges[MAX_LIDAR_POINTS];
     float scan_intensities[MAX_LIDAR_POINTS];
     float pid_target_data[6];
-    lidar_scan_t _temp_scan;
 };
