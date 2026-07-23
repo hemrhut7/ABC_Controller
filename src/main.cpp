@@ -26,7 +26,7 @@
 #define PRIORITY_CONTROL 24
 
 #define PRIORITY_LIDAR 15
-#define PRIORITY_UART1 12
+#define PRIORITY_UART1 14
 #define PRIORITY_WIFI 12
 #define PRIORITY_COMM 12
 #define PRIORITY_GAMEPAD 8
@@ -159,8 +159,7 @@ void UART1_Task(void *pvParameters) {
 
   for (;;) {
     uros_telemetry.update();
-
-    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+    vTaskDelay(1);
   }
 }
 

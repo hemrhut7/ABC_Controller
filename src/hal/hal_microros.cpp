@@ -111,10 +111,10 @@ HAL_MicroROS::~HAL_MicroROS() {
 
 void HAL_MicroROS::init() {
     if (!data_queue) {
-        data_queue = xQueueCreate(5, sizeof(system_state_t));
+        data_queue = xQueueCreate(10, sizeof(system_state_t));
     }
     if (!lidar_queue) {
-        lidar_queue = xQueueCreate(5, sizeof(lidar_scan_t));
+        lidar_queue = xQueueCreate(10, sizeof(lidar_scan_t));
     }
     // Initialize micro-ROS transport
     set_microros_transports();
@@ -409,9 +409,9 @@ void HAL_MicroROS::update() {
     switch (state) {
       case WAITING_AGENT: {
         uint32_t now_ms = millis();
-        if (now_ms - last_ping_check > 1000) {
+        if (now_ms - last_ping_check > 5000) {
           last_ping_check = now_ms;
-          if (rmw_uros_ping_agent(100, 1) == RMW_RET_OK) {
+          if (rmw_uros_ping_agent(10, 1) == RMW_RET_OK) {
             state = AGENT_AVAILABLE;
           }
         }
@@ -447,7 +447,7 @@ void HAL_MicroROS::update() {
 
         // 1. Process system state packet from queue if available
         system_state_t state_data;
-        if (data_queue != nullptr && xQueueReceive(data_queue, &state_data, 0) == pdTRUE) {
+        while (data_queue != nullptr && xQueueReceive(data_queue, &state_data, 0) == pdTRUE) {
           uint32_t current_time_us = micros();
 
           // 1.1 Publish IMU & JointState if IMU data is new
