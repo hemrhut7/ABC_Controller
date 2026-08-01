@@ -1,10 +1,8 @@
 #include "hal_microros.h"
 #include "hal_telemetry.h"
-#include "app/app_lidar.h"
 #include "app/app_mode.h"
 
 extern AppMode app_mode;
-extern AppLidar app_lidar;
 
 static void cmd_vel_callback(const void *msgin) {
   const geometry_msgs__msg__Twist *msg = (const geometry_msgs__msg__Twist *)msgin;
@@ -67,7 +65,6 @@ HAL_MicroROS::HAL_MicroROS() :
     memset(&uros_mag_publisher, 0, sizeof(uros_mag_publisher));
     memset(&uros_baro_publisher, 0, sizeof(uros_baro_publisher));
     memset(&uros_battery_publisher, 0, sizeof(uros_battery_publisher));
-    memset(&uros_scan_publisher, 0, sizeof(uros_scan_publisher));
     memset(&uros_temp_publisher, 0, sizeof(uros_temp_publisher));
     memset(&uros_mode_publisher, 0, sizeof(uros_mode_publisher));
     memset(&uros_delay_publisher, 0, sizeof(uros_delay_publisher));
@@ -78,7 +75,6 @@ HAL_MicroROS::HAL_MicroROS() :
     memset(&uros_cmd_mode_msg, 0, sizeof(uros_cmd_mode_msg));
 
     memset(&uros_battery_msg, 0, sizeof(uros_battery_msg));
-    memset(&uros_scan_msg, 0, sizeof(uros_scan_msg));
     memset(&uros_temp_msg, 0, sizeof(uros_temp_msg));
     memset(&uros_mode_msg, 0, sizeof(uros_mode_msg));
     memset(&uros_delay_msg, 0, sizeof(uros_delay_msg));
@@ -90,8 +86,6 @@ HAL_MicroROS::HAL_MicroROS() :
     joint_velocities[1] = 0.0;
     joint_efforts[0] = 0.0;
     joint_efforts[1] = 0.0;
-    memset(scan_ranges, 0, sizeof(scan_ranges));
-    memset(scan_intensities, 0, sizeof(scan_intensities));
     memset(pid_target_data, 0, sizeof(pid_target_data));
     for (int i = 0; i < 6; ++i) {
         last_pid_target[i] = -999999.0f;
@@ -106,18 +100,11 @@ HAL_MicroROS::~HAL_MicroROS() {
         vQueueDelete(data_queue);
         data_queue = nullptr;
     }
-    if (lidar_queue) {
-        vQueueDelete(lidar_queue);
-        lidar_queue = nullptr;
-    }
 }
 
 void HAL_MicroROS::init() {
     if (!data_queue) {
         data_queue = xQueueCreate(UROS_DATA_QUEUE_DEPTH, sizeof(system_state_t));
-    }
-    if (!lidar_queue) {
-        lidar_queue = xQueueCreate(UROS_LIDAR_QUEUE_DEPTH, sizeof(lidar_scan_t));
     }
     // Initialize micro-ROS transport
     set_microros_transports();
@@ -130,17 +117,6 @@ void HAL_MicroROS::push_data(const system_state_t &packet) {
         system_state_t dummy;
         if (xQueueReceive(data_queue, &dummy, 0) == pdTRUE) {
             xQueueSend(data_queue, &packet, 0);
-        }
-    }
-}
-
-void HAL_MicroROS::push_lidar_data(const lidar_scan_t &scan) {
-    if (lidar_queue == nullptr) return;
-
-    if (xQueueSend(lidar_queue, &scan, 0) != pdTRUE) {
-        lidar_scan_t dummy;
-        if (xQueueReceive(lidar_queue, &dummy, 0) == pdTRUE) {
-            xQueueSend(lidar_queue, &scan, 0);
         }
     }
 }
@@ -212,21 +188,11 @@ bool HAL_MicroROS::init_node_and_publishers() {
     return false;
   }
 
-  // Create publishers for battery, scan, temp, mode, delay, pid_target
   if (rclc_publisher_init_best_effort(
       &uros_battery_publisher,
       &uros_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, BatteryState),
       "/battery_state") != RCL_RET_OK) {
-    destroy_node_and_publishers();
-    return false;
-  }
-
-  if (rclc_publisher_init_best_effort(
-      &uros_scan_publisher,
-      &uros_node,
-      ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, LaserScan),
-      "/scan") != RCL_RET_OK) {
     destroy_node_and_publishers();
     return false;
   }
@@ -336,18 +302,6 @@ bool HAL_MicroROS::init_node_and_publishers() {
   uros_temp_msg.header.frame_id.size = strlen(uros_temp_msg.header.frame_id.data);
   uros_temp_msg.header.frame_id.capacity = uros_temp_msg.header.frame_id.size + 1;
 
-  uros_scan_msg.header.frame_id.data = (char*)"laser_link";
-  uros_scan_msg.header.frame_id.size = strlen(uros_scan_msg.header.frame_id.data);
-  uros_scan_msg.header.frame_id.capacity = uros_scan_msg.header.frame_id.size + 1;
-
-  uros_scan_msg.ranges.capacity = MAX_LIDAR_POINTS;
-  uros_scan_msg.ranges.size = 0;
-  uros_scan_msg.ranges.data = scan_ranges;
-
-  uros_scan_msg.intensities.capacity = MAX_LIDAR_POINTS;
-  uros_scan_msg.intensities.size = 0;
-  uros_scan_msg.intensities.data = scan_intensities;
-
   uros_pid_target_msg.data.capacity = 6;
   uros_pid_target_msg.data.size = 6;
   uros_pid_target_msg.data.data = pid_target_data;
@@ -386,7 +340,6 @@ void HAL_MicroROS::destroy_node_and_publishers() {
   FORCE_UNUSED(rcl_publisher_fini(&uros_delay_publisher, &uros_node));
   FORCE_UNUSED(rcl_publisher_fini(&uros_mode_publisher, &uros_node));
   FORCE_UNUSED(rcl_publisher_fini(&uros_temp_publisher, &uros_node));
-  FORCE_UNUSED(rcl_publisher_fini(&uros_scan_publisher, &uros_node));
   FORCE_UNUSED(rcl_publisher_fini(&uros_battery_publisher, &uros_node));
   FORCE_UNUSED(rcl_publisher_fini(&uros_baro_publisher, &uros_node));
   FORCE_UNUSED(rcl_publisher_fini(&uros_mag_publisher, &uros_node));
@@ -588,40 +541,7 @@ void HAL_MicroROS::process_system_state() {
     }
 }
 
-void HAL_MicroROS::process_lidar_scan() {
-    lidar_scan_t lidar_pkt;
-    while (lidar_queue != nullptr && xQueueReceive(lidar_queue, &lidar_pkt, 0) == pdTRUE) {
-        fill_ros_stamp(uros_scan_msg.header.stamp, lidar_pkt.timestamp, micros());
 
-        float start_angle_rad = lidar_pkt.points[0].angle * (M_PI / 180.0f);
-        if (start_angle_rad > M_PI) {
-            start_angle_rad -= 2.0f * M_PI;
-        }
-        float end_angle_rad = lidar_pkt.points[MAX_LIDAR_POINTS - 1].angle * (M_PI / 180.0f);
-        float angle_diff_rad = end_angle_rad - start_angle_rad;
-        if (angle_diff_rad < 0.0f) {
-            angle_diff_rad += 2.0f * M_PI;
-        }
-
-        uros_scan_msg.angle_min = start_angle_rad;
-        uros_scan_msg.angle_max = start_angle_rad + angle_diff_rad;
-        uros_scan_msg.angle_increment = (MAX_LIDAR_POINTS > 1) ? (angle_diff_rad / (float)(MAX_LIDAR_POINTS - 1)) : 0.0f;
-        uros_scan_msg.time_increment = 0.0f;
-        uros_scan_msg.scan_time = 0.1f;
-        uros_scan_msg.range_min = 0.12f;
-        uros_scan_msg.range_max = 3.5f;
-
-        uint16_t pt_count = MAX_LIDAR_POINTS;
-        uros_scan_msg.ranges.size = pt_count;
-        uros_scan_msg.intensities.size = pt_count;
-
-        for (uint16_t i = 0; i < pt_count; i++) {
-            scan_ranges[i] = lidar_pkt.points[i].distance;
-            scan_intensities[i] = (float)lidar_pkt.points[i].intensity;
-        }
-        FORCE_UNUSED(rcl_publish(&uros_scan_publisher, &uros_scan_msg, NULL));
-    }
-}
 
 void HAL_MicroROS::update() {
     switch (state) {
@@ -663,9 +583,8 @@ void HAL_MicroROS::update() {
           rmw_uros_sync_session(10);
         }
 
-        // Process system state & lidar scan queues
+        // Process system state queue
         process_system_state();
-        process_lidar_scan();
 
         // Spin executor with 0 timeout for best effort
         rclc_executor_spin_some(&uros_executor, RCL_MS_TO_NS(0));
@@ -681,10 +600,6 @@ void HAL_MicroROS::update() {
         if (data_queue != nullptr) {
           system_state_t dummy;
           while (xQueueReceive(data_queue, &dummy, 0) == pdTRUE) {}
-        }
-        if (lidar_queue != nullptr) {
-          lidar_scan_t dummy;
-          while (xQueueReceive(lidar_queue, &dummy, 0) == pdTRUE) {}
         }
 
         // Reset tracking variables on disconnect

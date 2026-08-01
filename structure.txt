@@ -44,8 +44,6 @@ ABC Controller Project Structure (Updated)
 │   ├── app/
 │   │   ├── app_fail_safe.cpp
 │   │   ├── app_fail_safe.h
-│   │   ├── app_lidar.cpp
-│   │   ├── app_lidar.h
 │   │   ├── app_mode.cpp
 │   │   ├── app_mode.h
 │   │   ├── app_script.cpp
@@ -62,8 +60,6 @@ ABC Controller Project Structure (Updated)
 │   │   ├── hal_imu.h
 │   │   ├── hal_joystick.cpp
 │   │   ├── hal_joystick.h
-│   │   ├── hal_lidar.cpp
-│   │   ├── hal_lidar.h
 │   │   ├── hal_motor.cpp
 │   │   ├── hal_motor.h
 │   │   ├── hal_storage.cpp

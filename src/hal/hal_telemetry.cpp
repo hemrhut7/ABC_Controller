@@ -8,12 +8,10 @@ extern HAL_MicroROS uros_telemetry;
 
 // Telemetry packet protocol constants
 static const uint8_t packet_header[2] = {0xAA, 0x55};
-static const float ANGLE_SCALE = 65535.0f / 360.0f; // Scale factor for angle conversion to uint16_t
 
 enum MSG_ID {
     MSG_ID_DEFAULT = 0x01,
     MSG_ID_PID     = 0x02,
-    MSG_ID_LIDAR   = 0x03,
 };
 
 // Helper function to calculate CRC-16 CCITT
@@ -33,11 +31,9 @@ static uint16_t calculate_crc16(const uint8_t *data, size_t len) {
 }
 
 #define TELEMETRY_QUEUE_LENGTH 5
-#define LIDAR_QUEUE_LENGTH 5
 
 #define LEN_PAYLOAD_DEFAULT 23
 #define LEN_PAYLOAD_PID 15
-#define LEN_PAYLOAD_LIDAR (MAX_LIDAR_POINTS * sizeof(lidar_point_packed_t) + sizeof(uint32_t)) // Timestamp + points
 
 
 Telemetry& Telemetry::getInstance() {
@@ -57,16 +53,11 @@ Telemetry::~Telemetry() {
     vQueueDelete(data_queue);
     data_queue = nullptr;
   }
-  if (lidar_queue) {
-    vQueueDelete(lidar_queue);
-    lidar_queue = nullptr;
-  }
 }
 
  void Telemetry::init(uint16_t base_freq) {
   _base_freq = base_freq;
   data_queue = xQueueCreate(TELEMETRY_QUEUE_LENGTH, sizeof(system_state_t));
-  lidar_queue = xQueueCreate(LIDAR_QUEUE_LENGTH, sizeof(lidar_scan_t));
 }
 
 void Telemetry::push_data(const system_state_t &packet) {
@@ -81,22 +72,11 @@ void Telemetry::push_data(const system_state_t &packet) {
   }
 }
 
-void Telemetry::push_lidar_data(const lidar_scan_t &scan) {
-  if (lidar_queue == nullptr || _format != FORMAT_LIDAR) return;
-
-  if (xQueueSend(lidar_queue, &scan, 0) != pdTRUE) {
-    lidar_scan_t dummy;
-    xQueueReceive(lidar_queue, &dummy, 0);
-    xQueueSend(lidar_queue, &scan, 0);
-  }
-}
-
 void Telemetry::set_config(bool enabled, uint8_t format, uint16_t freq_hz) {
   _enabled = enabled;
   _format = format;
   _packet_counter = 0; // Reset counter on config change
   _tx_packet_counter = 0;
-  _tx_lidar_packet_counter = 0;
 
   if (freq_hz == 0) {
     _divider = 1;
@@ -123,10 +103,6 @@ void Telemetry::process_serial_outgoing() {
       system_state_t dummy;
       while (xQueueReceive(data_queue, &dummy, 0) == pdTRUE) {}
     }
-    if (lidar_queue != nullptr) {
-      lidar_scan_t dummy;
-      while (xQueueReceive(lidar_queue, &dummy, 0) == pdTRUE) {}
-    }
     return;
   }
 
@@ -137,7 +113,7 @@ void Telemetry::process_serial_outgoing() {
   system_state_t pkt;
   if (data_queue != nullptr && xQueueReceive(data_queue, &pkt, 0) == pdTRUE) {
     if (++_packet_counter % _divider == 0) {
-      if (_format == FORMAT_DEFAULT || _format == FORMAT_LIDAR) {
+      if (_format == FORMAT_DEFAULT) {
         float payload[LEN_PAYLOAD_DEFAULT];
         payload[0] = pkt.abc_state.ahrs_data.imu_data.timestamp * 1e-6f;
         payload[1] = pkt.abc_state.ahrs_data.euler[0] * RAD_TO_DEG;
@@ -210,38 +186,7 @@ void Telemetry::process_serial_outgoing() {
     }
   }
 
-  // 2. Process Lidar packet from lidar_queue if available
-  if (_format == FORMAT_LIDAR) {
-    lidar_scan_t lidar_pkt;
-    if (lidar_queue != nullptr && xQueueReceive(lidar_queue, &lidar_pkt, 0) == pdTRUE) {
-      uint64_t start = micros();
-      size_t lidar_offset = total_len;
-
-      memcpy(tx_buffer + total_len, packet_header, sizeof(packet_header));
-      total_len += sizeof(packet_header);
-
-      tx_buffer[total_len++] = MSG_ID_LIDAR;
-      tx_buffer[total_len++] = _tx_lidar_packet_counter++;
-
-      uint32_t time_stampe_ms = (uint32_t)(lidar_pkt.timestamp * 1e-3f);
-      memcpy(tx_buffer + total_len, &time_stampe_ms, sizeof(time_stampe_ms));
-      total_len += sizeof(time_stampe_ms);
-
-      lidar_point_packed_t* packed_pts = (lidar_point_packed_t*)(tx_buffer + total_len);
-      for (int i = 0; i < MAX_LIDAR_POINTS; i++) {
-        packed_pts[i].distance = (uint16_t)(lidar_pkt.points[i].distance * 1000.0f);
-        packed_pts[i].angle = (uint16_t)(lidar_pkt.points[i].angle * ANGLE_SCALE);
-        packed_pts[i].intensity = lidar_pkt.points[i].intensity;
-      }
-      total_len += MAX_LIDAR_POINTS * sizeof(lidar_point_packed_t);
-
-      uint16_t crc = calculate_crc16(tx_buffer + lidar_offset + sizeof(packet_header) + 1, total_len - (lidar_offset + sizeof(packet_header) + 1));
-      memcpy(tx_buffer + total_len, &crc, sizeof(crc));
-      total_len += sizeof(crc);
-    }
-  }
-
-  // 3. ATOMIC SINGLE WRITE for all queued packets combined!
+  // 2. ATOMIC SINGLE WRITE for all queued packets combined!
   if (port && total_len > 0) {
     size_t pass_bytes = port->write(tx_buffer, total_len);
   }
@@ -255,3 +200,4 @@ void Telemetry::queue_string(const char *str) {
 void Telemetry::queue_string(const String &str) { 
   queue_string(str.c_str()); 
 }
+

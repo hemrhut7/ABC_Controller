@@ -11,7 +11,6 @@
 #include <sensor_msgs/msg/joint_state.h>
 #include <sensor_msgs/msg/magnetic_field.h>
 #include <sensor_msgs/msg/fluid_pressure.h>
-#include <sensor_msgs/msg/laser_scan.h>
 #include <sensor_msgs/msg/battery_state.h>
 #include <sensor_msgs/msg/temperature.h>
 #include <std_msgs/msg/int32.h>
@@ -22,7 +21,6 @@
 #include <freertos/queue.h>
 
 #define UROS_DATA_QUEUE_DEPTH 25
-#define UROS_LIDAR_QUEUE_DEPTH 20
 
 class HAL_MicroROS {
 public:
@@ -31,7 +29,6 @@ public:
 
     void init();
     void push_data(const system_state_t &packet);
-    void push_lidar_data(const lidar_scan_t &scan);
     void update();
 
     bool is_connected() const { return state == AGENT_CONNECTED; }
@@ -39,7 +36,6 @@ public:
 
 private:
     QueueHandle_t data_queue = nullptr;
-    QueueHandle_t lidar_queue = nullptr;
 
     enum States {
         WAITING_AGENT,
@@ -51,7 +47,6 @@ private:
     bool init_node_and_publishers();
     void destroy_node_and_publishers();
     void process_system_state();
-    void process_lidar_scan();
 
     // micro-ROS variables
     rcl_node_t uros_node;
@@ -64,7 +59,6 @@ private:
     rcl_publisher_t uros_mag_publisher;
     rcl_publisher_t uros_baro_publisher;
     rcl_publisher_t uros_battery_publisher;
-    rcl_publisher_t uros_scan_publisher;
     rcl_publisher_t uros_temp_publisher;
     rcl_publisher_t uros_mode_publisher;
     rcl_publisher_t uros_delay_publisher;
@@ -80,7 +74,6 @@ private:
     sensor_msgs__msg__MagneticField uros_mag_msg;
     sensor_msgs__msg__FluidPressure uros_baro_msg;
     sensor_msgs__msg__BatteryState uros_battery_msg;
-    sensor_msgs__msg__LaserScan uros_scan_msg;
     sensor_msgs__msg__Temperature uros_temp_msg;
     std_msgs__msg__Int32 uros_mode_msg;
     std_msgs__msg__Int32 uros_delay_msg;
@@ -108,7 +101,6 @@ private:
     double joint_positions[2];
     double joint_velocities[2];
     double joint_efforts[2];
-    float scan_ranges[MAX_LIDAR_POINTS];
-    float scan_intensities[MAX_LIDAR_POINTS];
     float pid_target_data[6];
 };
+

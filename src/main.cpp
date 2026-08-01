@@ -15,7 +15,6 @@
 #include <WiFi.h>
 #include "hal/hal_udp_stream.h"
 #endif
-#include "app/app_lidar.h"
 #include "hal/hal_microros.h"
 
 
@@ -25,7 +24,6 @@
 
 #define PRIORITY_CONTROL 24
 
-#define PRIORITY_LIDAR 15
 #define PRIORITY_UART1 14
 #define PRIORITY_WIFI 12
 #define PRIORITY_COMM 12
@@ -43,16 +41,6 @@ TaskHandle_t GamepadTaskHandle;
 #if HAS_WIFI_SERIAL
 TaskHandle_t WiFiTaskHandle;
 #endif
-TaskHandle_t SensorTaskHandle;
-extern AppLidar app_lidar;
-
-void Sensor_Task(void *pvParameters) {
-  for (;;) {
-    // Update Lidar (runs continuously to empty UART buffer)
-    app_lidar.update_step();
-    vTaskDelay(pdMS_TO_TICKS(1));
-  }
-}
 
 #include "esp_timer.h"
 static SemaphoreHandle_t control_timer_sem = nullptr;
@@ -81,7 +69,6 @@ void set_app_pending_mode(Mode_t mode) {
 HAL_Display system_display;
 HAL_Battery system_battery;
 Failsafe failsafe(PERIOD_CONTROL, &motor, set_app_pending_mode);
-AppLidar app_lidar(Serial2);
 HAL_MicroROS uros_telemetry;
 
 #if HAS_BLUEPAD32
@@ -236,9 +223,6 @@ void setup() {
   // Serial1 (Telemetry/Script)
   Serial1.setTxBufferSize(8192);
   Serial1.begin(2000000, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
-  // Serial2 (Sensor RX only)
-  Serial2.setRxBufferSize(4096);
-  Serial2.begin(230400, SERIAL_8N1, UART2_RX_PIN, UART2_TX_PIN);
 
   config_store.begin();
   if (!ahrs.init()) {
@@ -246,7 +230,6 @@ void setup() {
   }
   i2c_sensor.init();
   motor.init();
-  app_lidar.init();
   Telemetry::getInstance().set_port(Serial, PORT_USB);
   Telemetry::getInstance().init(MAIN_LOOP_RATE_HZ);
 #if HAS_WIFI_SERIAL
@@ -311,9 +294,6 @@ void setup() {
   xTaskCreatePinnedToCore(WiFi_Task, "WiFi_Task", 8192, NULL, PRIORITY_WIFI,
                           &WiFiTaskHandle, 0);
 #endif
-
-  xTaskCreatePinnedToCore(Sensor_Task, "SensorTask", 16384, NULL, 
-                          PRIORITY_LIDAR, &SensorTaskHandle, 0);
 }
 
 void loop() { vTaskDelete(NULL); }

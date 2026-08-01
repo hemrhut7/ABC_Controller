@@ -93,18 +93,6 @@ typedef struct {
 
 
 typedef struct {
-    float distance;
-    float angle;
-    uint8_t intensity;
-} lidar_point_t;
-
-#define MAX_LIDAR_POINTS 32
-typedef struct {
-    uint64_t timestamp;
-    lidar_point_t points[MAX_LIDAR_POINTS];
-} lidar_scan_t;
-
-typedef struct {
     ABC_state_t abc_state;
     UserCommand_t cmd;
     uint32_t delay_count;
