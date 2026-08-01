@@ -166,7 +166,7 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
                 is_static_pid_active = true;
                 float new_kp = baseline_velocity_pid.p * 0.1f;
                 float new_ki = baseline_velocity_pid.i;
-                float new_kd = baseline_velocity_pid.d;
+                float new_kd = baseline_velocity_pid.d * 0.5f;
                 _pid_velocity.setTunings(new_kp, new_ki, new_kd);
             }
         }
