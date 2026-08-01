@@ -73,7 +73,7 @@ void AppScript::parse_packet(const String &packet, Stream &response_stream, Tele
     int mode;
     if (sscanf(cmd_line.c_str(), "MODE %d", &mode) == 1) {
       // 安全檢查: Mode 範圍 (0-6)
-      if (mode >= MODE_STOP && mode <= MODE_REMOTE) {
+      if (mode >= MODE_STOP && mode <= MODE_AUTO) {
         if (_app_mode->enqueue_mode((Mode_t)mode)) {
           snprintf(tx_buffer, sizeof(tx_buffer), "[OK] Mode Queued: %d\n", mode);
         } else {
@@ -83,7 +83,7 @@ void AppScript::parse_packet(const String &packet, Stream &response_stream, Tele
         response_stream.print(tx_buffer);
       } else {
         snprintf(tx_buffer, sizeof(tx_buffer), "[ERR] Invalid Mode (0-%d)\n",
-                 MODE_REMOTE);
+                 MODE_AUTO);
         response_stream.print(tx_buffer);
       }
     } else {

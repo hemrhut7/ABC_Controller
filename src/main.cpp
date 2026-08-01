@@ -29,12 +29,12 @@
 #define PRIORITY_UART1 14
 #define PRIORITY_WIFI 12
 #define PRIORITY_COMM 12
-#define PRIORITY_GAMEPAD 8
+#define PRIORITY_GAMEPAD 13
 
 #define MAIN_LOOP_RATE_HZ  200.0f
-#define PERIOD_CONTROLL    1000.0f/MAIN_LOOP_RATE_HZ
+#define PERIOD_CONTROL    1000.0f/MAIN_LOOP_RATE_HZ
 #define PERIOD_COMM        2  // 500Hz
-#define PERIOD_GAMEPAD     20 // 50Hz
+#define PERIOD_GAMEPAD     40 // 25Hz
 
 TaskHandle_t ControlTaskHandle;
 TaskHandle_t UART1TaskHandle;
@@ -67,10 +67,10 @@ static void IRAM_ATTR control_timer_callback(void* arg) {
 }
 
 ConfigStore config_store;
-Processing_Motor motor(PERIOD_CONTROLL);
-Processing_AHRS ahrs(PERIOD_CONTROLL);
+Processing_Motor motor(PERIOD_CONTROL);
+Processing_AHRS ahrs(PERIOD_CONTROL);
 Processing_I2CSensor i2c_sensor(MAIN_LOOP_RATE_HZ);
-AppMode app_mode(&motor, &config_store, PERIOD_CONTROLL);
+AppMode app_mode(&motor, &config_store, PERIOD_CONTROL);
 
 AppScript app_script(&app_mode);
 
@@ -80,7 +80,7 @@ void set_app_pending_mode(Mode_t mode) {
 
 HAL_Display system_display;
 HAL_Battery system_battery;
-Failsafe failsafe(PERIOD_CONTROLL, &motor, set_app_pending_mode);
+Failsafe failsafe(PERIOD_CONTROL, &motor, set_app_pending_mode);
 AppLidar app_lidar(Serial2);
 HAL_MicroROS uros_telemetry;
 
@@ -108,7 +108,7 @@ void Control_Task(void *pvParameters) {
     system_state_t current_sys_state;
 
     if (dt <= 0.0f || dt > 0.1f)
-      dt = PERIOD_CONTROLL * 0.001f;
+      dt = PERIOD_CONTROL * 0.001f;
 
     // 分頻無鎖讀取磁力計與氣壓計
     i2c_sensor.update();
@@ -303,7 +303,7 @@ void setup() {
                           &CommTaskHandle, 0);
 
 #if HAS_BLUEPAD32
-  xTaskCreatePinnedToCore(HAL_Joystick::task_entry, "Gamepad_Task", 1024,
+  xTaskCreatePinnedToCore(HAL_Joystick::task_entry, "Gamepad_Task", 4096,
                           &joystick,
                           PRIORITY_GAMEPAD, &GamepadTaskHandle, 0);
 #endif

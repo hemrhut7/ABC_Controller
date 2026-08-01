@@ -459,15 +459,15 @@ void AppMode::update_mode_selection() {
         wheel_accumulator -= steps * cnt_per_step;  // 保留餘量
 
         // 確保起始 pending_mode 在合法循環範圍內
-        if (pending_mode < MODE_ANGLE || pending_mode > MODE_REMOTE) {
+        if (pending_mode < MODE_ANGLE || pending_mode > MODE_AUTO) {
             pending_mode = MODE_ANGLE;
         }
 
         int next_mode = (int)pending_mode + steps;
 
-        // 循環限制: MODE_ANGLE(4) ~ MODE_REMOTE(6)
-        if (next_mode > MODE_REMOTE) next_mode = MODE_ANGLE;
-        if (next_mode < MODE_ANGLE) next_mode = MODE_REMOTE;
+        // 循環限制: MODE_ANGLE(4) ~ MODE_AUTO(7)
+        if (next_mode > MODE_AUTO) next_mode = MODE_ANGLE;
+        if (next_mode < MODE_ANGLE) next_mode = MODE_AUTO;
 
         pending_mode = (Mode_t)next_mode;
     }

@@ -114,6 +114,8 @@ void HAL_Joystick::update_gamepad() {
     app_mode_->enqueue_mode(MODE_REMOTE);
   } else if (pressed_buttons & BUTTON_A) {
     app_mode_->enqueue_mode(MODE_ANGLE);
+  } else if (pressed_buttons & BUTTON_Y) {
+    app_mode_->enqueue_mode(MODE_AUTO);
   }
 
   float val = -apply_deadzone(normalize_axis(gamepad_->axisY()), deadzone_);
@@ -125,6 +127,12 @@ void HAL_Joystick::update_gamepad() {
   bool period_reached = (now - last_push_tick_) >= kMinPushInterval;
 
   if (changed || period_reached) {
+    // In MODE_AUTO, reject joystick target commands (micro-ROS has control)
+    if (app_mode_->get_mode() == MODE_AUTO) {
+      xSemaphoreGive(mutex_);
+      return;
+    }
+
     float scaled_val = val;
     float scaled_steer = steer;
     switch (app_mode_->get_mode())

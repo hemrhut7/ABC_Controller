@@ -7,8 +7,10 @@ extern AppLidar app_lidar;
 
 static void cmd_vel_callback(const void *msgin) {
   const geometry_msgs__msg__Twist *msg = (const geometry_msgs__msg__Twist *)msgin;
-  // Safely enqueue target velocity and steer to app_mode
-  app_mode.enqueue_target(msg->linear.x, msg->angular.z);
+  // Only accept velocity commands in MODE_AUTO (autonomous control via micro-ROS)
+  if (app_mode.get_mode() == MODE_AUTO) {
+    app_mode.enqueue_target(msg->linear.x, msg->angular.z);
+  }
 }
 
 static void cmd_mode_callback(const void *msgin) {

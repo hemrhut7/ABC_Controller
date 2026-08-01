@@ -10,7 +10,8 @@ typedef enum {
     MODE_MOTOR,         // 3. 直接控制馬達轉速 (Open/Close Loop)
     MODE_ANGLE,         // 4. 控制傾角 (最常用的調試模式)
     MODE_VELOCITY,      // 5. 控制前進速度 (加上速度環)
-    MODE_REMOTE,        // 6. 綜合遙控 (速度 + 轉向)
+    MODE_REMOTE,        // 6. 綜合遙控 (速度 + 轉向, 藍芽搖桿)
+    MODE_AUTO,          // 7. 自主控制 (速度 + 轉向, micro-ROS)
 } Mode_t;
 
 typedef enum {
