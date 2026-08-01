@@ -433,18 +433,23 @@ void HAL_MicroROS::process_system_state() {
 
             fill_ros_stamp(uros_imu_msg.header.stamp, state_data.abc_state.ahrs_data.imu_data.timestamp, current_time_us);
 
+            // Map internal body axes to ROS 2 FLU (Forward-Left-Up) frame:
+            // ROS X (Forward) = internal index 1
+            // ROS Y (Left) = - internal index 0
+            // ROS Z (Up) = internal index 2
+
             // Gyroscope is in rad/s in calibrated imu_data
-            uros_imu_msg.angular_velocity.x = state_data.abc_state.ahrs_data.imu_data.gyro[0];
-            uros_imu_msg.angular_velocity.y = state_data.abc_state.ahrs_data.imu_data.gyro[1];
+            uros_imu_msg.angular_velocity.x = state_data.abc_state.ahrs_data.imu_data.gyro[1];
+            uros_imu_msg.angular_velocity.y = -state_data.abc_state.ahrs_data.imu_data.gyro[0];
             uros_imu_msg.angular_velocity.z = state_data.abc_state.ahrs_data.imu_data.gyro[2];
 
             // Accelerometer is in m/s^2 in calibrated imu_data
-            uros_imu_msg.linear_acceleration.x = state_data.abc_state.ahrs_data.imu_data.accl[0];
-            uros_imu_msg.linear_acceleration.y = state_data.abc_state.ahrs_data.imu_data.accl[1];
+            uros_imu_msg.linear_acceleration.x = state_data.abc_state.ahrs_data.imu_data.accl[1];
+            uros_imu_msg.linear_acceleration.y = -state_data.abc_state.ahrs_data.imu_data.accl[0];
             uros_imu_msg.linear_acceleration.z = state_data.abc_state.ahrs_data.imu_data.accl[2];
 
-            // Populate orientation quaternion from Euler angles
-            euler_to_quaternion(state_data.abc_state.ahrs_data.euler[0], state_data.abc_state.ahrs_data.euler[1], state_data.abc_state.ahrs_data.euler[2], uros_imu_msg.orientation);
+            // Populate orientation quaternion from Euler angles (Roll=euler[1], Pitch=euler[0], Yaw=euler[2])
+            euler_to_quaternion(state_data.abc_state.ahrs_data.euler[1], state_data.abc_state.ahrs_data.euler[0], state_data.abc_state.ahrs_data.euler[2], uros_imu_msg.orientation);
 
             FORCE_UNUSED(rcl_publish(&uros_imu_publisher, &uros_imu_msg, NULL));
 
@@ -487,10 +492,11 @@ void HAL_MicroROS::process_system_state() {
 
             fill_ros_stamp(uros_mag_msg.header.stamp, state_data.mag_data.timestamp, current_time_us);
 
-            // Populate Magnetometer Message (convert uT to Tesla)
-            uros_mag_msg.magnetic_field.x = state_data.mag_data.mag[0] * 1e-6;
-            uros_mag_msg.magnetic_field.y = state_data.mag_data.mag[1] * 1e-6;
-            uros_mag_msg.magnetic_field.z = state_data.mag_data.mag[2] * 1e-6;
+            // Populate Magnetometer Message (convert uT to Tesla and map AK09916 to ROS 2 FLU IMU frame)
+            // ROS X (Forward) = +Y_mag, ROS Y (Left) = +X_mag, ROS Z (Up) = -Z_mag
+            uros_mag_msg.magnetic_field.x = state_data.mag_data.mag[1] * 1e-6;
+            uros_mag_msg.magnetic_field.y = state_data.mag_data.mag[0] * 1e-6;
+            uros_mag_msg.magnetic_field.z = -state_data.mag_data.mag[2] * 1e-6;
             memset(uros_mag_msg.magnetic_field_covariance, 0, sizeof(uros_mag_msg.magnetic_field_covariance));
 
             FORCE_UNUSED(rcl_publish(&uros_mag_publisher, &uros_mag_msg, NULL));
@@ -585,6 +591,9 @@ void HAL_MicroROS::process_lidar_scan() {
         fill_ros_stamp(uros_scan_msg.header.stamp, lidar_pkt.timestamp, micros());
 
         float start_angle_rad = lidar_pkt.points[0].angle * (M_PI / 180.0f);
+        if (start_angle_rad > M_PI) {
+            start_angle_rad -= 2.0f * M_PI;
+        }
         float end_angle_rad = lidar_pkt.points[MAX_LIDAR_POINTS - 1].angle * (M_PI / 180.0f);
         float angle_diff_rad = end_angle_rad - start_angle_rad;
         if (angle_diff_rad < 0.0f) {
