@@ -1,7 +1,10 @@
 #include "app_script.h"
+#include "hal/hal_microros.h"
 #if HAS_WIFI_SERIAL
 #include "hal/hal_udp_stream.h"
 #endif
+
+extern HAL_MicroROS uros_telemetry;
 
 AppScript::AppScript(AppMode *app_mode) : _app_mode(app_mode) {}
 
@@ -129,35 +132,39 @@ void AppScript::parse_packet(const String &packet, Stream &response_stream, Tele
   }
   // 5. 遙測控制指令: "TELE <enabled> <port_id> <format> <freq_hz>"
   else if (cmd_line.startsWith("TELE")) {
-    int enabled, port_id, format, freq_hz;
-    if (sscanf(cmd_line.c_str(), "TELE %d %d %d %d", &enabled, &port_id, &format,
-               &freq_hz) == 4) {
-      Stream *new_stream = nullptr;
-      if (port_id == PORT_USB) {
-        new_stream = &Serial;
-      } else if (port_id == PORT_UART1) {
-        new_stream = &Serial1;
-      } else if (port_id == PORT_WIFI) {
-#if HAS_WIFI_SERIAL
-        extern UDPStream udp_stream;
-        new_stream = &udp_stream;
-#endif
-      }
-
-      if (new_stream != nullptr) {
-        telemetry->set_port(*new_stream, (TelemetryPort_t)port_id);
-        telemetry->set_config(enabled != 0, (uint8_t)format, (uint16_t)freq_hz);
-        snprintf(tx_buffer, sizeof(tx_buffer),
-                 "[OK] Telemetry switched to port %d: En=%d, Fmt=%d, Freq=%dHz\n", port_id, enabled, format,
-                 freq_hz);
-        response_stream.print(tx_buffer);
-      } else {
-        snprintf(tx_buffer, sizeof(tx_buffer),
-                 "[ERR] Port %d not available or unsupported\n", port_id);
-        response_stream.print(tx_buffer);
-      }
+    if (uros_telemetry.is_connected()) {
+      response_stream.print("[ERR] Cannot modify Telemetry config while micro-ROS is active\n");
     } else {
-      response_stream.print("[ERR] Invalid TELE format. Usage: TELE <enabled> <port_id> <format> <freq_hz>\n");
+      int enabled, port_id, format, freq_hz;
+      if (sscanf(cmd_line.c_str(), "TELE %d %d %d %d", &enabled, &port_id, &format,
+                 &freq_hz) == 4) {
+        Stream *new_stream = nullptr;
+        if (port_id == PORT_USB) {
+          new_stream = &Serial;
+        } else if (port_id == PORT_UART1) {
+          new_stream = &Serial1;
+        } else if (port_id == PORT_WIFI) {
+#if HAS_WIFI_SERIAL
+          extern UDPStream udp_stream;
+          new_stream = &udp_stream;
+#endif
+        }
+
+        if (new_stream != nullptr) {
+          telemetry->set_port(*new_stream, (TelemetryPort_t)port_id);
+          telemetry->set_config(enabled != 0, (uint8_t)format, (uint16_t)freq_hz);
+          snprintf(tx_buffer, sizeof(tx_buffer),
+                   "[OK] Telemetry switched to port %d: En=%d, Fmt=%d, Freq=%dHz\n", port_id, enabled, format,
+                   freq_hz);
+          response_stream.print(tx_buffer);
+        } else {
+          snprintf(tx_buffer, sizeof(tx_buffer),
+                   "[ERR] Port %d not available or unsupported\n", port_id);
+          response_stream.print(tx_buffer);
+        }
+      } else {
+        response_stream.print("[ERR] Invalid TELE format. Usage: TELE <enabled> <port_id> <format> <freq_hz>\n");
+      }
     }
   }
   // 6. LPF 設定指令: "LPF <id> <freq>"

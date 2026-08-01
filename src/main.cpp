@@ -142,7 +142,9 @@ void Control_Task(void *pvParameters) {
     // Copy cached sensor data into current telemetry packet
     i2c_sensor.get_sensor_data(&current_sys_state.mag_data, &current_sys_state.baro_data);
 
-    Telemetry::getInstance().push_data(current_sys_state);
+    if (Telemetry::getInstance().is_transmitting()) {
+      Telemetry::getInstance().push_data(current_sys_state);
+    }
     uros_telemetry.push_data(current_sys_state);
   }
 }
@@ -154,12 +156,9 @@ void UART1_Task(void *pvParameters) {
 
   uros_telemetry.init();
 
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xFrequency = pdMS_TO_TICKS(PERIOD_COMM);
-
   for (;;) {
     uros_telemetry.update();
-    vTaskDelay(1);
+    vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
 
@@ -188,7 +187,7 @@ void Comm_Task(void *pvParameters) {
       } else {
           strncpy(wifi_s.ip, WiFi.localIP().toString().c_str(), 16);
       }
-      wifi_s.data_active = Telemetry::getInstance().connected() && (Telemetry::getInstance().get_port_id() == PORT_WIFI);
+      wifi_s.data_active = Telemetry::getInstance().is_transmitting() && (Telemetry::getInstance().get_port_id() == PORT_WIFI);
 #else
       wifi_s.connected = false;
       wifi_s.data_active = false;

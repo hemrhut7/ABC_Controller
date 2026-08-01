@@ -59,6 +59,7 @@ public:
   void queue_string(const String &str);
 
   bool connected() const {return _enabled;};
+  bool is_transmitting() const;
   TelemetryPort_t get_port_id() const { return port_id; };
 
 private:

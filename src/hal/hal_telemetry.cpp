@@ -1,7 +1,10 @@
 #include "hal_telemetry.h"
 #include "hal_motor.h"
+#include "hal_microros.h"
 #include <cstring>
 #include <math.h>
+
+extern HAL_MicroROS uros_telemetry;
 
 // Telemetry packet protocol constants
 static const uint8_t packet_header[2] = {0xAA, 0x55};
@@ -106,8 +109,26 @@ void Telemetry::set_config(bool enabled, uint8_t format, uint16_t freq_hz) {
   // Memory allocation/deallocation is handled in init() and destructor to avoid race conditions
 }
 
+bool Telemetry::is_transmitting() const {
+  return _enabled && !uros_telemetry.is_connected();
+}
+
 void Telemetry::process_serial_outgoing() {
   if (!_enabled) return;
+
+  // Global Mutual exclusion: Pause ALL Telemetry transmission whenever micro-ROS is connected
+  if (uros_telemetry.is_connected()) {
+    // Clear/drain queues to prevent stale accumulation while paused
+    if (data_queue != nullptr) {
+      system_state_t dummy;
+      while (xQueueReceive(data_queue, &dummy, 0) == pdTRUE) {}
+    }
+    if (lidar_queue != nullptr) {
+      lidar_scan_t dummy;
+      while (xQueueReceive(lidar_queue, &dummy, 0) == pdTRUE) {}
+    }
+    return;
+  }
 
   uint8_t tx_buffer[512];
   size_t total_len = 0;

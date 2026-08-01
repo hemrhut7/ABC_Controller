@@ -18,8 +18,11 @@ void AppLidar::update_step() {
         _scan_count++;
         _last_data_ms = millis();
 
-        // New scan completed - push directly to queues
-        Telemetry::getInstance().push_lidar_data(_current_scan);
-        uros_telemetry.push_lidar_data(_current_scan);
+        // push data to the queue of transmission
+        if (uros_telemetry.is_connected()) {
+            uros_telemetry.push_lidar_data(_current_scan);
+        } else if (Telemetry::getInstance().is_transmitting()) {
+            Telemetry::getInstance().push_lidar_data(_current_scan);
+        }
     }
 }

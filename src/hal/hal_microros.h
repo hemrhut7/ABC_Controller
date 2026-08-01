@@ -34,6 +34,9 @@ public:
     void push_lidar_data(const lidar_scan_t &scan);
     void update();
 
+    bool is_connected() const { return state == AGENT_CONNECTED; }
+    bool is_transmitting() const { return state == AGENT_CONNECTED; }
+
 private:
     QueueHandle_t data_queue = nullptr;
     QueueHandle_t lidar_queue = nullptr;

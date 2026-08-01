@@ -1,4 +1,5 @@
 #include "hal_microros.h"
+#include "hal_telemetry.h"
 #include "app/app_lidar.h"
 #include "app/app_mode.h"
 
@@ -675,6 +676,16 @@ void HAL_MicroROS::update() {
         destroy_node_and_publishers();
         state = WAITING_AGENT;
         last_pub_time = 0;
+
+        // Clear/drain queues on disconnect to prevent stale data bursts on reconnect
+        if (data_queue != nullptr) {
+          system_state_t dummy;
+          while (xQueueReceive(data_queue, &dummy, 0) == pdTRUE) {}
+        }
+        if (lidar_queue != nullptr) {
+          lidar_scan_t dummy;
+          while (xQueueReceive(lidar_queue, &dummy, 0) == pdTRUE) {}
+        }
 
         // Reset tracking variables on disconnect
         last_imu_timestamp = 0;
