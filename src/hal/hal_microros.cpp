@@ -404,8 +404,8 @@ void HAL_MicroROS::process_system_state() {
             uros_imu_msg.linear_acceleration.y = -state_data.abc_state.ahrs_data.imu_data.accl[0];
             uros_imu_msg.linear_acceleration.z = state_data.abc_state.ahrs_data.imu_data.accl[2];
 
-            // Populate orientation quaternion from Euler angles (Roll=euler[1], Pitch=euler[0], Yaw=euler[2])
-            euler_to_quaternion(state_data.abc_state.ahrs_data.euler[1], state_data.abc_state.ahrs_data.euler[0], state_data.abc_state.ahrs_data.euler[2], uros_imu_msg.orientation);
+            // Populate orientation quaternion from Euler angles mapped to ROS 2 FLU frame:
+            euler_to_quaternion(state_data.abc_state.ahrs_data.euler[1], -state_data.abc_state.ahrs_data.euler[0], state_data.abc_state.ahrs_data.euler[2], uros_imu_msg.orientation);
 
             FORCE_UNUSED(rcl_publish(&uros_imu_publisher, &uros_imu_msg, NULL));
 
