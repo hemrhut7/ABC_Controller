@@ -569,7 +569,7 @@ void HAL_MicroROS::update() {
       case AGENT_CONNECTED: {
         // Check if agent is still alive (every 5 seconds)
         uint32_t now_ms = millis();
-        if (now_ms - last_ping_check > 5000) {
+        if (now_ms - last_ping_check > 1000) {
           last_ping_check = now_ms;
           if (rmw_uros_ping_agent(10, 1) != RMW_RET_OK) {
             state = AGENT_DISCONNECTED;
