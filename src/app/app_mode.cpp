@@ -23,6 +23,14 @@ void AppMode::init() {
     // 初始化基準 PID 參數紀錄
     baseline_velocity_pid = _config_store->data.velocity;
     baseline_pitch_pid = _config_store->data.pitch;
+
+    // 初始化 LPF 截止頻率 (從 Flash / Memory 載入)
+    for (int i = 0; i < LPF_ID_COUNT; i++) {
+        set_cut_off_freq((LPF_id_t)i, _config_store->data.lpf_freq[i]);
+    }
+
+    // 初始化靜止 PID 倍率 (從 Flash / Memory 載入)
+    static_pid_scale = _config_store->data.static_velocity_scale;
     
     // Level 4: Velocity Loop (外環) - 輸入 m/s, 輸出 Target Pitch (rad)
     _pid_velocity.setTunings(_config_store->data.velocity.p, _config_store->data.velocity.i, _config_store->data.velocity.d);
@@ -148,7 +156,7 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
 
     // 1. 獲取狀態 (State Estimation)
     current_velocity = current_rpm * RPM_TO_MS; // 需定義轉換係數
-    current_velocity = lpf_current_velocity.update(current_velocity); // 10Hz 低通濾波
+    current_velocity = lpf_current_velocity.update(current_velocity); // 1Hz 低通濾波
 
     // --- 動態 PID 參數調整 ---
 
@@ -164,9 +172,9 @@ void AppMode::update(float dt, const ahrs_data_t &ahrs_state) {
         if (static_timer_ms >= 2000) { // 2 seconds timeout
             if (!is_static_pid_active) {
                 is_static_pid_active = true;
-                float new_kp = baseline_velocity_pid.p * 0.1f;
-                float new_ki = baseline_velocity_pid.i;
-                float new_kd = baseline_velocity_pid.d * 0.5f;
+                float new_kp = baseline_velocity_pid.p * static_pid_scale.p;
+                float new_ki = baseline_velocity_pid.i * static_pid_scale.i;
+                float new_kd = baseline_velocity_pid.d * static_pid_scale.d;
                 _pid_velocity.setTunings(new_kp, new_ki, new_kd);
             }
         }
@@ -304,6 +312,7 @@ void AppMode::set_pid_gains(PID_id_t pid_id, float kp, float ki, float kd) {
             break;
         case PID_VELOCITY: 
             is_static_pid_active = false; // 重置以防狀態不一致
+            static_timer_ms = 0;          // 重置靜止計時器
             baseline_velocity_pid = {kp, ki, kd}; // 記錄調試中的基準參數
             _pid_velocity.setTunings(kp, ki, kd); 
             _config_store->data.velocity = {kp, ki, kd};
@@ -343,6 +352,12 @@ const SystemConfig& AppMode::get_pid_config() const {
 }
 
 void AppMode::set_cut_off_freq(LPF_id_t lpf_id, float cut_off_freq) {
+#if defined(ESP_PLATFORM)
+    portENTER_CRITICAL(&app_mode_mux);
+#endif
+    if (lpf_id >= 0 && lpf_id < LPF_ID_COUNT) {
+        _config_store->data.lpf_freq[lpf_id] = cut_off_freq;
+    }
     switch (lpf_id) {
         case LPF_VELOCITY:
             cut_off_freq_velocity = cut_off_freq;
@@ -363,6 +378,9 @@ void AppMode::set_cut_off_freq(LPF_id_t lpf_id, float cut_off_freq) {
         default:
             break;
     }
+#if defined(ESP_PLATFORM)
+    portEXIT_CRITICAL(&app_mode_mux);
+#endif
 }
 
 float AppMode::get_lpf_freq(LPF_id_t lpf_id) {
@@ -373,6 +391,24 @@ float AppMode::get_lpf_freq(LPF_id_t lpf_id) {
         case LPF_CURRENT_VELOCITY: return cut_off_freq_current_velocity;
         default: return 0.0f;
     }
+}
+
+void AppMode::set_static_pid_scale(float kp_scale, float ki_scale, float kd_scale) {
+#if defined(ESP_PLATFORM)
+    portENTER_CRITICAL(&app_mode_mux);
+#endif
+    static_pid_scale = {kp_scale, ki_scale, kd_scale};
+    _config_store->data.static_velocity_scale = static_pid_scale;
+
+    if (is_static_pid_active) {
+        float new_kp = baseline_velocity_pid.p * static_pid_scale.p;
+        float new_ki = baseline_velocity_pid.i * static_pid_scale.i;
+        float new_kd = baseline_velocity_pid.d * static_pid_scale.d;
+        _pid_velocity.setTunings(new_kp, new_ki, new_kd);
+    }
+#if defined(ESP_PLATFORM)
+    portEXIT_CRITICAL(&app_mode_mux);
+#endif
 }
 
 void AppMode::set_ramp(PARAM_RAMP_id_t id, float ramp) {

@@ -40,6 +40,9 @@ public:
     void set_ramp(PARAM_RAMP_id_t id, float ramp);
     float get_ramp(PARAM_RAMP_id_t id) const;
 
+    void set_static_pid_scale(float kp_scale, float ki_scale, float kd_scale);
+    PID_Params get_static_pid_scale() const { return static_pid_scale; }
+
 private:
     enum AppCommandType : uint8_t {
         APP_CMD_SET_MODE = 0,
@@ -112,6 +115,9 @@ private:
     // 基準 PID 參數紀錄（用於即時 Tuning，避免因 Flash 未寫入而被覆蓋）
     PID_Params baseline_velocity_pid = {0};
     PID_Params baseline_pitch_pid = {0};
+
+    // 靜止狀態 Velocity PID 倍率
+    PID_Params static_pid_scale = {0.1f, 1.0f, 0.5f};
 
     uint8_t loop_counter = 0;
 };
