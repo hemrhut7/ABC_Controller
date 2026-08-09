@@ -32,16 +32,19 @@ void AppScript::parse_packet(const String &packet, Stream &response_stream, Tele
 
   char tx_buffer[256]; // Buffer for formatting response strings
 
+  // 0. 統一儲存指令: "SAVE PARM" (相容 "SAVE", "PID SAVE", "CONFIG SAVE", "LPF SAVE", "STATIC SAVE")
+  if (cmd_line == "SAVE PARM" || cmd_line == "SAVE" || cmd_line == "PID SAVE" || cmd_line == "CONFIG SAVE" ||
+      cmd_line == "LPF SAVE" || cmd_line == "STATIC SAVE" || cmd_line == "STATIC_PID SAVE") {
+    _app_mode->save_pid_gains();
+    snprintf(tx_buffer, sizeof(tx_buffer),
+             "[OK] Config Saved to EEPROM\n");
+    response_stream.print(tx_buffer);
+    return;
+  }
+
   // 1. PID Tuning 指令: "PID <id> <kp> <ki> <kd>"
   // ID Mapping: 0=MOTOR, 1=RATE, 2=ANGLE, 3=VELOCITY, 4=STEER
   if (cmd_line.startsWith("PID")) {
-    if (cmd_line == "PID SAVE" || cmd_line == "CONFIG SAVE" || cmd_line == "SAVE") {
-      _app_mode->save_pid_gains();
-      snprintf(tx_buffer, sizeof(tx_buffer),
-               "[OK] Config Saved to EEPROM\n");
-      response_stream.print(tx_buffer);
-      return;
-    }
 
     int id;
     float kp, ki, kd;
@@ -169,13 +172,6 @@ void AppScript::parse_packet(const String &packet, Stream &response_stream, Tele
   }
   // 6. LPF 設定指令: "LPF <id> <freq>"
   else if (cmd_line.startsWith("LPF")) {
-    if (cmd_line == "LPF SAVE") {
-      _app_mode->save_pid_gains();
-      snprintf(tx_buffer, sizeof(tx_buffer),
-               "[OK] LPF Config Saved to EEPROM\n");
-      response_stream.print(tx_buffer);
-      return;
-    }
 
     int id;
     float freq;
@@ -283,13 +279,6 @@ void AppScript::parse_packet(const String &packet, Stream &response_stream, Tele
 
   // 10. 靜止狀態 PID 倍率指令: "STATIC <kp_scale> <ki_scale> <kd_scale>"
   else if (cmd_line.startsWith("STATIC")) {
-    if (cmd_line == "STATIC SAVE" || cmd_line == "STATIC_PID SAVE") {
-      _app_mode->save_pid_gains();
-      snprintf(tx_buffer, sizeof(tx_buffer),
-               "[OK] Static PID Scale Saved to EEPROM\n");
-      response_stream.print(tx_buffer);
-      return;
-    }
 
     float kp_s, ki_s, kd_s;
     if (sscanf(cmd_line.c_str(), "STATIC %f %f %f", &kp_s, &ki_s, &kd_s) == 3 ||

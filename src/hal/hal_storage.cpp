@@ -20,7 +20,7 @@ void ConfigStore::reset_defaults() {
     // 設定預設 PID 參數 (從 config.h 讀取)
     data.motor = {PARM_PID_KP_MOTOR, PARM_PID_KI_MOTOR, PARM_PID_KD_MOTOR};
     data.pitch = {PARM_PID_KP_ANGLE, PARM_PID_KI_ANGLE, PARM_PID_KD_ANGLE};
-    data.rate  = {1.5f, 8.0f, 0.04f}; // Note: config.h didn't have RATE defaults visible, but others are critical
+    data.rate  = {PARM_PID_KP_RATE, PARM_PID_KI_RATE, PARM_PID_KD_RATE};
     data.steer   = {PARM_PID_KP_STEER, PARM_PID_KI_STEER, PARM_PID_KD_STEER};
     data.velocity = {PARM_PID_KP_VELOCITY, PARM_PID_KI_VELOCITY, PARM_PID_KD_VELOCITY};
 
@@ -29,7 +29,7 @@ void ConfigStore::reset_defaults() {
     data.lpf_freq[2] = PARM_LPF_CUTOFF_FREQ_GYRO_Z;
     data.lpf_freq[3] = PARM_LPF_CUTOFF_FREQ_CURRENT_VELOCITY;
 
-    data.static_velocity_scale = {0.1f, 1.0f, 0.5f};
+    data.static_velocity_scale = {1.0f, 1.0f, 1.0f};
 
     save_config(); // 寫入預設值
 }
