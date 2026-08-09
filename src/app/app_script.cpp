@@ -32,16 +32,19 @@ void AppScript::parse_packet(const String &packet, Stream &response_stream, Tele
 
   char tx_buffer[256]; // Buffer for formatting response strings
 
+  // 0. 統一儲存指令: "SAVE PARM" (相容 "SAVE", "PID SAVE", "CONFIG SAVE", "LPF SAVE", "STATIC SAVE")
+  if (cmd_line == "SAVE PARM" || cmd_line == "SAVE" || cmd_line == "PID SAVE" || cmd_line == "CONFIG SAVE" ||
+      cmd_line == "LPF SAVE" || cmd_line == "STATIC SAVE" || cmd_line == "STATIC_PID SAVE") {
+    _app_mode->save_pid_gains();
+    snprintf(tx_buffer, sizeof(tx_buffer),
+             "[OK] Config Saved to EEPROM\n");
+    response_stream.print(tx_buffer);
+    return;
+  }
+
   // 1. PID Tuning 指令: "PID <id> <kp> <ki> <kd>"
   // ID Mapping: 0=MOTOR, 1=RATE, 2=ANGLE, 3=VELOCITY, 4=STEER
   if (cmd_line.startsWith("PID")) {
-    if (cmd_line == "PID SAVE") {
-      _app_mode->save_pid_gains();
-      snprintf(tx_buffer, sizeof(tx_buffer),
-               "[OK] PID Config Saved to EEPROM\n");
-      response_stream.print(tx_buffer);
-      return;
-    }
 
     int id;
     float kp, ki, kd;
@@ -169,6 +172,7 @@ void AppScript::parse_packet(const String &packet, Stream &response_stream, Tele
   }
   // 6. LPF 設定指令: "LPF <id> <freq>"
   else if (cmd_line.startsWith("LPF")) {
+
     int id;
     float freq;
     if (sscanf(cmd_line.c_str(), "LPF %d %f", &id, &freq) == 2) {
@@ -260,7 +264,7 @@ void AppScript::parse_packet(const String &packet, Stream &response_stream, Tele
     } else {
       const char *ramp_names[] = {"PITCH", "VELOCITY"};
       for (int i = 0; i < PARAM_RAMP_ID_COUNT; i++) {
-        float val = _app_mode->get_ramp((PARAM_RAMP_id_t)id);
+        float val = _app_mode->get_ramp((PARAM_RAMP_id_t)i);
         const char *unit = "";
         if (i == PARAM_RAMP_PITCH) {
           val *= RAD_TO_DEG;
@@ -271,5 +275,36 @@ void AppScript::parse_packet(const String &packet, Stream &response_stream, Tele
         response_stream.print(tx_buffer);
       }
     }
+  }
+
+  // 10. 靜止狀態 PID 倍率指令: "STATIC <kp_scale> <ki_scale> <kd_scale>"
+  else if (cmd_line.startsWith("STATIC")) {
+
+    float kp_s, ki_s, kd_s;
+    if (sscanf(cmd_line.c_str(), "STATIC %f %f %f", &kp_s, &ki_s, &kd_s) == 3 ||
+        sscanf(cmd_line.c_str(), "STATIC_PID %f %f %f", &kp_s, &ki_s, &kd_s) == 3) {
+      if (isnan(kp_s) || isinf(kp_s) || kp_s < 0.0f ||
+          isnan(ki_s) || isinf(ki_s) || ki_s < 0.0f ||
+          isnan(kd_s) || isinf(kd_s) || kd_s < 0.0f) {
+        snprintf(tx_buffer, sizeof(tx_buffer),
+                 "[ERR] Rejected Static Scale: Values must be finite and non-negative\n");
+        response_stream.print(tx_buffer);
+        return;
+      }
+      _app_mode->set_static_pid_scale(kp_s, ki_s, kd_s);
+      snprintf(tx_buffer, sizeof(tx_buffer),
+               "[OK] Static Scale Updated: P=%.3f I=%.3f D=%.3f\n", kp_s, ki_s, kd_s);
+      response_stream.print(tx_buffer);
+    } else {
+      response_stream.print(
+          "[ERR] Invalid STATIC format. Usage: STATIC <kp_scale> <ki_scale> <kd_scale>\n");
+    }
+  }
+  // 11. 讀取靜止狀態 PID 倍率指令: "GET STATIC"
+  else if (cmd_line.startsWith("GET STATIC")) {
+    PID_Params s = _app_mode->get_static_pid_scale();
+    snprintf(tx_buffer, sizeof(tx_buffer),
+             "[OK] Static Scale: P=%.3f, I=%.3f, D=%.3f\n", s.p, s.i, s.d);
+    response_stream.print(tx_buffer);
   }
 }

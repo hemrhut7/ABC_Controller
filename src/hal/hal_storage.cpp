@@ -20,9 +20,16 @@ void ConfigStore::reset_defaults() {
     // 設定預設 PID 參數 (從 config.h 讀取)
     data.motor = {PARM_PID_KP_MOTOR, PARM_PID_KI_MOTOR, PARM_PID_KD_MOTOR};
     data.pitch = {PARM_PID_KP_ANGLE, PARM_PID_KI_ANGLE, PARM_PID_KD_ANGLE};
-    data.rate  = {1.5f, 8.0f, 0.04f}; // Note: config.h didn't have RATE defaults visible, but others are critical
+    data.rate  = {PARM_PID_KP_RATE, PARM_PID_KI_RATE, PARM_PID_KD_RATE};
     data.steer   = {PARM_PID_KP_STEER, PARM_PID_KI_STEER, PARM_PID_KD_STEER};
     data.velocity = {PARM_PID_KP_VELOCITY, PARM_PID_KI_VELOCITY, PARM_PID_KD_VELOCITY};
+
+    data.lpf_freq[0] = PARM_LPF_CUTOFF_FREQ_VELOCITY;
+    data.lpf_freq[1] = PARM_LPF_CUTOFF_FREQ_STEER;
+    data.lpf_freq[2] = PARM_LPF_CUTOFF_FREQ_GYRO_Z;
+    data.lpf_freq[3] = PARM_LPF_CUTOFF_FREQ_CURRENT_VELOCITY;
+
+    data.static_velocity_scale = {1.0f, 1.0f, 1.0f};
 
     save_config(); // 寫入預設值
 }
@@ -40,9 +47,19 @@ void ConfigStore::load_config() {
                isnan(data.pitch.p) || isnan(data.pitch.i) || isnan(data.pitch.d) ||
                isnan(data.rate.p) || isnan(data.rate.i) || isnan(data.rate.d) ||
                isnan(data.steer.p) || isnan(data.steer.i) || isnan(data.steer.d) ||
-               isnan(data.velocity.p) || isnan(data.velocity.i) || isnan(data.velocity.d)) {
-        Serial.println("Config invalid (contains NaN), resetting to defaults...");
+               isnan(data.velocity.p) || isnan(data.velocity.i) || isnan(data.velocity.d) ||
+               isnan(data.static_velocity_scale.p) || isnan(data.static_velocity_scale.i) || isnan(data.static_velocity_scale.d) ||
+               data.static_velocity_scale.p < 0.0f || data.static_velocity_scale.i < 0.0f || data.static_velocity_scale.d < 0.0f) {
+        Serial.println("Config invalid (contains NaN or invalid values), resetting to defaults...");
         needs_reset = true;
+    } else {
+        for (int i = 0; i < 4; i++) {
+            if (isnan(data.lpf_freq[i]) || isinf(data.lpf_freq[i]) || data.lpf_freq[i] <= 0.0f || data.lpf_freq[i] > 500.0f) {
+                Serial.println("Config invalid (LPF freq error), resetting to defaults...");
+                needs_reset = true;
+                break;
+            }
+        }
     }
 
     if (needs_reset) {

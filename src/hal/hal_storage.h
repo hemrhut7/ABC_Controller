@@ -19,6 +19,12 @@ struct SystemConfig {
     PID_Params rate;
     PID_Params steer;
     PID_Params velocity;
+
+    // 低通濾波器截止頻率 (Hz)
+    float lpf_freq[4]; // 4 = LPF_ID_COUNT
+
+    // 靜止狀態 Velocity PID 倍率
+    PID_Params static_velocity_scale;
 };
 
 class ConfigStore {
@@ -41,7 +47,7 @@ public:
     SystemConfig data;
 
 private:
-    const uint32_t CONFIG_MAGIC = 0xCAFEBAAB; // 識別碼 (已更新以強制重置舊設定)
+    const uint32_t CONFIG_MAGIC = 0xCAFEBAAC; // 識別碼 (已更新以強制重置舊設定)
     const int EEPROM_ADDR = 0;                // 起始位址
     bool _dirty = false;
 };
