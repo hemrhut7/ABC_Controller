@@ -153,6 +153,21 @@ constexpr float GYRO_CAL_B0  = 0.013262f;
 constexpr float GYRO_CAL_B1  = -0.026f;
 constexpr float GYRO_CAL_B2  = 0.004840951f;
 
+// Magnetometer Calibration Parameters (Hard Iron & Soft Iron)
+constexpr float MAG_CAL_R00 = 1.29079706f;
+constexpr float MAG_CAL_R01 = -0.02980506f;
+constexpr float MAG_CAL_R02 = 0.07661389f;
+constexpr float MAG_CAL_R10 = -0.02980506f;
+constexpr float MAG_CAL_R11 = 1.18896187f;
+constexpr float MAG_CAL_R12 = 0.06117371f;
+constexpr float MAG_CAL_R20 = 0.07661389f;
+constexpr float MAG_CAL_R21 = 0.06117371f;
+constexpr float MAG_CAL_R22 = 0.80646185f;
+constexpr float MAG_CAL_B0  = 2.08575625f;
+constexpr float MAG_CAL_B1  = -7.88591127f;
+constexpr float MAG_CAL_B2  = -16.47356713f;
+
+
 void hal_imu_init() {
     i2c_mutex = xSemaphoreCreateMutex();
     if (!Wire.begin(IMU_SDA_PIN, IMU_SCL_PIN, 400000)) {
@@ -358,9 +373,19 @@ bool hal_imu_mag_read(mag_data_t *data) {
         int16_t mz = (int16_t)(buf[6] << 8 | buf[5]);
         
         // AK09916 resolution is 0.15 uT per LSB
-        data->mag[0] = (float)mx * 0.15f;
-        data->mag[1] = (float)my * 0.15f;
-        data->mag[2] = (float)mz * 0.15f;
+        float raw_x = (float)mx * 0.15f;
+        float raw_y = (float)my * 0.15f;
+        float raw_z = (float)mz * 0.15f;
+
+        // Hard iron (bias) subtraction
+        float dx = raw_x - MAG_CAL_B0;
+        float dy = raw_y - MAG_CAL_B1;
+        float dz = raw_z - MAG_CAL_B2;
+
+        // Soft iron matrix multiplication: mag_cali = soft_iron @ (mag_raw - hard_iron)
+        data->mag[0] = MAG_CAL_R00 * dx + MAG_CAL_R01 * dy + MAG_CAL_R02 * dz;
+        data->mag[1] = MAG_CAL_R10 * dx + MAG_CAL_R11 * dy + MAG_CAL_R12 * dz;
+        data->mag[2] = MAG_CAL_R20 * dx + MAG_CAL_R21 * dy + MAG_CAL_R22 * dz;
         data->timestamp = micros();
     }
     
