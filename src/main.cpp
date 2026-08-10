@@ -222,6 +222,7 @@ void setup() {
   Serial.begin(921600);
   // Serial1 (Telemetry/Script)
   Serial1.setTxBufferSize(8192);
+  Serial1.setRxBufferSize(2048);
   Serial1.begin(2000000, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
 
   config_store.begin();

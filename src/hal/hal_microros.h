@@ -84,6 +84,7 @@ private:
     uint32_t last_pub_time;
     uint32_t last_ping_check;
     uint32_t last_sync_time;
+    uint8_t ping_fail_count = 0;
 
     // Tracking variables for new data publication
     uint64_t last_imu_timestamp;

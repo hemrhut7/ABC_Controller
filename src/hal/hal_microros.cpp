@@ -36,7 +36,11 @@ extern "C" {
 
   size_t arduino_transport_read(struct uxrCustomTransport * transport, uint8_t *buf, size_t len, int timeout, uint8_t *errcode) {
     (void)errcode;
-    Serial1.setTimeout(timeout);
+    static int last_timeout = -1;
+    if (last_timeout != timeout) {
+      Serial1.setTimeout(timeout);
+      last_timeout = timeout;
+    }
     return Serial1.readBytes((char *)buf, len);
   }
 }
@@ -551,6 +555,7 @@ void HAL_MicroROS::update() {
           last_ping_check = now_ms;
           if (rmw_uros_ping_agent(10, 1) == RMW_RET_OK) {
             state = AGENT_AVAILABLE;
+            ping_fail_count = 0;
           }
         }
         break;
@@ -567,13 +572,24 @@ void HAL_MicroROS::update() {
         break;
 
       case AGENT_CONNECTED: {
-        // Check if agent is still alive (every 5 seconds)
         uint32_t now_ms = millis();
-        if (now_ms - last_ping_check > 1000) {
+        
+        // check the healthy of connect once per 2 seconds.
+        if (now_ms - last_ping_check > 2000) {
           last_ping_check = now_ms;
-          if (rmw_uros_ping_agent(10, 1) != RMW_RET_OK) {
-            state = AGENT_DISCONNECTED;
-            break;
+          
+          // 將 Timeout 放寬至 50ms，並允許重試 2 次
+          static uint8_t ping_fail_count = 0;
+          if (rmw_uros_ping_agent(50, 2) == RMW_RET_OK) {
+            ping_fail_count = 0; // if ping successfully, reset ping_fail_count
+          } else {
+            ping_fail_count++;
+            // Only failed with 3 continuously ping checking
+            if (ping_fail_count >= 3) {
+              state = AGENT_DISCONNECTED;
+              ping_fail_count = 0;
+              break;
+            }
           }
         }
 
@@ -586,7 +602,7 @@ void HAL_MicroROS::update() {
         // Process system state queue
         process_system_state();
 
-        // Spin executor with 0 timeout for best effort
+        // Spin executor
         rclc_executor_spin_some(&uros_executor, RCL_MS_TO_NS(0));
         break;
       }
