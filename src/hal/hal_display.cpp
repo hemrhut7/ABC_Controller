@@ -1,4 +1,5 @@
 #include "hal_display.h"
+#include "hal_battery.h"
 
 HAL_Display::HAL_Display(uint16_t w, uint16_t h) 
     : _w(w), _h(h) {
@@ -122,11 +123,12 @@ void HAL_Display::update(Mode_t current_mode, Mode_t pending_mode, float battery
         _gfx->fillRect(10, 110, 300, 40, BLACK); // Clear battery area (moved down slightly)
         _gfx->setTextSize(4);
         _gfx->setCursor(10, 110);
-        if (battery_v < 11.0f) _gfx->setTextColor(RED);
-        else if (battery_v < 11.5f) _gfx->setTextColor(ORANGE);
+        uint8_t pct = HAL_Battery::voltage_to_percentage(battery_v);
+        if (pct <= 20) _gfx->setTextColor(RED);
+        else if (pct <= 50) _gfx->setTextColor(ORANGE);
         else _gfx->setTextColor(GREEN);
-        _gfx->print(battery_v, 1);
-        _gfx->print(F(" V"));
+        _gfx->print(pct);
+        _gfx->print(F("%"));
     }
 
     // WiFi Status (Circle + IP)

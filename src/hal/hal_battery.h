@@ -7,6 +7,11 @@
 #define BAT_V_SLOPE   0.00680089f
 #define BAT_V_OFFSET  3.43306268f
 
+typedef struct {
+    float voltage;
+    uint8_t percentage;
+} BatteryPoint;
+
 class HAL_Battery {
 public:
     /**
@@ -32,6 +37,19 @@ public:
      * @return float filtered voltage in Volts
      */
     float get_voltage() const { return _voltage; }
+
+    /**
+     * @brief Get the battery percentage
+     * @return uint8_t battery percentage (0-100)
+     */
+    uint8_t get_percentage() const { return voltage_to_percentage(_voltage); }
+
+    /**
+     * @brief Convert voltage to battery percentage using LUT linear interpolation
+     * @param voltage Input voltage in Volts
+     * @return uint8_t battery percentage (0-100)
+     */
+    static uint8_t voltage_to_percentage(float voltage);
 
 private:
     uint8_t _pin;
